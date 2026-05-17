@@ -842,17 +842,34 @@ final class CanvasViewportView: NSView {
                 }
                 lastSnapActive = snapActive
             } else {
-                // 普通拖拽：对齐到 16px 画布网格，每跨格触发触觉反馈
-                dragGuidelines = []
-                let snapped = snapToGrid(newOrigin)
-                let gridChanged = snapped != lastSnappedGridOrigin
-                newOrigin = snapped
-                newFrame = CGRect(origin: newOrigin, size: startFrame.size)
-                if gridChanged && lastSnappedGridOrigin != nil {
-                    NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+                // 普通拖拽：先尝试吸附到相邻节点边缘，无相邻节点则回落到 16px 网格
+                let otherFrames = nodeCanvasFrames
+                    .filter { $0.key != nodeId }
+                    .map { $0.value }
+                let (nodeSnapped, guidelines) = TileSnapping.snap(
+                    draggingFrame: newFrame,
+                    against: otherFrames
+                )
+                let nodeSnapActive = nodeSnapped != newOrigin
+                if nodeSnapActive {
+                    newOrigin = nodeSnapped
+                    dragGuidelines = guidelines
+                    if !lastSnapActive {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                    lastSnapActive = true
+                } else {
+                    dragGuidelines = []
+                    let gridSnapped = snapToGrid(newOrigin, size: startFrame.size)
+                    let gridChanged = gridSnapped != lastSnappedGridOrigin
+                    newOrigin = gridSnapped
+                    if gridChanged && lastSnappedGridOrigin != nil {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+                    }
+                    lastSnappedGridOrigin = gridSnapped
+                    lastSnapActive = false
                 }
-                lastSnappedGridOrigin = snapped
-                lastSnapActive = false
+                newFrame = CGRect(origin: newOrigin, size: startFrame.size)
             }
 
             // 直接更新屏幕 frame 和画布坐标缓存（禁用隐式动画，不触发 layout()）
@@ -865,18 +882,29 @@ final class CanvasViewportView: NSView {
         }
     }
 
-    /// 将画布坐标吸附到背景网格线（与 drawLineGrid 使用的坐标系一致）
-    private func snapToGrid(_ point: CGPoint) -> CGPoint {
+    /// 将节点 frame 的四条边吸附到背景网格线（与 drawLineGrid 使用的坐标系一致）
+    /// 分别对 left/right/top/bottom 四边取整，选择位移量最小的那条边对齐
+    private func snapToGrid(_ origin: CGPoint, size: CGSize) -> CGPoint {
         let grid: CGFloat = 16
-        // 网格线位于 canvasOrigin + n*16 处，相当于相对 canvasOrigin 取 16 的整数倍
-        let relX = point.x - canvasOrigin.x
-        let relY = point.y - canvasOrigin.y
-        let snappedRelX = (relX / grid).rounded() * grid
-        let snappedRelY = (relY / grid).rounded() * grid
-        return CGPoint(
-            x: canvasOrigin.x + snappedRelX,
-            y: canvasOrigin.y + snappedRelY
-        )
+
+        let left   = origin.x
+        let right  = origin.x + size.width
+        let bottom = origin.y
+        let top    = origin.y + size.height
+
+        let snappedLeft   = (left   / grid).rounded() * grid
+        let snappedRight  = (right  / grid).rounded() * grid
+        let snappedBottom = (bottom / grid).rounded() * grid
+        let snappedTop    = (top    / grid).rounded() * grid
+
+        let dx = abs(snappedLeft - left) <= abs(snappedRight - right)
+            ? snappedLeft - left
+            : snappedRight - right
+        let dy = abs(snappedBottom - bottom) <= abs(snappedTop - top)
+            ? snappedBottom - bottom
+            : snappedTop - top
+
+        return CGPoint(x: origin.x + dx, y: origin.y + dy)
     }
 
     override func mouseUp(with event: NSEvent) {

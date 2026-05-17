@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Build Universal Binary
+        run: |
+          xcodebuild \
+            -scheme open-maestri \
+            -configuration Release \
+            -archivePath build/open-maestri.xcarchive \
+            archive \
+            ARCHS="x86_64 arm64" \
+            ONLY_ACTIVE_ARCH=NO \
+            SYMROOT=$(pwd)/build \
+            OBJROOT=$(pwd)/build/obj
+
+      - name: Export and Sign
+        run: |
+          # Story 11.2 实现代码签名和公证步骤
+          echo "Signing and notarization to be implemented in Story 11.2"
+
+      - name: Create DMG
+        run: |
+          # Story 11.2 实现 DMG 创建
+          echo "DMG creation to be implemented in Story 11.2"
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            build/*.dmg
+            appcast.xml
