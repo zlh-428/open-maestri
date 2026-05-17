@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+out/
+build/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Electron builder
+app-builds/
+
+# Claude Code runtime
+.claude/
+memory/
+
+# Local-only docs and AI tooling artifacts
+docs/
+_bmad/
+_bmad-output/
+design-artifacts/
+
+# Xcode
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+DerivedData/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+*.moved-aside
+
+# SPM
+.build/
+.swiftpm/
+
+# Swift compiler intermediates (should not appear in root)
+*.d
+*.dia
+*.o
+*.swiftdeps
+*.swiftdeps~
+
+# Backup files
+*.omaestribak

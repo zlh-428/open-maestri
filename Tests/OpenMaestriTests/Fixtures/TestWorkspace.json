@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "type": "workspace",
+  "payload": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "name": "Test Workspace",
+    "nodes": [],
+    "connections": [],
+    "noteConnections": [],
+    "portalConnections": [],
+    "portalToPortalConnections": [],
+    "canvasOrigin": {"x": 9800, "y": 8500},
+    "canvasZoom": 1.0,
+    "workingDirectory": "/tmp/test",
+    "createdAt": "2026-05-16T00:00:00Z",
+    "lastModifiedAt": "2026-05-16T00:00:00Z"
+  }
+}
