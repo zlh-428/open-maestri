@@ -182,11 +182,6 @@ class BaseNodeView: NSView {
         } else {
             onFocusRequested?()
             onActivated?()
-            // 通知 canvas 层准备拖动
-            if let canvas = superview as? CanvasViewportView {
-                let canvasLoc = canvas.convert(event.locationInWindow, from: nil)
-                canvas.beginNodeDrag(nodeId: nodeId, screenLoc: canvasLoc)
-            }
         }
     }
 
@@ -416,10 +411,6 @@ final class ContentEventRouterView: NSView {
         } else {
             node.onFocusRequested?()
             node.onActivated?()
-            if let canvas = node.superview as? CanvasViewportView {
-                let canvasLoc = canvas.convert(event.locationInWindow, from: nil)
-                canvas.beginNodeDrag(nodeId: node.nodeId, screenLoc: canvasLoc)
-            }
         }
     }
 
