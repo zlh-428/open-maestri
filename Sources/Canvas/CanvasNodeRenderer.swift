@@ -188,22 +188,36 @@ final class CanvasNodeRenderer {
         // 使用 tc.id 作为 terminal id（TerminalManager 的 key），tc.id 在 JSON 中持久化
         let terminalId = tc.id
 
-        // 在 contentView 内嵌真实 PTY
-        var terminalEmbedded = TerminalEmbeddedView(
+        // 直接用 SwiftTermProvider 创建 LocalProcessTerminalView，跳过 NSHostingView
+        // NSHostingView 会拦截键盘事件给 SwiftUI 焦点系统，导致终端无法接收键盘输入
+        let provider = SwiftTermProvider(
             terminalId: terminalId,
             command: tc.command,
             workingDirectory: tc.workingDirectory
         )
-        terminalEmbedded.workspaceId = workspaceId
-        let host = NSHostingView(rootView: terminalEmbedded)
-        host.translatesAutoresizingMaskIntoConstraints = false
-        nodeView.contentView.addSubview(host)
+        provider.serverPort = InterAgentServer.shared.port
+        provider.workspaceId = workspaceId
+        let termView = provider.start(in: .zero)
+        termView.translatesAutoresizingMaskIntoConstraints = false
+        nodeView.contentView.addSubview(termView)
         NSLayoutConstraint.activate([
-            host.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-            host.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-            host.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-            host.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
+            termView.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
+            termView.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
+            termView.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
+            termView.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
         ])
+
+        // 绑定 output 回调（与原 TerminalEmbeddedView.makeNSView 逻辑一致）
+        if let session = TerminalManager.shared.terminals[terminalId] {
+            provider.onOutput = { text in
+                Task { @MainActor in session.recordOutput(text) }
+                provider.recordOutputForScrollback(text)
+            }
+        }
+        TerminalProviderRegistry.shared.register(terminalId: terminalId, provider: provider)
+
+        // PTY resize：contentView 尺寸变化时更新行列数
+        termView.autoresizingMask = [.width, .height]
 
         // 确保 TerminalManager 有对应会话
         if TerminalManager.shared.terminals[tc.id] == nil {
@@ -233,21 +247,15 @@ final class CanvasNodeRenderer {
             )
         }
 
-        // 键盘焦点透传：点击终端节点时把焦点传给 LocalProcessTerminalView（NSTextInputClient）
-        // 必须找到真正的 LocalProcessTerminalView，而不是 NSHostingView 包装层；
-        // 否则 NSHostingView 成为 first responder 后字符输入走不到 TSM 协议栈。
-        nodeView.onFocusRequested = { [weak host] in
-            guard let hostView = host else { return }
-            // 深度优先搜索 NSHostingView 子树内第一个 LocalProcessTerminalView
-            func findTerminalView(in view: NSView) -> NSView? {
-                if NSStringFromClass(type(of: view)).contains("LocalProcessTerminalView") { return view }
-                for sub in view.subviews {
-                    if let found = findTerminalView(in: sub) { return found }
-                }
-                return nil
+        // 键盘焦点透传：直接让 LocalProcessTerminalView 成为 firstResponder
+        let focusTermId = tc.id
+        nodeView.onFocusRequested = {
+            guard let tv = TerminalProviderRegistry.shared.provider(for: focusTermId)?.terminalView else {
+                print("[Focus] terminalView not found for \(focusTermId)")
+                return
             }
-            let target = findTerminalView(in: hostView) ?? hostView
-            hostView.window?.makeFirstResponder(target)
+            let result = tv.window?.makeFirstResponder(tv)
+            print("[Focus] makeFirstResponder result=\(result ?? false), firstResponder=\(type(of: tv.window?.firstResponder))")
         }
 
         // 滚动锁定回调：右键菜单切换时同步到 SwiftTermProvider
@@ -516,7 +524,7 @@ final class CanvasNodeRenderer {
         }
 
         // 点击节点时通知画布更新选中状态
-        nodeView.onNodeClicked = { [weak self] event in
+        nodeView.onNodeClicked = { [weak self, weak nodeView] event in
             guard let canvas = self?.canvas else { return }
             let nodeId = node.id
             if event.modifierFlags.contains(.command) {
@@ -527,7 +535,7 @@ final class CanvasNodeRenderer {
                     canvas.selectedNodeIds.insert(nodeId)
                 }
             } else {
-                // 普通点击：单选
+                // 普通点击：单选；焦点转移由 updateSelectionVisuals 统一处理
                 canvas.selectedNodeIds = [nodeId]
             }
         }

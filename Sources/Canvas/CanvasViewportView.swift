@@ -149,6 +149,8 @@ final class CanvasViewportView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
+        print("[Canvas] becomeFirstResponder called, callStack:")
+        Thread.callStackSymbols.prefix(8).forEach { print("  \($0)") }
         return true
     }
 
@@ -175,6 +177,17 @@ final class CanvasViewportView: NSView {
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
             guard let self else { return event }
             return self.routeScrollEvent(event)
+        }
+        // 调试：监控所有键盘事件，确认 keyDown 到达哪个视图
+        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            print("[KeyMonitor] keyDown: keyCode=\(event.keyCode) chars=\(event.characters ?? "") firstResponder=\(type(of: NSApp.keyWindow?.firstResponder)) isKeyWindow=\(NSApp.keyWindow?.isKeyWindow ?? false)")
+            return event
+        }
+        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyUp]) { event in
+            if event.type == .keyUp {
+                print("[KeyMonitor] keyUp: keyCode=\(event.keyCode) isKeyWindow=\(NSApp.keyWindow?.isKeyWindow ?? false)")
+            }
+            return event
         }
     }
 
@@ -344,14 +357,20 @@ final class CanvasViewportView: NSView {
     // MARK: - 选中视觉更新
 
     private func updateSelectionVisuals() {
+        print("[Selection] updateSelectionVisuals, selected=\(selectedNodeIds), currentFirstResponder=\(type(of: window?.firstResponder)) \(String(describing: window?.firstResponder))")
         for (id, view) in nodeViews {
             let selected = selectedNodeIds.contains(id)
             if let tv = view as? TerminalNodeView {
                 tv.isSelected = selected
             }
-            // 更新所有节点的 isNodeSelected 以控制滚动事件穿透
             if let baseNode = view as? BaseNodeView {
                 baseNode.isNodeSelected = selected
+                // 单选时将键盘焦点转给节点内容（终端需要成为 firstResponder 才能接收输入）
+                if selected && selectedNodeIds.count == 1 {
+                    print("[Selection] calling onFocusRequested for node \(id)")
+                    baseNode.onFocusRequested?()
+                    print("[Selection] after onFocusRequested, firstResponder=\(type(of: window?.firstResponder)) \(String(describing: window?.firstResponder))")
+                }
             }
         }
     }
@@ -368,6 +387,7 @@ final class CanvasViewportView: NSView {
     // MARK: - 键盘事件
 
     override func keyDown(with event: NSEvent) {
+        print("[Canvas] keyDown intercepted: keyCode=\(event.keyCode) chars=\(event.characters ?? "") firstResponder=\(type(of: window?.firstResponder))")
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers ?? ""
 
