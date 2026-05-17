@@ -291,25 +291,6 @@ final class CanvasViewportView: NSView {
         )
     }
 
-    /// 计算节点的视觉 frame（屏幕上的实际位置和尺寸，含 transform 缩放）
-    func visualFrame(of view: NSView) -> CGRect {
-        CGRect(
-            origin: view.frame.origin,
-            size: CGSize(width: view.frame.width * zoom, height: view.frame.height * zoom)
-        )
-    }
-
-    /// 对节点视图施加 zoom 缩放变换（等比缩放节点内容）
-    /// anchorPoint 设为 (0,0)（macOS 坐标系左下角），确保缩放后 frame.origin 不偏移
-    func applyNodeTransform(_ view: NSView) {
-        guard view.wantsLayer, let layer = view.layer else { return }
-        // 将 anchorPoint 固定在左下角，避免缩放后位置偏移
-        if layer.anchorPoint != .zero {
-            layer.anchorPoint = .zero
-        }
-        layer.transform = CATransform3DMakeScale(zoom, zoom, 1)
-    }
-
     // MARK: - 布局
 
     override func layout() {
@@ -319,13 +300,9 @@ final class CanvasViewportView: NSView {
         for (id, view) in nodeViews {
             if id == draggingNodeId { continue }
             if let canvasFrame = nodeCanvasFrames[id] {
-                // 节点 frame 使用画布原始尺寸（未缩放），通过 layer transform 做等比缩放
-                let screenOrigin = canvasToScreen(canvasFrame.origin)
-                view.frame = CGRect(
-                    origin: screenOrigin,
-                    size: canvasFrame.size  // 原始尺寸，transform 负责视觉缩放
-                )
-                applyNodeTransform(view)
+                // frame = 缩放后的屏幕尺寸，bounds = 画布原始尺寸
+                view.frame = canvasRectToScreen(canvasFrame)
+                view.setBoundsSize(canvasFrame.size)
             }
         }
     }
@@ -336,10 +313,6 @@ final class CanvasViewportView: NSView {
     // MARK: - 节点管理
 
     func addNodeView(_ view: NSView, id: UUID, canvasFrame: CGRect) {
-        // 首次添加时确保 anchorPoint 在 (0,0)，避免后续 transform 偏移
-        if view.wantsLayer, let layer = view.layer {
-            layer.anchorPoint = .zero
-        }
         nodeViews[id] = view
         addSubview(view)
         updateNodeFrame(id: id, canvasFrame: canvasFrame)
@@ -354,10 +327,9 @@ final class CanvasViewportView: NSView {
     func updateNodeFrame(id: UUID, canvasFrame: CGRect) {
         guard let view = nodeViews[id] else { return }
         nodeCanvasFrames[id] = canvasFrame
-        // 节点 frame 使用画布原始尺寸，通过 layer transform 做视觉缩放
-        let screenOrigin = canvasToScreen(canvasFrame.origin)
-        view.frame = CGRect(origin: screenOrigin, size: canvasFrame.size)
-        applyNodeTransform(view)
+        // frame = 缩放后屏幕尺寸，bounds = 画布原始尺寸（子视图以原始比例 layout）
+        view.frame = canvasRectToScreen(canvasFrame)
+        view.setBoundsSize(canvasFrame.size)
     }
 
     override func hitTest(_ point: CGPoint) -> NSView? {
@@ -368,14 +340,9 @@ final class CanvasViewportView: NSView {
                 }
                 continue
             }
-            // view.frame 是未缩放的画布尺寸，视觉上被 transform 缩放
-            // 计算缩放后的视觉 frame 来做点击检测
-            let visualFrame = CGRect(
-                origin: view.frame.origin,
-                size: CGSize(width: view.frame.width * zoom, height: view.frame.height * zoom)
-            )
-            guard visualFrame.contains(point) else { continue }
-            // 将画布坐标系中的点映射回节点 view 的本地坐标系（需除以 zoom 还原 transform）
+            // frame 已是缩放后的屏幕尺寸，直接做 contains 检测
+            guard view.frame.contains(point) else { continue }
+            // 将屏幕坐标映射回节点 bounds 坐标系（bounds 是画布原始尺寸）
             let localX = (point.x - view.frame.minX) / zoom
             let localY = (point.y - view.frame.minY) / zoom
             return deepHitTest(in: view, at: CGPoint(x: localX, y: localY))
@@ -407,7 +374,7 @@ final class CanvasViewportView: NSView {
     private func reportSelectionChange() {
         guard let callback = onSelectionChanged else { return }
         if let firstId = selectedNodeIds.first, let view = nodeViews[firstId] {
-            callback(selectedNodeIds, visualFrame(of: view))
+            callback(selectedNodeIds, view.frame)
         } else {
             callback(selectedNodeIds, nil)
         }
@@ -668,8 +635,7 @@ final class CanvasViewportView: NSView {
 
     /// 立即（无动画）跳转到指定视图（内部同步使用）
     private func scrollToView(_ view: NSView) {
-        let vf = visualFrame(of: view)
-        let screenCenter = CGPoint(x: vf.midX, y: vf.midY)
+        let screenCenter = CGPoint(x: view.frame.midX, y: view.frame.midY)
         let canvasCenter = screenToCanvas(screenCenter)
         let newOriginX = canvasCenter.x - (bounds.width / 2) / zoom
         let newOriginY = canvasCenter.y - (bounds.height / 2) / zoom
@@ -679,8 +645,7 @@ final class CanvasViewportView: NSView {
 
     /// 平滑动画跳转到指定视图（NSAnimationContext，duration=0.35s easeInOut）
     func scrollToViewAnimated(_ view: NSView, duration: TimeInterval = 0.35) {
-        let vf = visualFrame(of: view)
-        let screenCenter = CGPoint(x: vf.midX, y: vf.midY)
+        let screenCenter = CGPoint(x: view.frame.midX, y: view.frame.midY)
         let canvasCenter = screenToCanvas(screenCenter)
         let targetOriginX = canvasCenter.x - (bounds.width / 2) / zoom
         let targetOriginY = canvasCenter.y - (bounds.height / 2) / zoom
@@ -926,9 +891,8 @@ final class CanvasViewportView: NSView {
             // 直接更新屏幕 frame 和画布坐标缓存（禁用隐式动画，不触发 layout()）
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            let screenOrigin = canvasToScreen(newFrame.origin)
-            view.frame = CGRect(origin: screenOrigin, size: newFrame.size)
-            applyNodeTransform(view)
+            view.frame = canvasRectToScreen(newFrame)
+            view.setBoundsSize(newFrame.size)
             CATransaction.commit()
             nodeCanvasFrames[nodeId] = newFrame
         }
@@ -1244,8 +1208,7 @@ final class CanvasViewportView: NSView {
         guard let fromId = connectingFromNodeId,
               let fromView = nodeViews[fromId],
               let toPoint = connectionDragPoint else { return }
-        let vf = visualFrame(of: fromView)
-        let fromPoint = CGPoint(x: vf.midX, y: vf.midY)
+        let fromPoint = CGPoint(x: fromView.frame.midX, y: fromView.frame.midY)
         let path = NSBezierPath()
         path.move(to: fromPoint)
         path.line(to: toPoint)
@@ -1256,7 +1219,7 @@ final class CanvasViewportView: NSView {
 
         // 起点节点高亮
         NSColor.systemBlue.withAlphaComponent(0.3).setFill()
-        let dot = NSBezierPath(ovalIn: vf.insetBy(dx: -3, dy: -3))
+        let dot = NSBezierPath(ovalIn: fromView.frame.insetBy(dx: -3, dy: -3))
         dot.fill()
     }
 
