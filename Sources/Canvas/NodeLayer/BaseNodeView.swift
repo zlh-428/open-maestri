@@ -156,6 +156,11 @@ class BaseNodeView: NSView {
         resizeHandle.frame = CGRect(x: bounds.width - hs, y: 0, width: hs, height: hs)
         contentView.needsLayout = true
         contentView.layoutSubtreeIfNeeded()
+
+        // layout 阶段 frame 和 bounds 均已同步，此时刷新选中虚线框最可靠
+        if isNodeSelected {
+            updateSelectionOverlay()
+        }
     }
 
     // MARK: - 回调（Option 拖拽复制）
@@ -206,6 +211,10 @@ class BaseNodeView: NSView {
             let newHeight = max(startFrame.height - dy, Self.minNodeHeight * zoom)
             let newY = startFrame.maxY - newHeight
             frame = CGRect(x: startFrame.origin.x, y: newY, width: newWidth, height: newHeight)
+            // 同步 bounds 为画布原始尺寸，确保子视图 layout 正确
+            setBoundsSize(CGSize(width: newWidth / zoom, height: newHeight / zoom))
+            // frame 和 bounds 已同步，手动刷新选中虚线框（resize 不经过 layout()）
+            if isNodeSelected { updateSelectionOverlay() }
         } else {
             // 拖动开始时安装拦截层，防止快速拖动时内容区消费事件
             installDragIntercept()
@@ -293,7 +302,9 @@ class BaseNodeView: NSView {
                 layer?.addSublayer(dash)
                 selectionDashLayer = dash
             }
-            // 边框在节点外侧 8px 的位置
+            // selectionDashLayer 是 self.layer 的 sublayer，工作在 CALayer 坐标系中。
+            // layer-backed NSView 中 layer.bounds == view.bounds（含 setBoundsSize 的效果），
+            // 所以 sublayer 的 path 和 frame 应使用 view.bounds。
             let gap: CGFloat = 8
             let selectionRect = bounds.insetBy(dx: -gap, dy: -gap)
             selectionDashLayer?.path = CGPath(
@@ -309,14 +320,8 @@ class BaseNodeView: NSView {
         }
     }
 
-    override var frame: NSRect {
-        didSet {
-            if isNodeSelected {
-                // frame 改变时更新选中边框路径
-                updateSelectionOverlay()
-            }
-        }
-    }
+    // 注意：不在 frame/bounds didSet 中更新虚线框，因为 setBoundsSize 和 frame 赋值
+    // 往往不是原子操作，didSet 触发时两者可能不同步。改由 layout() 统一更新。
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
