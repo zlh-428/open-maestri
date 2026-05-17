@@ -155,7 +155,6 @@ class BaseNodeView: NSView {
         contentEventRouter.frame = contentView.frame
         resizeHandle.frame = CGRect(x: bounds.width - hs, y: 0, width: hs, height: hs)
         contentView.needsLayout = true
-        contentView.layoutSubtreeIfNeeded()
 
         // layout 阶段 frame 和 bounds 均已同步，此时刷新选中虚线框最可靠
         if isNodeSelected {

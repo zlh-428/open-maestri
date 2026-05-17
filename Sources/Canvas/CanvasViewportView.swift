@@ -31,6 +31,8 @@ final class CanvasViewportView: NSView {
 
     /// 节点视图映射（nodeId → NSView）
     private(set) var nodeViews: [UUID: NSView] = [:]
+    /// 反向映射（NSView 指针 → nodeId），用于 O(1) 反查（hitTest 热路径）
+    private var viewToNodeId: [ObjectIdentifier: UUID] = [:]
 
     /// 当前选中的节点 ID 集合
     var selectedNodeIds: Set<UUID> = [] {
@@ -104,39 +106,43 @@ final class CanvasViewportView: NSView {
     private func setup() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.white.cgColor
-        // 启用 layer-backed drawing 以提升滚动/缩放流畅度
         layerContentsRedrawPolicy = .onSetNeedsDisplay
         canDrawConcurrently = true
-        // 确保接收触摸板手势（pinch-to-zoom 需要 .indirect）
         allowedTouchTypes = [.indirect, .direct]
-        // 注册 Finder 文件拖入支持
         registerDragTypes()
-        // 监听 Minimap 平滑跳转通知
-        NotificationCenter.default.addObserver(
-            forName: .canvasJumpToOrigin,
-            object: nil,
-            queue: .main
-        ) { [weak self] notif in
-            guard let self, let target = notif.userInfo?["origin"] as? CGPoint else { return }
-            self.animateOriginTo(target)
-        }
-        // 监听工具栏/按钮缩放通知（以视口中心为锚点）
-        NotificationCenter.default.addObserver(
-            forName: .canvasZoomIn, object: nil, queue: .main
-        ) { [weak self] _ in self?.zoomCanvas(delta: +0.25) }
-        NotificationCenter.default.addObserver(
-            forName: .canvasZoomOut, object: nil, queue: .main
-        ) { [weak self] _ in self?.zoomCanvas(delta: -0.25) }
-        NotificationCenter.default.addObserver(
-            forName: .canvasZoomReset, object: nil, queue: .main
-        ) { [weak self] _ in self?.zoomCanvas(toAbsolute: 1.0) }
-        NotificationCenter.default.addObserver(
-            forName: .toggleCanvasZoom, object: nil, queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            let target: CGFloat = abs(zoom - 1.0) < 0.05 ? 0.5 : 1.0
-            self.zoomCanvas(toAbsolute: target)
-        }
+        setupNotificationObservers()
+    }
+
+    private func setupNotificationObservers() {
+        let nc = NotificationCenter.default
+        notificationObservers.append(
+            nc.addObserver(forName: .canvasJumpToOrigin, object: nil, queue: .main) { [weak self] notif in
+                guard let self, let target = notif.userInfo?["origin"] as? CGPoint else { return }
+                self.animateOriginTo(target)
+            }
+        )
+        notificationObservers.append(
+            nc.addObserver(forName: .canvasZoomIn, object: nil, queue: .main) { [weak self] _ in
+                self?.zoomCanvas(delta: +Constants.canvasZoomStep)
+            }
+        )
+        notificationObservers.append(
+            nc.addObserver(forName: .canvasZoomOut, object: nil, queue: .main) { [weak self] _ in
+                self?.zoomCanvas(delta: -Constants.canvasZoomStep)
+            }
+        )
+        notificationObservers.append(
+            nc.addObserver(forName: .canvasZoomReset, object: nil, queue: .main) { [weak self] _ in
+                self?.zoomCanvas(toAbsolute: 1.0)
+            }
+        )
+        notificationObservers.append(
+            nc.addObserver(forName: .toggleCanvasZoom, object: nil, queue: .main) { [weak self] _ in
+                guard let self else { return }
+                let target: CGFloat = abs(zoom - 1.0) < 0.05 ? 0.5 : 1.0
+                self.zoomCanvas(toAbsolute: target)
+            }
+        )
     }
 
     /// 平滑动画跳转到指定画布原点（供 Minimap 点击等外部调用）
@@ -149,9 +155,7 @@ final class CanvasViewportView: NSView {
     override var acceptsFirstResponder: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
-        print("[Canvas] becomeFirstResponder called, callStack:")
-        Thread.callStackSymbols.prefix(8).forEach { print("  \($0)") }
-        return true
+        true
     }
 
     override func viewDidMoveToWindow() {
@@ -171,23 +175,13 @@ final class CanvasViewportView: NSView {
     /// 如果鼠标在**选中**节点上，让事件正常传递给节点内容（终端滚动等）
     /// 如果鼠标在空白区域，正常传递给画布
     private var scrollMonitor: Any?
+    private var notificationObservers: [NSObjectProtocol] = []
 
     private func installScrollEventMonitor() {
         guard scrollMonitor == nil else { return }
         scrollMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
             guard let self else { return event }
             return self.routeScrollEvent(event)
-        }
-        // 调试：监控所有键盘事件，确认 keyDown 到达哪个视图
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            print("[KeyMonitor] keyDown: keyCode=\(event.keyCode) chars=\(event.characters ?? "") firstResponder=\(type(of: NSApp.keyWindow?.firstResponder)) isKeyWindow=\(NSApp.keyWindow?.isKeyWindow ?? false)")
-            return event
-        }
-        NSEvent.addLocalMonitorForEvents(matching: [.flagsChanged, .keyUp]) { event in
-            if event.type == .keyUp {
-                print("[KeyMonitor] keyUp: keyCode=\(event.keyCode) isKeyWindow=\(NSApp.keyWindow?.isKeyWindow ?? false)")
-            }
-            return event
         }
     }
 
@@ -243,15 +237,9 @@ final class CanvasViewportView: NSView {
         return root
     }
 
-    /// 从 hitTest 返回的视图反查所属节点 ID
+    /// 从视图（或其子视图）反查所属节点 ID（O(1) 直查 + O(n) 祖先降级）
     private func nodeIdForHitView(_ hitView: NSView?) -> UUID? {
-        guard let hitView else { return nil }
-        for (id, view) in nodeViews {
-            if hitView === view || hitView.isDescendant(of: view) {
-                return id
-            }
-        }
-        return nil
+        nodeId(for: hitView)
     }
 
 
@@ -259,6 +247,8 @@ final class CanvasViewportView: NSView {
         if let monitor = scrollMonitor {
             NSEvent.removeMonitor(monitor)
         }
+        animationTimer?.invalidate()
+        notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     // MARK: - 坐标转换
@@ -321,12 +311,16 @@ final class CanvasViewportView: NSView {
 
     func addNodeView(_ view: NSView, id: UUID, canvasFrame: CGRect) {
         nodeViews[id] = view
+        viewToNodeId[ObjectIdentifier(view)] = id
         addSubview(view)
         updateNodeFrame(id: id, canvasFrame: canvasFrame)
     }
 
     func removeNodeView(id: UUID) {
-        nodeViews[id]?.removeFromSuperview()
+        if let view = nodeViews[id] {
+            viewToNodeId.removeValue(forKey: ObjectIdentifier(view))
+            view.removeFromSuperview()
+        }
         nodeViews.removeValue(forKey: id)
         nodeCanvasFrames.removeValue(forKey: id)
     }
@@ -365,7 +359,6 @@ final class CanvasViewportView: NSView {
     // MARK: - 选中视觉更新
 
     private func updateSelectionVisuals() {
-        print("[Selection] updateSelectionVisuals, selected=\(selectedNodeIds), currentFirstResponder=\(type(of: window?.firstResponder)) \(String(describing: window?.firstResponder))")
         for (id, view) in nodeViews {
             let selected = selectedNodeIds.contains(id)
             if let tv = view as? TerminalNodeView {
@@ -373,11 +366,8 @@ final class CanvasViewportView: NSView {
             }
             if let baseNode = view as? BaseNodeView {
                 baseNode.isNodeSelected = selected
-                // 单选时将键盘焦点转给节点内容（终端需要成为 firstResponder 才能接收输入）
                 if selected && selectedNodeIds.count == 1 {
-                    print("[Selection] calling onFocusRequested for node \(id)")
                     baseNode.onFocusRequested?()
-                    print("[Selection] after onFocusRequested, firstResponder=\(type(of: window?.firstResponder)) \(String(describing: window?.firstResponder))")
                 }
             }
         }
@@ -395,7 +385,6 @@ final class CanvasViewportView: NSView {
     // MARK: - 键盘事件
 
     override func keyDown(with event: NSEvent) {
-        print("[Canvas] keyDown intercepted: keyCode=\(event.keyCode) chars=\(event.characters ?? "") firstResponder=\(type(of: window?.firstResponder))")
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers ?? ""
 
@@ -433,13 +422,13 @@ final class CanvasViewportView: NSView {
         }
 
         // ⌃Tab - 切换到下一个终端节点
-        if event.keyCode == 48 /* Tab */ && flags == .control {
+        if event.keyCode == CanvasKeyCode.tab && flags == .control {
             cycleTerminalFocus(forward: true)
             return
         }
 
         // ⌃⇧Tab - 切换到上一个终端节点
-        if event.keyCode == 48 /* Tab */ && flags == [.control, .shift] {
+        if event.keyCode == CanvasKeyCode.tab && flags == [.control, .shift] {
             cycleTerminalFocus(forward: false)
             return
         }
@@ -451,7 +440,7 @@ final class CanvasViewportView: NSView {
         }
 
         // Space - 进入平移模式
-        if event.keyCode == 49 && !isSpaceHeld {
+        if event.keyCode == CanvasKeyCode.space && !isSpaceHeld {
             isSpaceHeld = true
             NSCursor.openHand.set()
             return
@@ -462,7 +451,7 @@ final class CanvasViewportView: NSView {
 
     override func keyUp(with event: NSEvent) {
         // Space 释放 - 退出平移模式
-        if event.keyCode == 49 {
+        if event.keyCode == CanvasKeyCode.space {
             isSpaceHeld = false
             spaceDragStartOrigin = nil
             spaceDragStartMouse = nil
@@ -501,7 +490,7 @@ final class CanvasViewportView: NSView {
         if flags == .command,
            let key = event.charactersIgnoringModifiers,
            key == "=" || key == "+" {
-            zoomCanvas(delta: +0.25)
+            zoomCanvas(delta: +Constants.canvasZoomStep)
             return true
         }
 
@@ -509,7 +498,7 @@ final class CanvasViewportView: NSView {
         if flags == .command,
            let key = event.charactersIgnoringModifiers,
            key == "-" {
-            zoomCanvas(delta: -0.25)
+            zoomCanvas(delta: -Constants.canvasZoomStep)
             return true
         }
 
@@ -534,23 +523,16 @@ final class CanvasViewportView: NSView {
 
     /// 以视口中心为锚点，按增量调整缩放
     private func zoomCanvas(delta: CGFloat) {
-        let newZoom = (zoom + delta).clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom)
-        guard newZoom != zoom else { return }
-        let viewCenter = CGPoint(x: bounds.midX, y: bounds.midY)
-        let canvasCenter = screenToCanvas(viewCenter)
-        zoom = newZoom
-        canvasOrigin = CGPoint(
-            x: canvasCenter.x - viewCenter.x / zoom,
-            y: canvasCenter.y - viewCenter.y / zoom
-        )
-        needsLayout = true
-        needsDisplay = true
-        notifyViewportChanged()
+        applyZoom((zoom + delta).clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom))
     }
 
     /// 以视口中心为锚点，设置绝对缩放值（如重置 100%）
     private func zoomCanvas(toAbsolute target: CGFloat) {
-        let newZoom = target.clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom)
+        applyZoom(target.clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom))
+    }
+
+    /// 以视口中心为锚点应用缩放值（内部实现）
+    private func applyZoom(_ newZoom: CGFloat) {
         guard newZoom != zoom else { return }
         let viewCenter = CGPoint(x: bounds.midX, y: bounds.midY)
         let canvasCenter = screenToCanvas(viewCenter)
@@ -613,9 +595,9 @@ final class CanvasViewportView: NSView {
             .sorted { $0.frame.minX < $1.frame.minX || ($0.frame.minX == $1.frame.minX && $0.frame.minY < $1.frame.minY) }
     }
 
-    /// 反查节点视图对应的 UUID
+    /// 反查节点视图对应的 UUID（供内部循环使用）
     private func nodeId(forView view: NSView) -> UUID? {
-        nodeViews.first(where: { $0.value === view })?.key
+        nodeId(for: view)
     }
 
     // MARK: - ⌘⇧B 滚动锁定
@@ -672,9 +654,9 @@ final class CanvasViewportView: NSView {
         animateOrigin(from: startOrigin, to: targetOrigin, startTime: startTime, duration: duration)
     }
 
+    /// 逐帧插值 canvasOrigin（easeInOut 缓动），使用 CADisplayLink 跟随屏幕刷新率（支持 120Hz ProMotion）
     /// 逐帧插值 canvasOrigin（easeInOut 缓动）
     private func animateOrigin(from: CGPoint, to: CGPoint, startTime: CFTimeInterval, duration: TimeInterval) {
-        // 取消正在进行的动画
         animationTimer?.invalidate()
         animationTimer = nil
 
@@ -683,12 +665,11 @@ final class CanvasViewportView: NSView {
             let elapsed = CACurrentMediaTime() - startTime
             let progress = min(elapsed / duration, 1.0)
             let eased = Self.easeInOut(progress)
-
-            let newX = from.x + (to.x - from.x) * eased
-            let newY = from.y + (to.y - from.y) * eased
-            self.canvasOrigin = CGPoint(x: newX, y: newY)
+            self.canvasOrigin = CGPoint(
+                x: from.x + (to.x - from.x) * eased,
+                y: from.y + (to.y - from.y) * eased
+            )
             self.notifyViewportChanged()
-
             if progress >= 1.0 {
                 t.invalidate()
                 self.animationTimer = nil
@@ -703,7 +684,6 @@ final class CanvasViewportView: NSView {
         t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
     }
 
-    /// 当前活跃的滚动动画计时器
     private var animationTimer: Timer?
 
     // MARK: - 平移模式
@@ -763,8 +743,6 @@ final class CanvasViewportView: NSView {
         lastSnapActive = false
         lastSnappedGridOrigin = nil
         didDragMove = false
-
-        print("[Drag] beginNodeDrag: nodeId=\(nodeId.uuidString.prefix(8)), screenLoc=\(screenLoc)")
 
         // 批量拖动：如果被拖动节点在选中集合中且选中集合 > 1，记录所有选中节点的初始 frame
         batchDragStartFrames.removeAll()
@@ -882,9 +860,6 @@ final class CanvasViewportView: NSView {
            let startFrame = dragStartCanvasFrame,
            let view = nodeViews[nodeId] {
 
-            if !didDragMove {
-                print("[Drag] firstDrag: nodeId=\(nodeId.uuidString.prefix(8)), loc=\(loc)")
-            }
             didDragMove = true
             let currentCanvas = screenToCanvas(loc)
             let rawDX = currentCanvas.x - startMouse.x
@@ -979,7 +954,7 @@ final class CanvasViewportView: NSView {
     /// 将节点 frame 的四条边吸附到背景网格线（与 drawLineGrid 使用的坐标系一致）
     /// 分别对 left/right/top/bottom 四边取整，选择位移量最小的那条边对齐
     private func snapToGrid(_ origin: CGPoint, size: CGSize) -> CGPoint {
-        let grid: CGFloat = 16
+        let grid = Constants.canvasGridSpacing
 
         let left   = origin.x
         let right  = origin.x + size.width
@@ -1142,10 +1117,13 @@ final class CanvasViewportView: NSView {
 
     // MARK: - 连线辅助
 
+    /// 从视图（或其子视图）反查所属节点 ID
+    /// 先尝试 O(1) 直接映射缓存，未命中时走 O(n) 祖先链遍历
     private func nodeId(for view: NSView?) -> UUID? {
         guard let v = view else { return nil }
+        if let id = viewToNodeId[ObjectIdentifier(v)] { return id }
         for (id, nodeView) in nodeViews {
-            if nodeView === v || v.isDescendant(of: nodeView) { return id }
+            if v.isDescendant(of: nodeView) { return id }
         }
         return nil
     }
@@ -1257,10 +1235,9 @@ final class CanvasViewportView: NSView {
         ctx.setFillColor(NSColor.white.cgColor)
         ctx.fill(rect)
 
-        // 网格线参数
-        let gridSpacing: CGFloat = 16 * zoom
-        let lineColor = NSColor(white: 0.90, alpha: 1).cgColor
-        let lineWidth: CGFloat = 0.5
+        let gridSpacing: CGFloat = Constants.canvasGridSpacing * zoom
+        let lineColor = Constants.canvasGridLineColor.cgColor
+        let lineWidth = Constants.canvasGridLineWidth
 
         // 计算画布偏移以保持网格与画布坐标对齐
         let offsetX = -(canvasOrigin.x * zoom).truncatingRemainder(dividingBy: gridSpacing)

@@ -12,6 +12,7 @@ final class CanvasNodeRenderer {
     private var renderedNodeIds: Set<UUID> = []
     /// 当前工作区（供节点回调使用）
     private weak var currentWorkspace: WorkspaceManager?
+    private var notificationObservers: [NSObjectProtocol] = []
     /// 当前可用角色列表（由外部在 sync 前注入）
     var rolePresets: [RolePreset] = []
 
@@ -35,25 +36,41 @@ final class CanvasNodeRenderer {
         canvas.onNodeDragEnded = { [weak self] nodeId, canvasFrame in
             guard let self else { return }
             self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: canvasFrame)
-            Task { try? await self.currentWorkspace?.save() }
+            self.saveWorkspace()
         }
         canvas.onBatchNodeDragEnded = { [weak self] finalFrames in
             guard let self else { return }
             for (nodeId, frame) in finalFrames {
                 self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: frame)
             }
-            Task { try? await self.currentWorkspace?.save() }
+            self.saveWorkspace()
+        }
+    }
+
+    private func saveWorkspace() {
+        guard let ws = currentWorkspace else { return }
+        Task {
+            do {
+                try await ws.save()
+            } catch {
+                logger.error("Failed to save workspace: \(error.localizedDescription)")
+            }
         }
     }
 
     private func observePortalReplacement() {
-        NotificationCenter.default.addObserver(
+        let observer = NotificationCenter.default.addObserver(
             forName: .portalWebViewReplaced,
             object: nil,
             queue: .main
         ) { [weak self] notif in
             self?.handlePortalWebViewReplaced(notif)
         }
+        notificationObservers.append(observer)
+    }
+
+    deinit {
+        notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     private func handlePortalWebViewReplaced(_ notif: Notification) {
@@ -67,16 +84,8 @@ final class CanvasNodeRenderer {
         }
         for (portalId, newWebView) in pairs {
             if let nodeView = portalViews[portalId] {
-                // 移除旧 WebView，添加新 WebView
                 nodeView.contentView.subviews.forEach { $0.removeFromSuperview() }
-                newWebView.translatesAutoresizingMaskIntoConstraints = false
-                nodeView.contentView.addSubview(newWebView)
-                NSLayoutConstraint.activate([
-                    newWebView.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-                    newWebView.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-                    newWebView.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-                    newWebView.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
-                ])
+                nodeView.contentView.addSubviewFillingBounds(newWebView)
             }
         }
     }
@@ -206,14 +215,7 @@ final class CanvasNodeRenderer {
         provider.serverPort = InterAgentServer.shared.port
         provider.workspaceId = workspaceId
         let termView = provider.start(in: .zero)
-        termView.translatesAutoresizingMaskIntoConstraints = false
-        nodeView.contentView.addSubview(termView)
-        NSLayoutConstraint.activate([
-            termView.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-            termView.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-            termView.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-            termView.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
-        ])
+        nodeView.contentView.addSubviewFillingBounds(termView)
 
         // 绑定 output 回调（与原 TerminalEmbeddedView.makeNSView 逻辑一致）
         if let session = TerminalManager.shared.terminals[terminalId] {
@@ -259,11 +261,9 @@ final class CanvasNodeRenderer {
         let focusTermId = tc.id
         nodeView.onFocusRequested = {
             guard let tv = TerminalProviderRegistry.shared.provider(for: focusTermId)?.terminalView else {
-                print("[Focus] terminalView not found for \(focusTermId)")
                 return
             }
-            let result = tv.window?.makeFirstResponder(tv)
-            print("[Focus] makeFirstResponder result=\(result ?? false), firstResponder=\(type(of: tv.window?.firstResponder))")
+            tv.window?.makeFirstResponder(tv)
         }
 
         // 滚动锁定回调：右键菜单切换时同步到 SwiftTermProvider
@@ -345,7 +345,11 @@ final class CanvasNodeRenderer {
         // 确保文件存在（managed 模式自动创建，custom 模式仅在文件不存在时提示）
         if !FileManager.default.fileExists(atPath: filePath) {
             if case .managed = nc.storageMode {
-                try? "".write(toFile: filePath, atomically: true, encoding: .utf8)
+                do {
+                    try "".write(toFile: filePath, atomically: true, encoding: .utf8)
+                } catch {
+                    logger.error("Failed to create note file at \(filePath): \(error.localizedDescription)")
+                }
             } else {
                 logger.warning("Custom note file not found at \(filePath)")
             }
@@ -374,7 +378,7 @@ final class CanvasNodeRenderer {
                 nc.hasCustomName = true
                 nc.fileName = newName.hasSuffix(".md") ? newName : "\(newName).md"
                 workspace.nodes[idx].content = .stickyNote(nc)
-                Task { try? await workspace.save() }
+                self.saveWorkspace()
             }
         }
         // "移动到…" 回调：物理移动 .md 文件到目标目录，更新 storageMode 为 .custom(path)
@@ -397,7 +401,7 @@ final class CanvasNodeRenderer {
                 workspace.nodes[idx].content = .stickyNote(nc)
                 // 更新 NoteRegistry
                 NoteRegistry.shared.register(name: fileName, filePath: destURL.path, nodeId: node.id)
-                Task { try? await workspace.save() }
+                self.saveWorkspace()
                 self.logger.info("Note moved to \(destURL.path)")
             } catch {
                 self.logger.error("Failed to move note: \(error.localizedDescription)")
@@ -408,15 +412,7 @@ final class CanvasNodeRenderer {
         setupLockCallback(nodeView: nodeView, node: node)
         nodeView.onClose = { [weak self] in self?.removeNode(id: node.id, from: self?.currentWorkspace) }
         vc.loadViewIfNeeded()
-        // 使用 Auto Layout 代替 frame 设置（contentView 尚未 layout）
-        vc.view.translatesAutoresizingMaskIntoConstraints = false
-        nodeView.contentView.addSubview(vc.view)
-        NSLayoutConstraint.activate([
-            vc.view.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-            vc.view.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-            vc.view.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-            vc.view.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
-        ])
+        nodeView.contentView.addSubviewFillingBounds(vc.view)
 
         return nodeView
     }
@@ -433,14 +429,7 @@ final class CanvasNodeRenderer {
             for: pc.id,
             initialURL: pc.currentURL.isEmpty ? nil : pc.currentURL
         )
-        webView.translatesAutoresizingMaskIntoConstraints = false
-        nodeView.contentView.addSubview(webView)
-        NSLayoutConstraint.activate([
-            webView.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-            webView.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-            webView.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-            webView.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
-        ])
+        nodeView.contentView.addSubviewFillingBounds(webView)
 
         portalViews[node.id] = nodeView
         setupLockCallback(nodeView: nodeView, node: node)
@@ -457,14 +446,7 @@ final class CanvasNodeRenderer {
         nodeView.isLocked = node.isLocked
 
         let outlineView = FileTreeOutlineView(rootPath: fc.rootPath)
-        outlineView.translatesAutoresizingMaskIntoConstraints = false
-        nodeView.contentView.addSubview(outlineView)
-        NSLayoutConstraint.activate([
-            outlineView.topAnchor.constraint(equalTo: nodeView.contentView.topAnchor),
-            outlineView.bottomAnchor.constraint(equalTo: nodeView.contentView.bottomAnchor),
-            outlineView.leadingAnchor.constraint(equalTo: nodeView.contentView.leadingAnchor),
-            outlineView.trailingAnchor.constraint(equalTo: nodeView.contentView.trailingAnchor),
-        ])
+        nodeView.contentView.addSubviewFillingBounds(outlineView)
 
         fileTreeViews[node.id] = nodeView
         setupLockCallback(nodeView: nodeView, node: node)
@@ -484,7 +466,11 @@ final class CanvasNodeRenderer {
                 if let fn = nc.fileName, let ws = workspace {
                     let path = PersistenceManager.shared.notesDirURL(workspaceId: ws.id)
                         .appendingPathComponent(fn).path
-                    try? FileManager.default.removeItem(atPath: path)
+                    do {
+                        try FileManager.default.removeItem(atPath: path)
+                    } catch {
+                        logger.error("Failed to delete note file at \(path): \(error.localizedDescription)")
+                    }
                 }
             case .custom(let customPath):
                 // custom 路径由用户管理，不自动删除（与官方行为一致）
@@ -517,7 +503,7 @@ final class CanvasNodeRenderer {
             guard let self else { return }
             if let idx = self.currentWorkspace?.nodes.firstIndex(where: { $0.id == node.id }) {
                 self.currentWorkspace?.nodes[idx].isLocked = isLocked
-                Task { try? await self.currentWorkspace?.save() }
+                self.saveWorkspace()
             }
         }
 
@@ -566,7 +552,7 @@ final class CanvasNodeRenderer {
                 copy.content = .terminal(tc)
             }
             ws.addNode(copy)
-            Task { try? await ws.save() }
+            self.saveWorkspace()
         }
     }
 
