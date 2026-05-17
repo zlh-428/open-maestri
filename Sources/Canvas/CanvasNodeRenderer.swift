@@ -151,14 +151,13 @@ final class CanvasNodeRenderer {
             let weakWorkspace = workspace
             let weakCanvas = canvas
 
-            baseView.onFrameChanged = { [weak weakCanvas] screenFrame in
+            baseView.onFrameChanged = { [weak weakCanvas] nodeFrame in
                 guard let cv = weakCanvas else { return }
-                let canvasOrigin = cv.screenToCanvas(screenFrame.origin)
+                // nodeFrame 已是画布原始尺寸（未缩放），origin 需从屏幕坐标转回画布坐标
+                let canvasOrigin = cv.screenToCanvas(nodeFrame.origin)
                 let canvasFrame = CGRect(
-                    x: canvasOrigin.x,
-                    y: canvasOrigin.y,
-                    width: screenFrame.width / cv.zoom,
-                    height: screenFrame.height / cv.zoom
+                    origin: canvasOrigin,
+                    size: nodeFrame.size  // 已是画布坐标尺寸，无需再除以 zoom
                 )
                 Task { @MainActor in
                     weakWorkspace.updateNodeFrame(id: nodeId, frame: canvasFrame)

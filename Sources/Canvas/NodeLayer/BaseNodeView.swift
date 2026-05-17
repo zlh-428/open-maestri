@@ -191,11 +191,12 @@ class BaseNodeView: NSView {
 
         if isResizing, let startLoc = resizeStartLocation, let startFrame = resizeStartFrame {
             // Resize：右下角拖拽（节点自身处理）
+            // frame 是画布原始尺寸（未缩放），鼠标 delta 需除以 zoom 还原到画布坐标
             let zoom = (superview as? CanvasViewportView)?.zoom ?? 1.0
-            let dx = loc.x - startLoc.x
-            let dy = loc.y - startLoc.y
-            let newWidth = max(startFrame.width + dx, Self.minNodeWidth * zoom)
-            let newHeight = max(startFrame.height - dy, Self.minNodeHeight * zoom)
+            let dx = (loc.x - startLoc.x) / zoom
+            let dy = (loc.y - startLoc.y) / zoom
+            let newWidth = max(startFrame.width + dx, Self.minNodeWidth)
+            let newHeight = max(startFrame.height - dy, Self.minNodeHeight)
             let newY = startFrame.maxY - newHeight
             frame = CGRect(x: startFrame.origin.x, y: newY, width: newWidth, height: newHeight)
         } else {
