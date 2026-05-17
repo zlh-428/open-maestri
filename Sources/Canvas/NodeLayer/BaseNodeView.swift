@@ -260,13 +260,16 @@ class BaseNodeView: NSView {
         didSet {
             guard oldValue != isNodeSelected else { return }
             updateSelectionOverlay()
-            // 选中时移除路由层，让内容区（终端/WebView）接收键盘和鼠标事件
-            // 未选中时恢复路由层，确保下次点击能触发选中
             if isNodeSelected {
-                contentEventRouter.removeFromSuperview()
+                contentEventRouter.isHidden = true
+                print("[BaseNode] isNodeSelected=true, isHidden=true, firstResponder=\(type(of: window?.firstResponder))")
             } else {
-                addSubview(contentEventRouter, positioned: .above, relativeTo: contentView)
-                contentEventRouter.frame = contentView.frame
+                contentEventRouter.isHidden = false
+                print("[BaseNode] isNodeSelected=false, isHidden=false")
+                if contentEventRouter.superview == nil {
+                    addSubview(contentEventRouter, positioned: .above, relativeTo: contentView)
+                    contentEventRouter.frame = contentView.frame
+                }
             }
         }
     }
@@ -337,10 +340,8 @@ class BaseNodeView: NSView {
     fileprivate func installDragIntercept() {
         guard !contentEventRouter.isDragging else { return }
         // 拖动时路由层扩展到整个节点，确保快速拖动时全区域拦截
+        contentEventRouter.isHidden = false
         if contentEventRouter.superview == nil {
-            addSubview(contentEventRouter, positioned: .above, relativeTo: nil)
-        } else {
-            contentEventRouter.removeFromSuperview()
             addSubview(contentEventRouter, positioned: .above, relativeTo: nil)
         }
         contentEventRouter.frame = bounds
@@ -349,11 +350,13 @@ class BaseNodeView: NSView {
 
     private func removeDragIntercept() {
         contentEventRouter.isDragging = false
-        // 拖动结束：若节点仍选中则完全移除（让内容区可交互），否则恢复到 contentView 覆盖
+        // 拖动结束：若节点仍选中则恢复透传模式，否则恢复到 contentView 覆盖并启用拦截
         if isNodeSelected {
-            contentEventRouter.removeFromSuperview()
+            contentEventRouter.frame = contentView.frame
+            contentEventRouter.isHidden = true
         } else {
             contentEventRouter.frame = contentView.frame
+            contentEventRouter.isHidden = false
         }
     }
 }
