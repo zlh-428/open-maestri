@@ -31,6 +31,8 @@ final class SwiftTermProvider: NSObject {
     private let scrollbackStore = ScrollbackStore()
     private var pendingScrollback: [ScrollbackEntry] = []
     private let scrollbackFlushThreshold = 50
+    /// 无法直接 execve 的命令（alias/函数等），shell 启动后延迟发送
+    private var pendingCommand: String? = nil
 
     init(terminalId: UUID, command: String, workingDirectory: String) {
         self.terminalId = terminalId
@@ -68,30 +70,56 @@ final class SwiftTermProvider: NSObject {
         env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
 
         let args: [String]
+        let execName: String
         if command.isEmpty || command == "zsh" || command.hasSuffix("/zsh") {
             args = ["/bin/zsh", "--login"]
+            execName = "zsh"
         } else if command == "bash" || command.hasSuffix("/bash") {
             args = ["/bin/bash", "--login"]
+            execName = "bash"
         } else {
-            // 对非 shell 命令尝试用 which 解析完整路径
+            // 先尝试在 PATH 里找到可执行文件
             let resolved = resolveCommandPath(command, env: env)
-            args = [resolved]
+            if FileManager.default.isExecutableFile(atPath: resolved) {
+                // 找到可执行文件，直接执行
+                args = [resolved]
+                execName = command
+            } else {
+                // 找不到可执行文件（可能是 alias、shell 函数、多词命令等）
+                // 启动交互式 login shell，稍后通过 write() 发送命令字符串
+                // 交互式 shell 会加载 .zshrc，alias 在其中定义，可以正常展开
+                args = ["/bin/zsh", "--login"]
+                execName = "zsh"
+                pendingCommand = command
+            }
         }
 
         view.startProcess(
             executable: args[0],
             args: Array(args.dropFirst()),
             environment: env.map { "\($0.key)=\($0.value)" },
-            execName: command.isEmpty ? "zsh" : command
+            execName: execName
         )
         logger.debug("PTY started: \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
 
         // SwiftTerm 的 startProcess 不直接支持 cwd，通过 cd 命令切换到工作目录
-        if !workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory) {
+        // 若有 pendingCommand（alias/函数），在 cd 之后再发送，确保 shell 已完全初始化
+        let hasCd = !workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory)
+        let pending = pendingCommand
+        if hasCd {
             let escapedPath = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
-            // 延迟 0.3s 等 shell 初始化完成后再 cd
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.write("cd '\(escapedPath)'\n")
+                if let cmd = pending {
+                    // 额外延迟确保 cd 已执行
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                        self?.write("\(cmd)\n")
+                    }
+                }
+            }
+        } else if let cmd = pending {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.write("\(cmd)\n")
             }
         }
         return view

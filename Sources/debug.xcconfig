@@ -1,0 +1,7 @@
+// Xcode debug build config — makes the SPM executable target behave like a proper app bundle
+// Xcode picks this up automatically when it exists alongside Package.swift
+
+CODE_SIGN_ENTITLEMENTS = Sources/open-maestri.entitlements
+CODE_SIGN_IDENTITY = -
+INFOPLIST_FILE = Sources/Info.plist
+PRODUCT_BUNDLE_IDENTIFIER = com.open-maestri.app
