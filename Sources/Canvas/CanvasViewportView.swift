@@ -202,14 +202,20 @@ final class CanvasViewportView: NSView {
         guard isInCanvas else { return event }
 
         if event.type == .magnify || event.type == .scrollWheel {
-            // 若鼠标在已选中节点上，事件穿透给节点内容（终端滚动、WebView 滚动等）
+            // 判断鼠标是否悬停在某个选中节点上
             let hoveredNodeId = nodeIdForHitView(hitView)
             let isOverSelectedNode = hoveredNodeId.map { selectedNodeIds.contains($0) } ?? false
-            if isOverSelectedNode {
-                return event
+
+            if isOverSelectedNode, event.type == .scrollWheel,
+               let hId = hoveredNodeId,
+               let nodeView = nodeViews[hId] as? BaseNodeView {
+                // 鼠标在选中节点上 + scrollWheel：手动转发给节点内容区域，
+                // 然后吞掉事件（return nil），确保画布不再收到此 scroll
+                nodeView.contentView.scrollWheel(with: event)
+                return nil
             }
 
-            // 未选中节点区域或空白区域：由画布统一处理（平移/缩放）
+            // 其余情况（空白区域 / 未选中节点 / magnify）：由画布统一处理
             self.handle(scrollOrMagnify: event)
             return nil
         }
@@ -783,12 +789,17 @@ final class CanvasViewportView: NSView {
         }
 
         // 节点选中由 BaseNodeView.onNodeClicked 回调处理；
-        // canvas mouseDown 只负责点击空白区域的清除选中
+        // canvas mouseDown 只负责点击空白区域的清除选中 + 框选初始化
         if nodeId(for: hit) == nil {
             if !event.modifierFlags.contains(.command) {
                 selectedNodeIds.removeAll()
             }
             window?.makeFirstResponder(self)
+            // 在选择模式下（非绘制、非连线），空白区域按下时初始化框选
+            if !isInDrawingMode && !isInConnectingMode {
+                selectionStartPoint = loc
+                selectionCurrentPoint = nil
+            }
         }
     }
 
@@ -821,6 +832,13 @@ final class CanvasViewportView: NSView {
 
         if connectingFromNodeId != nil {
             connectionDragPoint = loc
+            needsDisplay = true
+            return
+        }
+
+        // 框选拖拽（选择模式下空白区域拖拽）：只更新绘制坐标，不修改选中状态
+        if selectionStartPoint != nil {
+            selectionCurrentPoint = loc
             needsDisplay = true
             return
         }
@@ -924,6 +942,22 @@ final class CanvasViewportView: NSView {
     }
 
     override func mouseUp(with event: NSEvent) {
+        // 框选结束：计算选中节点，然后清除框选状态
+        if selectionStartPoint != nil {
+            if let rect = selectionRect, rect.width > 4 || rect.height > 4 {
+                var hitIds = Set<UUID>()
+                for (id, view) in nodeViews {
+                    if view.frame.intersects(rect) {
+                        hitIds.insert(id)
+                    }
+                }
+                selectedNodeIds = hitIds
+            }
+            selectionStartPoint = nil
+            selectionCurrentPoint = nil
+            needsDisplay = true
+        }
+
         // Space+拖拽结束
         if isSpaceHeld {
             spaceDragStartOrigin = nil
@@ -977,6 +1011,24 @@ final class CanvasViewportView: NSView {
             needsDisplay = true
             return
         }
+    }
+
+    // MARK: - 框选（Marquee Selection）
+
+    /// 框选起始点（屏幕坐标，nil = 未在框选）
+    private var selectionStartPoint: CGPoint?
+    /// 框选当前点（屏幕坐标）
+    private var selectionCurrentPoint: CGPoint?
+
+    /// 当前框选矩形（屏幕坐标），用于绘制和命中检测
+    private var selectionRect: CGRect? {
+        guard let start = selectionStartPoint, let current = selectionCurrentPoint else { return nil }
+        return CGRect(
+            x: min(start.x, current.x),
+            y: min(start.y, current.y),
+            width: abs(current.x - start.x),
+            height: abs(current.y - start.y)
+        )
     }
 
     // MARK: - 节点绘制模式
@@ -1110,9 +1162,10 @@ final class CanvasViewportView: NSView {
             drawLineGrid(in: dirtyRect)
         }
 
-        // 再绘制前景覆盖物（连线、绘制矩形、磁力对齐参考线）
+        // 再绘制前景覆盖物（连线、绘制矩形、框选矩形、磁力对齐参考线）
         drawTemporaryConnection()
         drawDrawingRect()
+        drawSelectionRect()
         drawSnapGuidelines()
     }
 
@@ -1198,6 +1251,18 @@ final class CanvasViewportView: NSView {
         path.setLineDash([4, 3], count: 2, phase: 0)
         NSColor.systemBlue.withAlphaComponent(0.6).setStroke()
         NSColor.systemBlue.withAlphaComponent(0.05).setFill()
+        path.stroke()
+        path.fill()
+    }
+
+    // MARK: - 框选矩形绘制
+
+    private func drawSelectionRect() {
+        guard let rect = selectionRect, rect.width > 2 || rect.height > 2 else { return }
+        let path = NSBezierPath(rect: rect)
+        path.lineWidth = 1.0
+        NSColor.systemBlue.withAlphaComponent(0.4).setStroke()
+        NSColor.systemBlue.withAlphaComponent(0.08).setFill()
         path.stroke()
         path.fill()
     }
