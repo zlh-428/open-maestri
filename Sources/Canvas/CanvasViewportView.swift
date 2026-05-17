@@ -303,8 +303,9 @@ final class CanvasViewportView: NSView {
         super.layout()
         // 重新应用所有节点的位置和缩放变换（zoom/origin 变化时）
         // 跳过正在拖动的节点——其 frame 由 mouseDragged 直接维护，避免双重更新导致闪烁
+        let draggedIds: Set<UUID> = isBatchDragging ? Set(batchDragStartFrames.keys) : (draggingNodeId.map { [$0] } ?? [])
         for (id, view) in nodeViews {
-            if id == draggingNodeId { continue }
+            if draggedIds.contains(id) { continue }
             if let canvasFrame = nodeCanvasFrames[id] {
                 // frame = 缩放后的屏幕尺寸，bounds = 画布原始尺寸
                 view.frame = canvasRectToScreen(canvasFrame)
@@ -332,6 +333,11 @@ final class CanvasViewportView: NSView {
 
     func updateNodeFrame(id: UUID, canvasFrame: CGRect) {
         guard let view = nodeViews[id] else { return }
+        // 拖动期间不允许外部覆盖被拖动节点的 frame
+        if draggingNodeId != nil {
+            let isDragged = (id == draggingNodeId) || batchDragStartFrames.keys.contains(id)
+            if isDragged { return }
+        }
         nodeCanvasFrames[id] = canvasFrame
         // frame = 缩放后屏幕尺寸，bounds = 画布原始尺寸（子视图以原始比例 layout）
         view.frame = canvasRectToScreen(canvasFrame)
@@ -717,7 +723,7 @@ final class CanvasViewportView: NSView {
     // MARK: - 节点拖动（画布层统一处理，避免 layout() 干扰）
 
     /// 正在被拖动的节点 ID（nil = 未拖动）
-    private var draggingNodeId: UUID? = nil
+    private(set) var draggingNodeId: UUID? = nil
     /// 拖动开始时鼠标在 canvas 坐标系中的位置
     private var dragStartCanvasMouse: CGPoint? = nil
     /// 拖动开始时节点的画布 frame
@@ -730,18 +736,45 @@ final class CanvasViewportView: NSView {
     private(set) var dragGuidelines: [GuideLine] = [] {
         didSet { needsDisplay = true }
     }
+    /// 批量拖动：所有被拖动节点的初始 frame（不含主节点）
+    private var batchDragStartFrames: [UUID: CGRect] = [:]
+    /// 是否正在进行批量拖动
+    private var isBatchDragging: Bool { !batchDragStartFrames.isEmpty }
+    /// 拖动过程中是否发生了实际位移（用于区分点击和拖动）
+    private var didDragMove = false
 
-    /// 节点拖动回调（拖动完成时，通知 renderer 持久化）
+    /// 节点拖动回调（单节点拖动完成时，通知 renderer 持久化）
     var onNodeDragEnded: ((UUID, CGRect) -> Void)?
+    /// 批量拖动回调（批量拖动完成时，通知 renderer 持久化所有节点 frame）
+    var onBatchNodeDragEnded: (([UUID: CGRect]) -> Void)?
 
     /// 由 BaseNodeView.mouseDown 调用，初始化画布层节点拖动
     func beginNodeDrag(nodeId: UUID?, screenLoc: CGPoint) {
         guard let nodeId else { return }
+
+        // 防止重复初始化：如果已经在拖动同一个节点，忽略重复调用
+        if draggingNodeId == nodeId {
+            return
+        }
+
         draggingNodeId = nodeId
         dragStartCanvasMouse = screenToCanvas(screenLoc)
         dragStartCanvasFrame = nodeCanvasFrames[nodeId]
         lastSnapActive = false
         lastSnappedGridOrigin = nil
+        didDragMove = false
+
+        print("[Drag] beginNodeDrag: nodeId=\(nodeId.uuidString.prefix(8)), screenLoc=\(screenLoc)")
+
+        // 批量拖动：如果被拖动节点在选中集合中且选中集合 > 1，记录所有选中节点的初始 frame
+        batchDragStartFrames.removeAll()
+        if selectedNodeIds.contains(nodeId) && selectedNodeIds.count > 1 {
+            for id in selectedNodeIds {
+                if let frame = nodeCanvasFrames[id] {
+                    batchDragStartFrames[id] = frame
+                }
+            }
+        }
     }
 
     // MARK: - 鼠标点击（选择节点）
@@ -849,6 +882,10 @@ final class CanvasViewportView: NSView {
            let startFrame = dragStartCanvasFrame,
            let view = nodeViews[nodeId] {
 
+            if !didDragMove {
+                print("[Drag] firstDrag: nodeId=\(nodeId.uuidString.prefix(8)), loc=\(loc)")
+            }
+            didDragMove = true
             let currentCanvas = screenToCanvas(loc)
             let rawDX = currentCanvas.x - startMouse.x
             let rawDY = currentCanvas.y - startMouse.y
@@ -858,10 +895,13 @@ final class CanvasViewportView: NSView {
             )
             var newFrame = CGRect(origin: newOrigin, size: startFrame.size)
 
+            // 批量拖动时，吸附计算排除所有被拖动的节点
+            let draggedIds = isBatchDragging ? Set(batchDragStartFrames.keys) : [nodeId]
+
             if event.modifierFlags.contains(.command) {
                 // ⌘+拖拽：磁力瓦片对齐（吸附到相邻节点边缘）
                 let otherFrames = nodeCanvasFrames
-                    .filter { $0.key != nodeId }
+                    .filter { !draggedIds.contains($0.key) }
                     .map { $0.value }
                 let (snapped, guidelines) = TileSnapping.snap(
                     draggingFrame: newFrame,
@@ -878,7 +918,7 @@ final class CanvasViewportView: NSView {
             } else {
                 // 普通拖拽：先尝试吸附到相邻节点边缘，无相邻节点则回落到 16px 网格
                 let otherFrames = nodeCanvasFrames
-                    .filter { $0.key != nodeId }
+                    .filter { !draggedIds.contains($0.key) }
                     .map { $0.value }
                 let (nodeSnapped, guidelines) = TileSnapping.snap(
                     draggingFrame: newFrame,
@@ -906,13 +946,33 @@ final class CanvasViewportView: NSView {
                 newFrame = CGRect(origin: newOrigin, size: startFrame.size)
             }
 
+            // 计算主节点最终位移量（含吸附修正）
+            let finalDX = newFrame.origin.x - startFrame.origin.x
+            let finalDY = newFrame.origin.y - startFrame.origin.y
+
             // 直接更新屏幕 frame 和画布坐标缓存（禁用隐式动画，不触发 layout()）
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             view.frame = canvasRectToScreen(newFrame)
             view.setBoundsSize(newFrame.size)
-            CATransaction.commit()
             nodeCanvasFrames[nodeId] = newFrame
+
+            // 批量拖动：将相同位移应用到所有其他选中节点
+            if isBatchDragging {
+                for (otherId, otherStartFrame) in batchDragStartFrames where otherId != nodeId {
+                    guard let otherView = nodeViews[otherId] else { continue }
+                    let otherNewOrigin = CGPoint(
+                        x: otherStartFrame.origin.x + finalDX,
+                        y: otherStartFrame.origin.y + finalDY
+                    )
+                    let otherNewFrame = CGRect(origin: otherNewOrigin, size: otherStartFrame.size)
+                    otherView.frame = canvasRectToScreen(otherNewFrame)
+                    otherView.setBoundsSize(otherNewFrame.size)
+                    nodeCanvasFrames[otherId] = otherNewFrame
+                }
+            }
+
+            CATransaction.commit()
         }
     }
 
@@ -966,13 +1026,33 @@ final class CanvasViewportView: NSView {
         }
 
         // 节点拖动结束：持久化最终 canvas frame
-        if let nodeId = draggingNodeId, let finalFrame = nodeCanvasFrames[nodeId] {
+        if let nodeId = draggingNodeId {
             dragGuidelines = []
-            onNodeDragEnded?(nodeId, finalFrame)
+            if didDragMove {
+                if isBatchDragging {
+                    // 批量拖动结束：收集所有被拖动节点的最终 frame 并统一持久化
+                    var finalFrames: [UUID: CGRect] = [:]
+                    for id in batchDragStartFrames.keys {
+                        if let frame = nodeCanvasFrames[id] {
+                            finalFrames[id] = frame
+                        }
+                    }
+                    onBatchNodeDragEnded?(finalFrames)
+                } else if let finalFrame = nodeCanvasFrames[nodeId] {
+                    onNodeDragEnded?(nodeId, finalFrame)
+                }
+            } else {
+                // 没有发生拖动 = 单击：如果之前是多选且点击的节点在选中集合中，执行单选
+                if selectedNodeIds.count > 1 && selectedNodeIds.contains(nodeId) {
+                    selectedNodeIds = [nodeId]
+                }
+            }
         }
         draggingNodeId = nil
         dragStartCanvasMouse = nil
         dragStartCanvasFrame = nil
+        batchDragStartFrames.removeAll()
+        didDragMove = false
         lastSnapActive = false
         lastSnappedGridOrigin = nil
 

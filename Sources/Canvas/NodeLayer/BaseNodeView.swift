@@ -24,8 +24,8 @@ class BaseNodeView: NSView {
     private let resizeHandle = NSView()
     /// 常驻于 contentView 之上的事件路由层：
     ///   - 节点未选中时：拦截 mouseDown，触发选中 + 初始化拖动
-    ///   - 节点已选中时：移除自身，让事件穿透到终端/WebView 内容区
-    ///   - 拖动期间：重新安装，全程拦截防止内容区消费拖动
+    ///   - 节点已选中时：透传判定模式，拦截 mouseDown 后延迟判断是拖动还是终端交互
+    ///   - 拖动期间：扩展至整个节点，全程拦截防止内容区消费拖动
     private lazy var contentEventRouter: ContentEventRouterView = {
         let v = ContentEventRouterView()
         v.autoresizingMask = [.width, .height]
@@ -187,8 +187,10 @@ class BaseNodeView: NSView {
         } else {
             onFocusRequested?()
             onActivated?()
-            // Header 区域点击：通知画布层初始化拖动
+            // Header 区域点击：通知画布层初始化拖动，并立即安装拦截层
+            // 防止快速向下拖动时终端内容区捕获事件导致文字选中
             if loc.y >= bounds.height - Self.headerHeight {
+                installDragIntercept()
                 if let canvas = superview as? CanvasViewportView {
                     let canvasLoc = canvas.convert(event.locationInWindow, from: nil)
                     canvas.beginNodeDrag(nodeId: nodeId, screenLoc: canvasLoc)
@@ -272,17 +274,14 @@ class BaseNodeView: NSView {
         didSet {
             guard oldValue != isNodeSelected else { return }
             updateSelectionOverlay()
-            if isNodeSelected {
-                contentEventRouter.isHidden = true
-                print("[BaseNode] isNodeSelected=true, isHidden=true, firstResponder=\(type(of: window?.firstResponder))")
-            } else {
-                contentEventRouter.isHidden = false
-                print("[BaseNode] isNodeSelected=false, isHidden=false")
-                if contentEventRouter.superview == nil {
-                    addSubview(contentEventRouter, positioned: .above, relativeTo: contentView)
-                    contentEventRouter.frame = contentView.frame
-                }
+            // contentEventRouter 始终可见（不再 hide），通过 isNodeSelected 切换模式：
+            // - 未选中：拦截模式，mouseDown 触发选中
+            // - 已选中：透传判定模式，mouseDown 先拦截，判断是拖动还是终端交互
+            contentEventRouter.isNodeSelected = isNodeSelected
+            if contentEventRouter.superview == nil {
+                addSubview(contentEventRouter, positioned: .above, relativeTo: contentView)
             }
+            contentEventRouter.frame = contentView.frame
         }
     }
 
@@ -347,8 +346,7 @@ class BaseNodeView: NSView {
 
     fileprivate func installDragIntercept() {
         guard !contentEventRouter.isDragging else { return }
-        // 拖动时路由层扩展到整个节点，确保快速拖动时全区域拦截
-        contentEventRouter.isHidden = false
+        // 拖动时路由层扩展到整个节点 bounds，确保快速拖动时全区域拦截
         if contentEventRouter.superview == nil {
             addSubview(contentEventRouter, positioned: .above, relativeTo: nil)
         }
@@ -358,14 +356,8 @@ class BaseNodeView: NSView {
 
     private func removeDragIntercept() {
         contentEventRouter.isDragging = false
-        // 拖动结束：若节点仍选中则恢复透传模式，否则恢复到 contentView 覆盖并启用拦截
-        if isNodeSelected {
-            contentEventRouter.frame = contentView.frame
-            contentEventRouter.isHidden = true
-        } else {
-            contentEventRouter.frame = contentView.frame
-            contentEventRouter.isHidden = false
-        }
+        // 拖动结束：恢复到 contentView 区域覆盖
+        contentEventRouter.frame = contentView.frame
     }
 }
 
@@ -397,31 +389,83 @@ final class HeaderForwardingView: NSView {
 
 // MARK: - 内容区事件路由视图
 
-/// 覆盖在 contentView 之上，负责两种职责：
+/// 覆盖在 contentView 之上，负责三种职责：
 ///
-/// **常驻模式**（节点未选中）：
+/// **拦截模式**（节点未选中，isNodeSelected=false）：
 ///   拦截 mouseDown，触发选中 + 初始化拖动。
+///
+/// **透传判定模式**（节点已选中，isNodeSelected=true）：
+///   拦截 mouseDown，延迟判断用户意图：
+///   - 如果发生拖动（mouseDragged 位移 > 阈值）→ 启动节点拖动
+///   - 如果未拖动就 mouseUp → 将点击事件转发给底下的终端/WebView
+///   这确保了快速向下拖动时终端永远不会接收到 drag 事件（不会触发文字选中）。
 ///
 /// **拖动模式**（isDragging=true）：
 ///   扩展至整个节点，全程拦截 mouseDragged，防止终端/WebView 消费拖动事件。
 final class ContentEventRouterView: NSView {
     weak var baseNodeView: BaseNodeView?
     var isDragging = false
+    /// 节点选中状态，决定事件路由模式
+    var isNodeSelected = false
 
-    override var acceptsFirstResponder: Bool { true }
+    /// 透传判定模式下的状态
+    private var pendingMouseDown: NSEvent?
+    private var mouseDownLocation: CGPoint = .zero
+    private var didStartDrag = false
+    /// 拖动判定阈值（像素），超过此值认为是拖动而非点击
+    private static let dragThreshold: CGFloat = 3.0
+
+    override var acceptsFirstResponder: Bool { false }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // 始终拦截左键事件（无论是否选中），确保 SwiftTerm 不会直接收到 mouseDown
+        guard !isHidden, alphaValue > 0, frame.contains(point) else { return nil }
+        return self
+    }
+
+    // 滚轮事件直接转发给底层内容视图（终端内滚动）
+    override func scrollWheel(with event: NSEvent) {
+        if let target = findContentTarget(at: event.locationInWindow) {
+            target.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+
+    // 右键菜单直接转发给底层内容视图
+    override func rightMouseDown(with event: NSEvent) {
+        if isNodeSelected, let target = findContentTarget(at: event.locationInWindow) {
+            target.rightMouseDown(with: event)
+        } else {
+            super.rightMouseDown(with: event)
+        }
+    }
 
     override func mouseDown(with event: NSEvent) {
-        // 触发节点选中（等同于 BaseNodeView.mouseDown 中的 onNodeClicked）
-        baseNodeView?.onNodeClicked?(event)
+        guard let node = baseNodeView else { return }
 
-        guard let node = baseNodeView, !node.isLocked else { return }
-        let loc = node.convert(event.locationInWindow, from: nil)
-        node.hasTriggeredDuplicate = false
+        // 无论哪种模式，先记录 mouseDown 位置（供 mouseDragged 判定使用）
+        pendingMouseDown = event
+        mouseDownLocation = event.locationInWindow
+        didStartDrag = false
 
-        if node.isInResizeHandlePublic(loc) {
-            // resize handle：转给节点处理
-            baseNodeView?.mouseDown(with: event)
+        if !isNodeSelected {
+            // === 拦截模式（未选中）：触发选中 ===
+            node.onNodeClicked?(event)
+            guard !node.isLocked else { return }
+            let loc = node.convert(event.locationInWindow, from: nil)
+            node.hasTriggeredDuplicate = false
+            if node.isInResizeHandlePublic(loc) {
+                node.mouseDown(with: event)
+            } else {
+                node.onFocusRequested?()
+                node.onActivated?()
+            }
         } else {
+            // === 透传判定模式（已选中）：拦截 mouseDown，延迟判断意图 ===
+            node.onNodeClicked?(event)
+            guard !node.isLocked else { return }
+            node.hasTriggeredDuplicate = false
             node.onFocusRequested?()
             node.onActivated?()
         }
@@ -429,23 +473,87 @@ final class ContentEventRouterView: NSView {
 
     override func mouseDragged(with event: NSEvent) {
         guard let node = baseNodeView, !node.isLocked else { return }
-        if node.isResizing {
-            baseNodeView?.mouseDragged(with: event)
+
+        if !isNodeSelected {
+            // === 拦截模式拖动 ===
+            if node.isResizing {
+                node.mouseDragged(with: event)
+            } else {
+                node.installDragIntercept()
+                if event.modifierFlags.contains(.option) && !node.hasTriggeredDuplicate {
+                    if abs(event.deltaX) > 2 || abs(event.deltaY) > 2 {
+                        node.hasTriggeredDuplicate = true
+                        node.onOptionDragDuplicate?()
+                    }
+                }
+                node.superview?.mouseDragged(with: event)
+            }
         } else {
-            // 拖动开始时安装拦截层，防止快速拖动时内容区消费事件
-            node.installDragIntercept()
-            if event.modifierFlags.contains(.option) && !node.hasTriggeredDuplicate {
-                if abs(event.deltaX) > 2 || abs(event.deltaY) > 2 {
-                    node.hasTriggeredDuplicate = true
-                    node.onOptionDragDuplicate?()
+            // === 透传判定模式拖动 ===
+            // 如果画布已经在拖动此节点（由 header mouseDown 启动），直接转发
+            if let canvas = node.superview as? CanvasViewportView,
+               canvas.draggingNodeId == node.nodeId {
+                didStartDrag = true
+                node.superview?.mouseDragged(with: event)
+                return
+            }
+
+            if !didStartDrag {
+                // 检查位移是否超过阈值
+                let dx = event.locationInWindow.x - mouseDownLocation.x
+                let dy = event.locationInWindow.y - mouseDownLocation.y
+                let distance = sqrt(dx * dx + dy * dy)
+                if distance < Self.dragThreshold { return }
+
+                // 超过阈值：确认为节点拖动，启动 beginNodeDrag
+                didStartDrag = true
+                node.installDragIntercept()
+                if let canvas = node.superview as? CanvasViewportView {
+                    let canvasLoc = canvas.convert(mouseDownLocation, from: nil)
+                    canvas.beginNodeDrag(nodeId: node.nodeId, screenLoc: canvasLoc)
                 }
             }
-            node.superview?.mouseDragged(with: event)
+
+            // 已进入拖动状态：转发给 canvas
+            if didStartDrag {
+                if event.modifierFlags.contains(.option) && !node.hasTriggeredDuplicate {
+                    if abs(event.deltaX) > 2 || abs(event.deltaY) > 2 {
+                        node.hasTriggeredDuplicate = true
+                        node.onOptionDragDuplicate?()
+                    }
+                }
+                node.superview?.mouseDragged(with: event)
+            }
         }
     }
 
     override func mouseUp(with event: NSEvent) {
-        baseNodeView?.mouseUp(with: event)
+        guard let node = baseNodeView else { return }
+
+        if isNodeSelected && !didStartDrag {
+            // === 透传判定模式：没有拖动 = 用户想与终端交互 ===
+            // 将点击事件转发给底层内容视图（终端/WebView）
+            if let contentTarget = findContentTarget(at: event.locationInWindow) {
+                contentTarget.mouseDown(with: pendingMouseDown ?? event)
+                contentTarget.mouseUp(with: event)
+            }
+        } else {
+            node.mouseUp(with: event)
+        }
+
+        // 清理状态
+        pendingMouseDown = nil
+        didStartDrag = false
+    }
+
+    /// 在底层内容视图中查找实际应接收事件的视图
+    private func findContentTarget(at locationInWindow: CGPoint) -> NSView? {
+        guard let node = baseNodeView else { return nil }
+        let localPoint = node.contentView.convert(locationInWindow, from: nil)
+        // 临时隐藏自己做 hitTest
+        isHidden = true
+        let target = node.contentView.hitTest(localPoint)
+        isHidden = false
+        return target
     }
 }
-

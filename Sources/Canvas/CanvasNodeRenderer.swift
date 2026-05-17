@@ -37,6 +37,13 @@ final class CanvasNodeRenderer {
             self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: canvasFrame)
             Task { try? await self.currentWorkspace?.save() }
         }
+        canvas.onBatchNodeDragEnded = { [weak self] finalFrames in
+            guard let self else { return }
+            for (nodeId, frame) in finalFrames {
+                self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: frame)
+            }
+            Task { try? await self.currentWorkspace?.save() }
+        }
     }
 
     private func observePortalReplacement() {
@@ -536,8 +543,11 @@ final class CanvasNodeRenderer {
                     canvas.selectedNodeIds.insert(nodeId)
                 }
             } else {
-                // 普通点击：单选；焦点转移由 updateSelectionVisuals 统一处理
-                canvas.selectedNodeIds = [nodeId]
+                // 普通点击：如果节点已在选中集合中（批量选中），保持选中状态（支持批量拖动）；
+                // 如果节点不在选中集合中，执行单选
+                if !canvas.selectedNodeIds.contains(nodeId) {
+                    canvas.selectedNodeIds = [nodeId]
+                }
             }
         }
 
