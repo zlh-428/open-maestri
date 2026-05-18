@@ -31,6 +31,7 @@ final class CanvasNodeRenderer {
         self.canvas = canvas
         setupOverlay(canvas: canvas)
         observePortalReplacement()
+        observeFileTreeRootChanged()
         setupNodeDragCallback(canvas: canvas)
     }
 
@@ -69,6 +70,32 @@ final class CanvasNodeRenderer {
             self?.handlePortalWebViewReplaced(notif)
         }
         notificationObservers.append(observer)
+    }
+
+    private func observeFileTreeRootChanged() {
+        let observer = NotificationCenter.default.addObserver(
+            forName: .fileTreeRootChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] notif in
+            self?.handleFileTreeRootChanged(notif)
+        }
+        notificationObservers.append(observer)
+    }
+
+    private func handleFileTreeRootChanged(_ notif: Notification) {
+        guard let info = notif.userInfo,
+              let nodeId = info["nodeId"] as? UUID,
+              let newPath = info["newPath"] as? String,
+              let nodeView = fileTreeViews[nodeId] else { return }
+        // 找到嵌入的 FileTreeOutlineView 并更新根目录
+        for subview in nodeView.contentView.subviews {
+            if let outlineView = subview as? FileTreeOutlineView {
+                outlineView.changeRoot(to: newPath)
+                nodeView.title = URL(fileURLWithPath: newPath).lastPathComponent
+                break
+            }
+        }
     }
 
     deinit {
@@ -467,9 +494,72 @@ final class CanvasNodeRenderer {
         nodeView.nodeId = node.id
         nodeView.title = fc.name
         nodeView.isLocked = node.isLocked
+        nodeView.currentRootPath = fc.rootPath
 
         let outlineView = FileTreeOutlineView(rootPath: fc.rootPath)
         nodeView.contentView.addSubviewFillingBounds(outlineView)
+
+        // Finder 式导航：单击文件夹进入该目录
+        outlineView.onDirectoryClicked = { [weak self, weak nodeView, weak outlineView] dirPath in
+            guard let self, let nodeView, let outlineView else { return }
+            // 切换 outlineView 的根目录到点击的文件夹
+            outlineView.changeRoot(to: dirPath)
+            // 更新导航栏（push 到导航历史）
+            nodeView.pushNavigation(to: dirPath)
+            // 更新数据模型
+            guard let ws = self.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == node.id }),
+                  case .fileTree(var content) = ws.nodes[idx].content else { return }
+            content.rootPath = dirPath
+            content.name = URL(fileURLWithPath: dirPath).lastPathComponent
+            ws.nodes[idx].content = .fileTree(content)
+            self.saveWorkspace()
+        }
+
+        // 在访达中显示回调
+        nodeView.onRevealInFinder = { [weak nodeView] in
+            let path = nodeView?.currentRootPath ?? fc.rootPath
+            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+        }
+
+        // 更改根目录回调
+        nodeView.onChangeRoot = { [weak self, weak nodeView, weak outlineView] in
+            let panel = NSOpenPanel()
+            panel.canChooseDirectories = true
+            panel.canChooseFiles = false
+            panel.allowsMultipleSelection = false
+            panel.directoryURL = URL(fileURLWithPath: nodeView?.currentRootPath ?? fc.rootPath)
+            panel.prompt = "选择目录"
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            let newPath = url.path
+
+            // 更新数据模型
+            guard let self, let ws = self.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == node.id }),
+                  case .fileTree(var content) = ws.nodes[idx].content else { return }
+            content.rootPath = newPath
+            content.name = url.lastPathComponent
+            ws.nodes[idx].content = .fileTree(content)
+
+            // 更新视图
+            outlineView?.changeRoot(to: newPath)
+            nodeView?.pushNavigation(to: newPath)
+            self.saveWorkspace()
+        }
+
+        // 导航栏前进/后退回调（不打开面板，直接切换目录）
+        nodeView.onNavigateToPath = { [weak self, weak outlineView] newPath in
+            outlineView?.changeRoot(to: newPath)
+
+            // 更新数据模型
+            guard let self, let ws = self.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == node.id }),
+                  case .fileTree(var content) = ws.nodes[idx].content else { return }
+            content.rootPath = newPath
+            content.name = URL(fileURLWithPath: newPath).lastPathComponent
+            ws.nodes[idx].content = .fileTree(content)
+            self.saveWorkspace()
+        }
 
         fileTreeViews[node.id] = nodeView
         setupLockCallback(nodeView: nodeView, node: node)

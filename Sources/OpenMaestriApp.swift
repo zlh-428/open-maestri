@@ -154,4 +154,6 @@ extension Notification.Name {
     static let editTerminalRequested   = Notification.Name("OpenMaestri.editTerminalRequested")
     /// Portal WebView 重建通知（shareSession 后更新视图）
     static let portalWebViewReplaced   = Notification.Name("OpenMaestri.portalWebViewReplaced")
+    /// FileTree 根目录变更通知：userInfo 含 nodeId/newPath
+    static let fileTreeRootChanged     = Notification.Name("OpenMaestri.fileTreeRootChanged")
 }
