@@ -1,0 +1,28 @@
+import Foundation
+
+// MARK: - Notification Names
+
+extension Notification.Name {
+    static let showCreateWorkspace = Notification.Name("OpenMaestri.showCreateWorkspace")
+    static let toggleCanvasZoom    = Notification.Name("OpenMaestri.toggleCanvasZoom")
+    static let showFloorOverview   = Notification.Name("OpenMaestri.showFloorOverview")
+    static let showCanvasFilter    = Notification.Name("OpenMaestri.showCanvasFilter")
+    static let openInEditor        = Notification.Name("OpenMaestri.openInEditor")
+    static let nextWorkspace       = Notification.Name("OpenMaestri.nextWorkspace")
+    static let prevWorkspace       = Notification.Name("OpenMaestri.prevWorkspace")
+    static let nextTerminal        = Notification.Name("OpenMaestri.nextTerminal")
+    static let prevTerminal        = Notification.Name("OpenMaestri.prevTerminal")
+    static let canvasZoomIn        = Notification.Name("OpenMaestri.canvasZoomIn")
+    static let canvasZoomOut       = Notification.Name("OpenMaestri.canvasZoomOut")
+    static let canvasZoomReset     = Notification.Name("OpenMaestri.canvasZoomReset")
+    /// Minimap 点击跳转：userInfo 含 "origin" CGPoint（画布坐标）
+    static let canvasJumpToOrigin  = Notification.Name("OpenMaestri.canvasJumpToOrigin")
+    /// Maestro recruit 完成通知
+    static let maestroRecruited        = Notification.Name("OpenMaestri.maestroRecruited")
+    /// 编辑终端请求：userInfo 含 nodeId/terminalContent
+    static let editTerminalRequested   = Notification.Name("OpenMaestri.editTerminalRequested")
+    /// Portal WebView 重建通知（shareSession 后更新视图）
+    static let portalWebViewReplaced   = Notification.Name("OpenMaestri.portalWebViewReplaced")
+    /// FileTree 根目录变更通知：userInfo 含 nodeId/newPath
+    static let fileTreeRootChanged     = Notification.Name("OpenMaestri.fileTreeRootChanged")
+}
