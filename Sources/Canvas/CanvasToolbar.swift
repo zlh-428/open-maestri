@@ -24,66 +24,66 @@ struct CanvasToolbar: View {
                 // 选择工具（默认）
                 FloatingToolButton(
                     icon: "cursorarrow",
+                    tooltip: "选择工具",
                     isActive: activeDrawingTool == nil && !isConnecting
                 ) {
                     activeDrawingTool = nil
                     isConnecting = false
                 }
-                .help("选择工具")
 
                 // Terminal 工具
                 FloatingToolButton(
                     icon: "terminal.fill",
+                    tooltip: "终端",
                     isActive: activeDrawingTool == "terminal"
                 ) {
                     toggleDrawingTool("terminal")
                 }
-                .help("终端")
 
                 // Note 工具
                 FloatingToolButton(
                     icon: "note.text",
+                    tooltip: "笔记",
                     isActive: activeDrawingTool == "stickyNote"
                 ) {
                     toggleDrawingTool("stickyNote")
                 }
-                .help("笔记")
 
                 // Portal 工具
                 FloatingToolButton(
                     icon: "globe",
+                    tooltip: "浏览器",
                     isActive: activeDrawingTool == "portal"
                 ) {
                     toggleDrawingTool("portal")
                 }
-                .help("浏览器")
 
                 // Text 工具
                 FloatingToolButton(
                     icon: "textformat.abc",
+                    tooltip: "文本标签",
                     isActive: activeDrawingTool == "text"
                 ) {
                     toggleDrawingTool("text")
                 }
-                .help("文本标签")
 
                 // Drawing 工具
                 FloatingToolButton(
                     icon: "pencil.tip.crop.circle",
+                    tooltip: "手绘",
                     isActive: activeDrawingTool == "drawing"
                 ) {
                     toggleDrawingTool("drawing")
                 }
-                .help("手绘")
 
                 // FileTree 工具
                 FloatingToolButton(
                     icon: "folder.fill",
+                    tooltip: "文件树",
                     isActive: activeDrawingTool == "fileTree"
                 ) {
                     toggleDrawingTool("fileTree")
                 }
-                .help("文件树")
 
                 // 分割线
                 Rectangle()
@@ -94,21 +94,21 @@ struct CanvasToolbar: View {
                 // 连线工具（L）
                 FloatingToolButton(
                     icon: "link",
+                    tooltip: "创建连接（L）",
                     isActive: isConnecting
                 ) {
                     isConnecting.toggle()
                     activeDrawingTool = nil
                 }
-                .help("创建连接（L）")
 
                 // 格式工具（预留）
                 FloatingToolButton(
                     icon: "textformat",
+                    tooltip: "格式",
                     isActive: false
                 ) {
                     // 预留
                 }
-                .help("格式")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -250,8 +250,13 @@ struct CanvasToolbar: View {
 
 private struct FloatingToolButton: View {
     let icon: String
+    var tooltip: String = ""
     var isActive: Bool = false
     let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var showTooltip = false
+    @State private var hoverTask: Task<Void, Never>?
 
     var body: some View {
         Button(action: action) {
@@ -266,6 +271,48 @@ private struct FloatingToolButton: View {
         }
         .buttonStyle(.plain)
         .contentShape(Rectangle())
+        .background(
+            ToolbarHoverTrackingView { hovering in
+                if hovering {
+                    if !isHovered {
+                        isHovered = true
+                        hoverTask = Task {
+                            try? await Task.sleep(nanoseconds: 600_000_000)
+                            guard !Task.isCancelled else { return }
+                            showTooltip = true
+                        }
+                    }
+                } else {
+                    isHovered = false
+                    hoverTask?.cancel()
+                    hoverTask = nil
+                    showTooltip = false
+                }
+            }
+        )
+        .overlay(alignment: .bottom) {
+            if showTooltip && !tooltip.isEmpty {
+                Text(tooltip)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(Color(white: 0.88), lineWidth: 0.5)
+                    )
+                    .fixedSize()
+                    .offset(y: 34)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+                    .zIndex(1000)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: showTooltip)
     }
 }
 
@@ -741,5 +788,50 @@ private extension Color {
             green: Double((val >> 8) & 0xFF) / 255,
             blue: Double(val & 0xFF) / 255
         )
+    }
+}
+
+// MARK: - AppKit 级别 Hover 追踪（解决 NSViewRepresentable 上方 SwiftUI hover 失效问题）
+
+/// 使用 NSTrackingArea 在 AppKit 层面检测 hover，绕过 SwiftUI .onHover 在 NSView 上方失效的问题
+private struct ToolbarHoverTrackingView: NSViewRepresentable {
+    let onHover: (Bool) -> Void
+
+    func makeNSView(context: Context) -> ToolbarHoverNSView {
+        let view = ToolbarHoverNSView()
+        view.onHover = onHover
+        return view
+    }
+
+    func updateNSView(_ nsView: ToolbarHoverNSView, context: Context) {
+        nsView.onHover = onHover
+    }
+}
+
+class ToolbarHoverNSView: NSView {
+    var onHover: ((Bool) -> Void)?
+    private var trackingRef: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingRef {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingRef = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHover?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover?(false)
     }
 }

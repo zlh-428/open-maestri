@@ -107,14 +107,30 @@ struct WorkspaceCanvasView: View {
 
                 // 二级操作工具栏（选中节点时显示，固定在一级工具栏正下方）
                 if !selectedNodeIds.isEmpty {
-                    NodeContextToolbar(
-                        onEdit: { editSelectedNode() },
-                        onConnect: { startConnectionFromSelected() },
-                        onRefresh: { /* 预留刷新操作 */ },
-                        onDelete: { deleteSelectedNodes() }
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                    if selectedNodeContentType == "fileTree" {
+                        FileTreeContextToolbar(
+                            onRevealInFinder: { revealFileTreeInFinder() },
+                            onChangeRoot: { changeFileTreeRoot() },
+                            onDelete: { deleteSelectedNodes() }
+                        )
+                        .fixedSize()
+                        .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                        .contentShape(Rectangle())
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                    } else {
+                        NodeContextToolbar(
+                            onEdit: { editSelectedNode() },
+                            onConnect: { startConnectionFromSelected() },
+                            onRefresh: { /* 预留刷新操作 */ },
+                            onDelete: { deleteSelectedNodes() }
+                        )
+                        .fixedSize()
+                        .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                        .contentShape(Rectangle())
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                        .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                    }
                 }
             }
             .zIndex(100)
@@ -566,6 +582,54 @@ struct WorkspaceCanvasView: View {
         guard !selectedNodeIds.isEmpty else { return }
         isConnecting = true
     }
+
+    /// 获取当前选中节点的内容类型（单选时）
+    private var selectedNodeContentType: String? {
+        guard selectedNodeIds.count == 1,
+              let firstId = selectedNodeIds.first,
+              let node = workspace.nodes.first(where: { $0.id == firstId }) else { return nil }
+        return contentTypeName(node.content)
+    }
+
+    /// FileTree 节点：在访达中显示
+    private func revealFileTreeInFinder() {
+        guard let firstId = selectedNodeIds.first,
+              let node = workspace.nodes.first(where: { $0.id == firstId }),
+              case .fileTree(let fc) = node.content else { return }
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: fc.rootPath)
+    }
+
+    /// FileTree 节点：更改根目录
+    private func changeFileTreeRoot() {
+        guard let firstId = selectedNodeIds.first,
+              let idx = workspace.nodes.firstIndex(where: { $0.id == firstId }),
+              case .fileTree(let fc) = workspace.nodes[idx].content else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = URL(fileURLWithPath: fc.rootPath)
+        panel.prompt = "选择目录"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let newPath = url.path
+
+        // 更新数据模型
+        var content = fc
+        content.rootPath = newPath
+        content.name = url.lastPathComponent
+        workspace.nodes[idx].content = .fileTree(content)
+
+        // 通知 CanvasNodeRenderer 刷新视图（通过 save + reload）
+        Task { try? await workspace.save() }
+
+        // 发送通知让 renderer 更新文件树视图
+        NotificationCenter.default.post(
+            name: .fileTreeRootChanged,
+            object: nil,
+            userInfo: ["nodeId": firstId, "newPath": newPath]
+        )
+    }
 }
 
 // MARK: - 节点类型辅助
@@ -652,16 +716,155 @@ struct NodeContextToolbar: View {
         }
     }
 
+    @ViewBuilder
     private func contextButton(icon: String, tooltip: String, action: @escaping () -> Void) -> some View {
+        ContextToolbarButton(icon: icon, tooltip: tooltip, action: action)
+    }
+}
+
+// MARK: - FileTree 选中节点浮动工具栏
+
+struct FileTreeContextToolbar: View {
+    let onRevealInFinder: () -> Void
+    let onChangeRoot: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            contextButton(icon: "folder.badge.questionmark", tooltip: "在访达中显示", action: onRevealInFinder)
+            contextButton(icon: "folder.badge.gearshape", tooltip: "更改根目录", action: onChangeRoot)
+            contextButton(icon: "trash", tooltip: "删除", action: onDelete)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background {
+            Capsule()
+                .fill(.white)
+                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+                )
+        }
+    }
+
+    @ViewBuilder
+    private func contextButton(icon: String, tooltip: String, action: @escaping () -> Void) -> some View {
+        ContextToolbarButton(icon: icon, tooltip: tooltip, action: action)
+    }
+}
+
+// MARK: - 二级工具栏按钮（自定义 hover tooltip）
+
+private struct ContextToolbarButton: View {
+    let icon: String
+    let tooltip: String
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @State private var showTooltip = false
+    @State private var hoverTask: Task<Void, Never>?
+
+    var body: some View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(Color(white: 0.35))
+                .foregroundStyle(isHovered ? Color(white: 0.15) : Color(white: 0.35))
                 .frame(width: 30, height: 30)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isHovered ? Color.black.opacity(0.05) : Color.clear)
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(tooltip)
+        .background(
+            HoverTrackingView { hovering in
+                if hovering {
+                    if !isHovered {
+                        isHovered = true
+                        hoverTask = Task {
+                            try? await Task.sleep(nanoseconds: 600_000_000)
+                            guard !Task.isCancelled else { return }
+                            showTooltip = true
+                        }
+                    }
+                } else {
+                    isHovered = false
+                    hoverTask?.cancel()
+                    hoverTask = nil
+                    showTooltip = false
+                }
+            }
+        )
+        .overlay(alignment: .bottom) {
+            if showTooltip && !tooltip.isEmpty {
+                Text(tooltip)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 5)
+                            .stroke(Color(white: 0.88), lineWidth: 0.5)
+                    )
+                    .fixedSize()
+                    .offset(y: 34)
+                    .transition(.opacity.combined(with: .scale(scale: 0.9, anchor: .top)))
+                    .zIndex(1000)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: showTooltip)
+    }
+}
+
+// MARK: - AppKit 级别 Hover 追踪（解决 NSViewRepresentable 上方 SwiftUI hover 失效问题）
+
+/// 使用 NSTrackingArea 在 AppKit 层面检测 hover，绕过 SwiftUI .onHover 在 NSView 上方失效的问题
+private struct HoverTrackingView: NSViewRepresentable {
+    let onHover: (Bool) -> Void
+
+    func makeNSView(context: Context) -> HoverTrackingNSView {
+        let view = HoverTrackingNSView()
+        view.onHover = onHover
+        return view
+    }
+
+    func updateNSView(_ nsView: HoverTrackingNSView, context: Context) {
+        nsView.onHover = onHover
+    }
+}
+
+private class HoverTrackingNSView: NSView {
+    var onHover: ((Bool) -> Void)?
+    private var trackingRef: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let existing = trackingRef {
+            removeTrackingArea(existing)
+        }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingRef = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        onHover?(true)
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHover?(false)
     }
 }
 
