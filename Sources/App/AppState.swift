@@ -16,8 +16,37 @@ final class AppState {
 
     private let logger = Logger.make(category: "AppState")
     private let pm = PersistenceManager.shared
+    private var idleObserver: NSObjectProtocol?
 
-    init() {}
+    init() {
+        idleObserver = NotificationCenter.default.addObserver(
+            forName: .terminalBecameIdle,
+            object: nil,
+            queue: nil  // 在 post 线程接收，再通过 Task 跳回 MainActor
+        ) { [weak self] notif in
+            guard let terminalId = notif.userInfo?["terminalId"] as? UUID else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let wsId = TerminalManager.shared.terminalWorkspaceMap[terminalId]
+                guard let wsId,
+                      let ws = self.workspaces.first(where: { $0.id == wsId }) else { return }
+                if wsId != self.activeWorkspaceId {
+                    ws.unreadActivityCount += 1
+                }
+            }
+        }
+    }
+
+    deinit {
+        if let obs = idleObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+    }
+
+    /// 切换到某工作区时调用，清零该工作区的未读计数
+    func clearUnread(workspaceId: UUID) {
+        workspaces.first(where: { $0.id == workspaceId })?.unreadActivityCount = 0
+    }
 
     // MARK: - 启动加载（NFR1：冷启动 < 1.5s）
 

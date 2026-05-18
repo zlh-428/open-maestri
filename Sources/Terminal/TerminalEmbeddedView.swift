@@ -58,8 +58,10 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 // MARK: - TerminalProviderRegistry
 
 /// 全局注册表：terminalId → SwiftTermProvider
-/// 职责：仅存储 provider 引用，供 TerminalManager.write 转发写入 PTY
-/// 不设置 TerminalSession.onOutput（避免覆盖已在 makeNSView 设置的回调）
+/// 职责：
+///   1. 存储 provider 引用，供 TerminalManager.write 转发写入 PTY
+///   2. 缓存 LocalProcessTerminalView，使其生命周期独立于 Canvas View 层级，
+///      实现切换工作区时 PTY 进程不重置（复用已有 terminalView）
 final class TerminalProviderRegistry {
     static let shared = TerminalProviderRegistry()
     private var providers: [UUID: SwiftTermProvider] = [:]
@@ -89,5 +91,12 @@ final class TerminalProviderRegistry {
     func provider(for terminalId: UUID) -> SwiftTermProvider? {
         lock.lock(); defer { lock.unlock() }
         return providers[terminalId]
+    }
+
+    /// 将已缓存的 terminalView 从当前父视图移除（供 Canvas 层重新 attach 前调用）
+    @MainActor
+    func detachTerminalView(for terminalId: UUID) {
+        guard let view = providers[terminalId]?.terminalView else { return }
+        view.removeFromSuperview()
     }
 }

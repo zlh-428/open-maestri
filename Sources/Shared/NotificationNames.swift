@@ -25,4 +25,6 @@ extension Notification.Name {
     static let portalWebViewReplaced   = Notification.Name("OpenMaestri.portalWebViewReplaced")
     /// FileTree 根目录变更通知：userInfo 含 nodeId/newPath
     static let fileTreeRootChanged     = Notification.Name("OpenMaestri.fileTreeRootChanged")
+    /// 终端从 active→idle（任务完成）：userInfo 含 "terminalId" UUID, "workspaceId" UUID?
+    static let terminalBecameIdle      = Notification.Name("OpenMaestri.terminalBecameIdle")
 }

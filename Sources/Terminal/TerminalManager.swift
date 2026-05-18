@@ -62,6 +62,11 @@ final class TerminalManager {
         return session
     }
 
+    /// 补填终端所属工作区映射（用于复用 provider 时 workspaceId 未随 session 传入的情况）
+    func registerWorkspace(terminalId: UUID, workspaceId: UUID) {
+        terminalWorkspaceMap[terminalId] = workspaceId
+    }
+
     func removeTerminal(id: UUID) {
         terminals[id]?.terminate()
         terminals.removeValue(forKey: id)
@@ -114,11 +119,21 @@ final class TerminalSession {
     private var outputBuffer: [String] = []
     private let bufferMaxLines = 500
 
+    private let activityMonitor = TerminalActivityMonitor()
+
     init(id: UUID, command: String, workingDirectory: String, roleName: String?) {
         self.id = id
         self.command = command
         self.workingDirectory = workingDirectory
         self.roleName = roleName
+
+        activityMonitor.onStatusChanged = { [weak self] isActive in
+            guard let self else { return }
+            if !isActive {
+                self.markIdle()
+            }
+        }
+        activityMonitor.start()
     }
 
     func write(_ text: String) {
@@ -138,6 +153,7 @@ final class TerminalSession {
             outputBuffer = Array(outputBuffer.suffix(bufferMaxLines))
         }
         isIdle = false
+        activityMonitor.recordOutput()
     }
 
     /// 获取最近 N 行输出
@@ -145,10 +161,20 @@ final class TerminalSession {
         Array(outputBuffer.suffix(lines)).joined(separator: "\n")
     }
 
-    /// 标记空闲（由 TerminalActivityMonitor 调用）
-    func markIdle() { isIdle = true }
+    /// 标记空闲（由 activityMonitor 回调触发）
+    /// 仅当从非空闲切换到空闲时才发出通知（避免重复触发）
+    func markIdle() {
+        guard !isIdle else { return }
+        isIdle = true
+        NotificationCenter.default.post(
+            name: .terminalBecameIdle,
+            object: nil,
+            userInfo: ["terminalId": id]
+        )
+    }
 
     func terminate() {
         isRunning = false
+        activityMonitor.stop()
     }
 }

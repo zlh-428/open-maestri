@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import SwiftTerm
 import WebKit
 import OSLog
 
@@ -255,39 +256,59 @@ final class CanvasNodeRenderer {
         // 使用 tc.id 作为 terminal id（TerminalManager 的 key），tc.id 在 JSON 中持久化
         let terminalId = tc.id
 
-        // 直接用 SwiftTermProvider 创建 LocalProcessTerminalView，跳过 NSHostingView
-        // NSHostingView 会拦截键盘事件给 SwiftUI 焦点系统，导致终端无法接收键盘输入
-        let provider = SwiftTermProvider(
-            terminalId: terminalId,
-            command: tc.command,
-            workingDirectory: tc.workingDirectory
-        )
-        provider.serverPort = InterAgentServer.shared.port
-        provider.workspaceId = workspaceId
-        let termView = provider.start(in: .zero)
-        nodeView.contentView.addSubviewFillingBounds(termView)
+        // 优先复用 Registry 中已缓存的 provider（切换工作区时保持 PTY 进程存活）
+        let registry = TerminalProviderRegistry.shared
+        let provider: SwiftTermProvider
+        let termView: LocalProcessTerminalView
 
-        // 绑定 output 回调（与原 TerminalEmbeddedView.makeNSView 逻辑一致）
-        if let session = TerminalManager.shared.terminals[terminalId] {
-            provider.onOutput = { text in
-                Task { @MainActor in session.recordOutput(text) }
-                provider.recordOutputForScrollback(text)
+        if let existing = registry.provider(for: terminalId), existing.isRunning,
+           let existingView = existing.terminalView {
+            // 复用已有 provider：先从旧父视图 detach，再 attach 到新 nodeView
+            provider = existing
+            termView = existingView
+            termView.removeFromSuperview()
+        } else {
+            // 首次创建：直接用 SwiftTermProvider 创建 LocalProcessTerminalView
+            // NSHostingView 会拦截键盘事件给 SwiftUI 焦点系统，导致终端无法接收键盘输入
+            let newProvider = SwiftTermProvider(
+                terminalId: terminalId,
+                command: tc.command,
+                workingDirectory: tc.workingDirectory
+            )
+            newProvider.serverPort = InterAgentServer.shared.port
+            newProvider.workspaceId = workspaceId
+            termView = newProvider.start(in: .zero)
+            provider = newProvider
+
+            // 绑定 output 回调（仅首次创建时设置）
+            if let session = TerminalManager.shared.terminals[terminalId] {
+                newProvider.onOutput = { text in
+                    Task { @MainActor in session.recordOutput(text) }
+                    newProvider.recordOutputForScrollback(text)
+                }
             }
+            registry.register(terminalId: terminalId, provider: newProvider)
         }
-        TerminalProviderRegistry.shared.register(terminalId: terminalId, provider: provider)
+
+        nodeView.contentView.addSubviewFillingBounds(termView)
 
         // PTY resize：contentView 尺寸变化时更新行列数
         termView.autoresizingMask = [.width, .height]
 
-        // 确保 TerminalManager 有对应会话
+        // 确保 TerminalManager 有对应会话（必须传 workspaceId，否则 terminalWorkspaceMap 无记录，未读红点无法触发）
         if TerminalManager.shared.terminals[tc.id] == nil {
             let preset = AgentPreset.defaults.first { $0.agentType == tc.agentType }
                 ?? AgentPreset.defaults.last!
             _ = TerminalManager.shared.createTerminal(
                 id: tc.id,
                 workingDirectory: tc.workingDirectory,
-                preset: preset
+                preset: preset,
+                workspaceId: workspaceId
             )
+        } else if let wsId = workspaceId,
+                  TerminalManager.shared.terminalWorkspaceMap[tc.id] == nil {
+            // session 已存在但 workspaceId 未记录（复用 provider 场景），补填映射
+            TerminalManager.shared.registerWorkspace(terminalId: tc.id, workspaceId: wsId)
         }
 
         // 空闲状态同步

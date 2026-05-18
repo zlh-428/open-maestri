@@ -30,6 +30,7 @@ struct WorkspaceSidebarView: View {
         .onChange(of: selectedId) { _, newId in
             appState.activeWorkspaceId = newId
             if let id = newId {
+                appState.clearUnread(workspaceId: id)
                 updateRecentWorkspaces(id: id)
             }
         }
@@ -122,9 +123,11 @@ struct WorkspaceSidebarView: View {
 
     @ViewBuilder
     private func workspaceRowItem(entry: WorkspaceEntry, inGroup groupId: UUID?) -> some View {
+        let ws = appState.workspaces.first(where: { $0.id == entry.id })
         WorkspaceRowView(
             entry: entry,
-            nodeCount: appState.workspaces.first(where: { $0.id == entry.id })?.nodes.count ?? 0
+            terminalCount: ws?.terminalCount ?? 0,
+            unreadCount: ws?.unreadActivityCount ?? 0
         )
         .tag(entry.id)
         .contextMenu(menuItems: {
@@ -155,9 +158,14 @@ struct WorkspaceSidebarView: View {
 
     @ViewBuilder
     private func workspaceRow(_ entry: WorkspaceEntry) -> some View {
-        WorkspaceRowView(entry: entry)
-            .tag(entry.id)
-            .contextMenu(menuItems: { buildContextMenu(for: entry, inGroup: nil) })
+        let ws = appState.workspaces.first(where: { $0.id == entry.id })
+        WorkspaceRowView(
+            entry: entry,
+            terminalCount: ws?.terminalCount ?? 0,
+            unreadCount: ws?.unreadActivityCount ?? 0
+        )
+        .tag(entry.id)
+        .contextMenu(menuItems: { buildContextMenu(for: entry, inGroup: nil) })
     }
 
     // MARK: - 确认删除按钮
@@ -230,13 +238,15 @@ struct WorkspaceSidebarView: View {
     }
 
     private func updateRecentWorkspaces(id: UUID) {
-        var state = (try? PersistenceManager.shared.loadAppState()) ?? AppStateData()
-        state.recentWorkspaceIds.removeAll { $0 == id }
-        state.recentWorkspaceIds.insert(id, at: 0)
-        if state.recentWorkspaceIds.count > 5 {
-            state.recentWorkspaceIds = Array(state.recentWorkspaceIds.prefix(5))
+        Task.detached(priority: .background) {
+            var state = (try? PersistenceManager.shared.loadAppState()) ?? AppStateData()
+            state.recentWorkspaceIds.removeAll { $0 == id }
+            state.recentWorkspaceIds.insert(id, at: 0)
+            if state.recentWorkspaceIds.count > 5 {
+                state.recentWorkspaceIds = Array(state.recentWorkspaceIds.prefix(5))
+            }
+            try? PersistenceManager.shared.saveAppState(state)
         }
-        try? PersistenceManager.shared.saveAppState(state)
     }
 
     private func applyEdit(_ updated: WorkspaceEntry) {
@@ -252,6 +262,7 @@ struct WorkspaceSidebarView: View {
         var manifest = appState.manifest
         manifest.workspaces.removeAll { $0.id == entry.id }
         appState.manifest = manifest
+        appState.workspaces.removeAll { $0.id == entry.id }
         if selectedId == entry.id {
             selectedId = manifest.workspaces.first?.id
         }
@@ -306,7 +317,8 @@ struct WorkspaceSidebarView: View {
 
 struct WorkspaceRowView: View {
     let entry: WorkspaceEntry
-    var nodeCount: Int = 0
+    var terminalCount: Int = 0
+    var unreadCount: Int = 0
 
     var body: some View {
         HStack(spacing: 8) {
@@ -322,19 +334,38 @@ struct WorkspaceRowView: View {
                     .lineLimit(1)
             }
             Spacer()
-            if nodeCount > 0 {
-                Text("\(nodeCount)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 6)
+            HStack(spacing: 4) {
+                // 未读红点（任务完成角标）
+                if unreadCount > 0 {
+                    ZStack {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 18, height: 18)
+                        Text("\(min(unreadCount, 99))")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                // 终端计数徽章
+                if terminalCount > 0 {
+                    HStack(spacing: 3) {
+                        Image(systemName: "terminal")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                        Text("\(terminalCount)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 5)
                     .padding(.vertical, 2)
                     .background(Color.secondary.opacity(0.12))
                     .clipShape(Capsule())
-            }
-            if entry.isPinned {
-                Image(systemName: "pin.fill")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                }
+                if entry.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 2)

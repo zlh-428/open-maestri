@@ -44,25 +44,35 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 停止 autosave timer 避免与同步保存冲突
         appState.stopAutosave()
 
-        // 同步保存所有工作区（applicationWillTerminate 在主线程同步调用）
-        for ws in appState.workspaces {
-            do {
-                try ws.saveSync()
-            } catch {
-                logger.error("Failed to save workspace \(ws.id) on terminate: \(error)")
-            }
+        // 在主线程先把所有 @Observable 属性快照为纯值类型，
+        // 再交给后台线程做 I/O，避免跨线程访问 @Observable 对象导致死锁
+        let payloads: [(id: UUID, doc: WorkspaceDocument)] = appState.workspaces.map { ws in
+            let payload = ws.snapshotPayload()
+            return (ws.id, WorkspaceDocument(payload: payload))
         }
+        let stateData: AppStateData = {
+            var s = AppStateData()
+            s.activeWorkspaceId = appState.activeWorkspaceId
+            s.hasCompletedOnboarding = appState.hasCompletedOnboarding
+            s.cleanShutdown = true
+            return s
+        }()
+        let manifest = appState.manifest
 
-        // 保存 app state
-        do {
-            var stateData = AppStateData()
-            stateData.activeWorkspaceId = appState.activeWorkspaceId
-            stateData.hasCompletedOnboarding = appState.hasCompletedOnboarding
-            stateData.cleanShutdown = true
-            try PersistenceManager.shared.saveAppState(stateData)
-        } catch {
-            logger.error("Failed to save app state on terminate: \(error)")
+        let semaphore = DispatchSemaphore(value: 0)
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let pm = PersistenceManager.shared
+            for item in payloads {
+                do { try pm.saveSync(item.doc, to: pm.workspaceURL(id: item.id)) }
+                catch { self?.logger.error("Failed to save workspace \(item.id) on terminate: \(error)") }
+            }
+            do { try pm.saveManifest(manifest) }
+            catch { self?.logger.error("Failed to save manifest on terminate: \(error)") }
+            do { try pm.saveAppState(stateData) }
+            catch { self?.logger.error("Failed to save app state on terminate: \(error)") }
+            semaphore.signal()
         }
+        _ = semaphore.wait(timeout: .now() + 3.0)
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

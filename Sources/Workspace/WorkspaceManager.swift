@@ -24,6 +24,14 @@ final class WorkspaceManager: Identifiable {
     var canvasOrigin: CGPoint = Constants.canvasInitialOrigin
     var canvasZoom: CGFloat = 1.0
 
+    /// 该工作区未读的"任务完成"通知数（终端从 active→idle 时累积，用户切回时清零）
+    var unreadActivityCount: Int = 0
+
+    /// Terminal 节点数量（侧边栏徽章用，避免在 View body 里做 O(n) filter）
+    var terminalCount: Int {
+        nodes.count(where: { if case .terminal = $0.content { true } else { false } })
+    }
+
     private let logger = Logger.make(category: "WorkspaceManager")
     private let pm = PersistenceManager.shared
 
@@ -132,6 +140,9 @@ final class WorkspaceManager: Identifiable {
     }
 
     // MARK: - 私有辅助
+
+    /// 将当前状态快照为纯值类型，可安全传递到后台线程
+    func snapshotPayload() -> WorkspacePayload { buildPayload() }
 
     private func buildPayload() -> WorkspacePayload {
         var payload = WorkspacePayload(id: id, name: name, workingDirectory: workingDirectory)

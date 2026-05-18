@@ -98,36 +98,48 @@ struct CreateWorkspaceSheet: View {
             workingDirectory: workingDirectory,
             icon: selectedIcon
         )
-        let pm = PersistenceManager.shared
-
-        // 1. 创建目录和初始 workspace.json（同步，确保文件存在后再 dismiss）
-        try? pm.ensureWorkspaceDirectoryExists(id: entry.id)
-        let payload = WorkspacePayload(id: entry.id, name: name, workingDirectory: workingDirectory)
-        let doc = WorkspaceDocument(payload: payload)
-        try? pm.saveSync(doc, to: pm.workspaceURL(id: entry.id))
-
-        // 2. 更新 manifest（同步持久化）
-        var manifest = appState.manifest
-        manifest.workspaces.append(entry)
-        appState.manifest = manifest
-        try? pm.saveManifest(manifest)
-
-        // 3. 立即创建 WorkspaceManager 实例并加入 AppState.workspaces
-        //    （这是关键：ContentView 的 detail 通过 appState.workspaces 查找工作区）
-        let ws = WorkspaceManager(entry: entry)
-        try? ws.load()
-        appState.workspaces.append(ws)
-
-        // 4. 激活新工作区
-        appState.activeWorkspaceId = entry.id
-
-        // 5. Spotlight 更新
-        SpotlightIndexer.shared.indexWorkspace(
-            id: entry.id,
-            name: entry.name,
-            workingDirectory: entry.workingDirectory
-        )
+        // 在 dismiss 前快照 manifest 和 appState 强引用，避免 sheet 销毁后 @Environment 失效
+        let currentManifest = appState.manifest
+        let capturedAppState = appState
 
         dismiss()
+
+        Task.detached(priority: .userInitiated) {
+            let pm = PersistenceManager.shared
+
+            // 1. 创建目录和初始 workspace.json
+            try? pm.ensureWorkspaceDirectoryExists(id: entry.id)
+            let payload = WorkspacePayload(id: entry.id, name: entry.name, workingDirectory: entry.workingDirectory)
+            let doc = WorkspaceDocument(payload: payload)
+            try? pm.saveSync(doc, to: pm.workspaceURL(id: entry.id))
+
+            // 2. 持久化 manifest
+            var newManifest = currentManifest
+            newManifest.workspaces.append(entry)
+            try? pm.saveManifest(newManifest)
+
+            // 3. 构造 WorkspaceManager（不需要 load，刚创建的是空工作区）
+            let ws = WorkspaceManager(entry: entry)
+
+            // 4. 回主线程更新 UI 状态（用强引用 capturedAppState，不会因 sheet 销毁而为 nil）
+            let finalManifest = newManifest
+            await MainActor.run {
+                capturedAppState.manifest = finalManifest
+                capturedAppState.workspaces.append(ws)
+                capturedAppState.activeWorkspaceId = entry.id
+                NotificationCenter.default.post(
+                    name: .workspaceCreated,
+                    object: nil,
+                    userInfo: ["workspaceId": entry.id]
+                )
+            }
+
+            // 5. Spotlight 更新
+            SpotlightIndexer.shared.indexWorkspace(
+                id: entry.id,
+                name: entry.name,
+                workingDirectory: entry.workingDirectory
+            )
+        }
     }
 }
