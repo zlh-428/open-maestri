@@ -15,7 +15,8 @@ let package = Package(
                 "SwiftTerm",
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
-            path: "Sources"
+            path: "Sources",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "OpenMaestriTests",
