@@ -63,16 +63,32 @@ struct RopePathRenderer {
 
     // MARK: - 绘制
 
-    /// 绘制连接线（状态颜色 + 虚线）
-    static func draw(points: [CGPoint], status: ConnectionStatus) {
+    /// 绘制连接线（状态颜色 + 虚线 + glow）
+    static func draw(points: [CGPoint], status: ConnectionStatus, isHighlighted: Bool = false) {
         guard !points.isEmpty else { return }
         let path = bezierPath(from: points)
-        strokeColor(for: status).setStroke()
-        path.lineWidth = lineWidth(for: status)
+
+        // 通信中或高亮时绘制 glow 底层
+        if status == .communicating || isHighlighted {
+            let glowPath = bezierPath(from: points)
+            let glowColor = isHighlighted
+                ? NSColor.systemBlue.withAlphaComponent(0.25)
+                : NSColor.systemGreen.withAlphaComponent(0.3)
+            glowColor.setStroke()
+            glowPath.lineWidth = lineWidth(for: status) + 4
+            glowPath.lineCapStyle = .round
+            glowPath.lineJoinStyle = .round
+            glowPath.stroke()
+        }
+
+        // 主线条
+        let color = isHighlighted ? NSColor.systemBlue : strokeColor(for: status)
+        color.setStroke()
+        path.lineWidth = isHighlighted ? 2.5 : lineWidth(for: status)
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
 
-        if isDashed(for: status) {
+        if !isHighlighted && isDashed(for: status) {
             let pattern: [CGFloat] = [6, 4]
             path.setLineDash(pattern, count: 2, phase: 0)
         }
