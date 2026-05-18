@@ -275,8 +275,7 @@ extension CanvasViewportView {
         animateOrigin(from: startOrigin, to: targetOrigin, startTime: startTime, duration: duration)
     }
 
-    /// 逐帧插值 canvasOrigin（easeInOut 缓动），使用 CADisplayLink 跟随屏幕刷新率（支持 120Hz ProMotion）
-    /// 逐帧插值 canvasOrigin（easeInOut 缓动）
+    /// 逐帧插值 canvasOrigin（easeInOut 缓动），使用 Timer 60fps 驱动
     func animateOrigin(from: CGPoint, to: CGPoint, startTime: CFTimeInterval, duration: TimeInterval) {
         animationTimer?.invalidate()
         animationTimer = nil
@@ -310,5 +309,46 @@ extension CanvasViewportView {
     func togglePanMode() {
         isPanMode = !isPanMode
         NSCursor.closedHand.set()
+    }
+
+    // MARK: - 手势（触控板平移和缩放）
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) {
+            // ⌘+滚轮 缩放（以鼠标位置为锚点）
+            let delta = event.scrollingDeltaY * 0.01
+            let newZoom = (zoom + delta).clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom)
+            let mouseScreen = convert(event.locationInWindow, from: nil)
+            let mouseCanvas = screenToCanvas(mouseScreen)
+            zoom = newZoom
+            canvasOrigin = CGPoint(
+                x: mouseCanvas.x - mouseScreen.x / zoom,
+                y: mouseCanvas.y - mouseScreen.y / zoom
+            )
+        } else {
+            // 触摸板两指平移：手指方向 = 画布移动方向（自然滚动）
+            canvasOrigin = CGPoint(
+                x: canvasOrigin.x - event.scrollingDeltaX / zoom,
+                y: canvasOrigin.y + event.scrollingDeltaY / zoom
+            )
+        }
+        needsLayout = true
+        needsDisplay = true
+        notifyViewportChanged()
+    }
+
+    override func magnify(with event: NSEvent) {
+        let newZoom = (zoom * (1 + event.magnification))
+            .clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom)
+        let mouseScreen = convert(event.locationInWindow, from: nil)
+        let mouseCanvas = screenToCanvas(mouseScreen)
+        zoom = newZoom
+        canvasOrigin = CGPoint(
+            x: mouseCanvas.x - mouseScreen.x / zoom,
+            y: mouseCanvas.y - mouseScreen.y / zoom
+        )
+        needsLayout = true
+        needsDisplay = true
+        notifyViewportChanged()
     }
 }
