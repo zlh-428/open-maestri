@@ -264,8 +264,13 @@ final class TerminalNodeView: BaseNodeView {
         let scrollLockItem = NSMenuItem(title: scrollLockLabel, action: #selector(toggleScrollLock), keyEquivalent: "")
         menu.addItem(scrollLockItem)
         menu.addItem(.separator())
+        // 创建连接
+        menu.addItem(NSMenuItem(title: "创建连接", action: #selector(startConnect), keyEquivalent: ""))
+        menu.addItem(.separator())
         let closeItem = NSMenuItem(title: "关闭", action: #selector(closeNode), keyEquivalent: "w")
         closeItem.keyEquivalentModifierMask = .command
+        let closeAttrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemRed]
+        closeItem.attributedTitle = NSAttributedString(string: "关闭", attributes: closeAttrs)
         menu.addItem(closeItem)
         for item in menu.items { item.target = self }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
@@ -291,11 +296,8 @@ final class TerminalNodeView: BaseNodeView {
         autoScrollLocked.toggle()
         onScrollLockToggle?(autoScrollLocked)
     }
+    @objc private func startConnect() { onConnect?() }
     @objc private func closeNode() { onClose?() }
-
-    // MARK: - 额外回调
-
-    var onDuplicate: (() -> Void)?
     /// 滚动锁定状态变更回调（由 CanvasNodeRenderer 绑定）
     var onScrollLockToggle: ((Bool) -> Void)?
     /// Assign Role 回调（rolePreset = nil 表示清除角色，立即重启终端）

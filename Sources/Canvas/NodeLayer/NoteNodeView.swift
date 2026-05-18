@@ -58,6 +58,7 @@ final class NoteNodeView: BaseNodeView {
 
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "复制节点", action: #selector(duplicateNote), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "重命名", action: #selector(renameNote), keyEquivalent: ""))
         menu.addItem(.separator())
         let moveItem = NSMenuItem(title: "移动到…", action: #selector(moveNoteToDirectory), keyEquivalent: "")
@@ -67,14 +68,19 @@ final class NoteNodeView: BaseNodeView {
                                   action: #selector(toggleLock), keyEquivalent: "")
         menu.addItem(lockItem)
         menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "创建连接", action: #selector(startConnect), keyEquivalent: ""))
+        menu.addItem(.separator())
         let closeItem = NSMenuItem(title: "删除", action: #selector(closeNote), keyEquivalent: "")
-        closeItem.keyEquivalentModifierMask = .command
+        let closeAttrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemRed]
+        closeItem.attributedTitle = NSAttributedString(string: "删除", attributes: closeAttrs)
         menu.addItem(closeItem)
         for item in menu.items { item.target = self }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
+    @objc private func duplicateNote() { onDuplicate?() }
     @objc private func renameNote() { startInlineRename() }
+    @objc private func startConnect() { onConnect?() }
 
     @objc private func moveNoteToDirectory() {
         let panel = NSOpenPanel()

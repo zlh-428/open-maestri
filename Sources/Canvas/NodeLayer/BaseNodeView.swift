@@ -54,6 +54,10 @@ class BaseNodeView: NSView {
     var onClose: (() -> Void)?
     /// 节点被点击回调（传入 NSEvent，由画布处理选中逻辑）
     var onNodeClicked: ((NSEvent) -> Void)?
+    /// 复制节点回调（右键菜单 Duplicate）
+    var onDuplicate: (() -> Void)?
+    /// 开始创建连接回调（右键菜单 Connect）
+    var onConnect: (() -> Void)?
 
     // MARK: - 行内重命名（基类通用实现）
 

@@ -52,18 +52,26 @@ final class FileTreeNodeView: BaseNodeView {
 
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
+        menu.addItem(NSMenuItem(title: "复制节点", action: #selector(duplicateTree), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "重命名", action: #selector(renameTree), keyEquivalent: ""))
         menu.addItem(.separator())
         let lockItem = NSMenuItem(title: isLocked ? "解锁" : "锁定",
                                   action: #selector(toggleLock), keyEquivalent: "")
         menu.addItem(lockItem)
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "删除", action: #selector(closeTree), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "创建连接", action: #selector(startConnect), keyEquivalent: ""))
+        menu.addItem(.separator())
+        let closeItem = NSMenuItem(title: "删除", action: #selector(closeTree), keyEquivalent: "")
+        let closeAttrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemRed]
+        closeItem.attributedTitle = NSAttributedString(string: "删除", attributes: closeAttrs)
+        menu.addItem(closeItem)
         for item in menu.items { item.target = self }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
 
+    @objc private func duplicateTree() { onDuplicate?() }
     @objc private func renameTree() { startInlineRename() }
+    @objc private func startConnect() { onConnect?() }
     @objc private func toggleLock() {
         isLocked = !isLocked
         onLockToggle?(isLocked)
