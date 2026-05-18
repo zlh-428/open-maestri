@@ -1,0 +1,1284 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "button.add_custom_preset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Custom Preset…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加自定义预设…" } }
+      }
+    },
+    "button.add_role" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Role…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建角色…" } }
+      }
+    },
+    "button.cancel" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
+      }
+    },
+    "button.check_updates" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Check for Updates…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "检查更新…" } }
+      }
+    },
+    "button.choose_directory" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择…" } }
+      }
+    },
+    "button.close" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Close" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭" } }
+      }
+    },
+    "button.commit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Commit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "提交" } }
+      }
+    },
+    "button.confirm" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirm" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "确定" } }
+      }
+    },
+    "button.connect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接" } }
+      }
+    },
+    "button.continue" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Continue" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "继续" } }
+      }
+    },
+    "button.create" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建" } }
+      }
+    },
+    "button.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
+      }
+    },
+    "button.delete_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除分组" } }
+      }
+    },
+    "button.done" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Done" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "完成" } }
+      }
+    },
+    "button.duplicate" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制" } }
+      }
+    },
+    "button.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑" } }
+      }
+    },
+    "button.get_started" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get Started" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始使用" } }
+      }
+    },
+    "button.merge" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Merge" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "合并" } }
+      }
+    },
+    "button.modify" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Modify" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "修改" } }
+      }
+    },
+    "button.ok" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "OK" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "好" } }
+      }
+    },
+    "button.remove_from_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Remove from Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从分组移除" } }
+      }
+    },
+    "button.rename" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名" } }
+      }
+    },
+    "button.rename_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名分组" } }
+      }
+    },
+    "button.restore" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restore" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复" } }
+      }
+    },
+    "button.restore_defaults" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restore Defaults" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复默认" } }
+      }
+    },
+    "button.save" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存" } }
+      }
+    },
+    "button.save_files" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Save Files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "保存文件" } }
+      }
+    },
+    "button.select" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择…" } }
+      }
+    },
+    "button.start" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始" } }
+      }
+    },
+    "button.view_backups" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "View Backups…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "查看备份…" } }
+      }
+    },
+    "general.appearance.coming_soon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance customization coming soon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "外观自定义功能即将推出" } }
+      }
+    },
+    "general.auto_backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto Backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动备份" } }
+      }
+    },
+    "general.auto_backup.hourly" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hourly" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每小时" } }
+      }
+    },
+    "general.background.dot_grid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dot Grid" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "点阵网格" } }
+      }
+    },
+    "general.background.solid" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Solid" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "纯色" } }
+      }
+    },
+    "general.background.transparent" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Transparent" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "透明" } }
+      }
+    },
+    "general.backup_list.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Backups" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无备份" } }
+      }
+    },
+    "general.backup_list.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backup List" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "备份列表" } }
+      }
+    },
+    "general.canvas_background" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Canvas Background" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "画布背景" } }
+      }
+    },
+    "general.metal_renderer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Metal Renderer (High Performance Terminal)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Metal 渲染器（终端高性能模式）" } }
+      }
+    },
+    "general.metal_renderer.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use Metal GPU acceleration for terminal rendering to reduce CPU usage during heavy output" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用 Metal GPU 加速终端渲染，可降低大量输出时的 CPU 占用" } }
+      }
+    },
+    "general.preferred_ide" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preferred IDE" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "首选 IDE" } }
+      }
+    },
+    "general.preferred_ide.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Editor used when choosing View → Open in Editor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在「View → Open in Editor」时使用的编辑器" } }
+      }
+    },
+    "general.section.appearance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "外观" } }
+      }
+    },
+    "general.section.backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "备份" } }
+      }
+    },
+    "general.section.integration" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Integration" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "集成" } }
+      }
+    },
+    "general.section.update" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Update" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新" } }
+      }
+    },
+    "general.ssh_add_to_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add to PATH" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加到 PATH" } }
+      }
+    },
+    "general.ssh_enabled" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable Remote SSH" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用 Remote SSH" } }
+      }
+    },
+    "general.ssh_script_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Script Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "脚本路径" } }
+      }
+    },
+    "general.ssh_script_path.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "omaestri script installation path (default ~/.local/bin/omaestri)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "omaestri 脚本安装路径（默认 ~/.local/bin/omaestri）" } }
+      }
+    },
+    "general.ssh_tunnel.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "SSH reverse tunnel port (default 7433), used by remote omaestri CLI to connect back" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "SSH 反向隧道端口（默认 7433），远端 omaestri CLI 通过此端口回连" } }
+      }
+    },
+    "general.ssh_username" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Username" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户名" } }
+      }
+    },
+    "settings.tab.agents" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agents" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Agent" } }
+      }
+    },
+    "settings.tab.general" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "通用" } }
+      }
+    },
+    "settings.tab.shortcuts" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shortcuts" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快捷键" } }
+      }
+    },
+    "settings.tab.terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端" } }
+      }
+    },
+    "settings.terminal.font" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体" } }
+      }
+    },
+    "settings.terminal.font.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font changes take effect in new terminals; existing terminals require restart" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体变更在新建终端时生效，已有终端需重启。" } }
+      }
+    },
+    "settings.terminal.font_size" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font Size" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字号" } }
+      }
+    },
+    "settings.terminal.theme" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主题" } }
+      }
+    },
+    "settings.terminal.theme.dark" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "深色" } }
+      }
+    },
+    "settings.terminal.theme.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme changes apply immediately to all open terminals" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主题变更立即应用到所有已打开的终端。" } }
+      }
+    },
+    "settings.terminal.theme.light" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浅色" } }
+      }
+    },
+    "settings.terminal.theme.system" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跟随系统" } }
+      }
+    },
+    "terminal.auto_scroll_lock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lock/Unlock Auto-scroll" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "锁定/解锁自动滚动" } }
+      }
+    },
+    "terminal.command" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Command" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "命令" } }
+      }
+    },
+    "terminal.edit.menu" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑终端" } }
+      }
+    },
+    "terminal.edit.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑终端" } }
+      }
+    },
+    "terminal.jump" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Jump to Terminal (⌘+number)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跳转终端（⌘+数字）" } }
+      }
+    },
+    "terminal.launch_command" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Launch Command" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启动命令" } }
+      }
+    },
+    "terminal.maestro_mode" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Maestro Mode" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Maestro 模式" } }
+      }
+    },
+    "terminal.monitor" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Monitor Activity" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "监控活动" } }
+      }
+    },
+    "terminal.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端名称" } }
+      }
+    },
+    "terminal.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建终端" } }
+      }
+    },
+    "terminal.next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一个终端" } }
+      }
+    },
+    "terminal.no_active" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No active terminals" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无活跃终端" } }
+      }
+    },
+    "terminal.no_command" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Command" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无命令" } }
+      }
+    },
+    "terminal.prev" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一个终端" } }
+      }
+    },
+    "terminal.scroll_lock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lock Scroll (⌘⇧B)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "锁定滚动（⌘⇧B）" } }
+      }
+    },
+    "terminal.scroll_unlock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlock Scroll" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "解除滚动锁定" } }
+      }
+    },
+    "terminal.target" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Target Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标终端" } }
+      }
+    },
+    "workspace.duplicate" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制" } }
+      }
+    },
+    "workspace.edit.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑工作区" } }
+      }
+    },
+    "workspace.group_name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Group Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分组名称" } }
+      }
+    },
+    "workspace.move_to_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move to Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移入分组" } }
+      }
+    },
+    "workspace.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Workspace Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "工作区名称" } }
+      }
+    },
+    "workspace.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建工作区" } }
+      }
+    },
+    "workspace.new_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建分组" } }
+      }
+    },
+    "workspace.new_or_group" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Workspace or Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建工作区或分组" } }
+      }
+    },
+    "workspace.next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换下一个工作区" } }
+      }
+    },
+    "workspace.pin" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pin" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "置顶" } }
+      }
+    },
+    "workspace.prev" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换上一个工作区" } }
+      }
+    },
+    "workspace.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search Workspaces" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索工作区" } }
+      }
+    },
+    "workspace.sidebar.create_hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create a workspace in the sidebar" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在侧边栏创建一个工作区" } }
+      }
+    },
+    "workspace.unpin" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unpin" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消置顶" } }
+      }
+    },
+    "workspace.working_dir" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Working Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "工作目录" } }
+      }
+    },
+    "workspace.working_dir.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not selected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未选择" } }
+      }
+    },
+    "alert.workspace.load_failed" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Some workspaces failed to load" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "部分工作区加载失败" } }
+      }
+    },
+    "canvas.center_node" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Center Selected Node" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "居中选中节点" } }
+      }
+    },
+    "canvas.chrome.hide" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide Chrome" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐藏控制栏" } }
+      }
+    },
+    "canvas.chrome.show" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show Chrome" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示控制栏" } }
+      }
+    },
+    "canvas.chrome.toggle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide/Show Chrome" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐藏/显示控制栏" } }
+      }
+    },
+    "canvas.delete_node" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Selected Node" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除选中节点" } }
+      }
+    },
+    "canvas.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Canvas is empty" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "画布为空" } }
+      }
+    },
+    "canvas.minimap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Canvas Minimap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "画布缩略图" } }
+      }
+    },
+    "canvas.toolbar.draw" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Draw" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手绘" } }
+      }
+    },
+    "canvas.toolbar.filetree" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File Tree" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件树" } }
+      }
+    },
+    "canvas.toolbar.filter" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filter/Search" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "过滤/搜索" } }
+      }
+    },
+    "canvas.toolbar.format" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Format" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "格式" } }
+      }
+    },
+    "canvas.toolbar.note" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Note" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "笔记" } }
+      }
+    },
+    "canvas.toolbar.portal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Browser" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浏览器" } }
+      }
+    },
+    "canvas.toolbar.select" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择工具" } }
+      }
+    },
+    "canvas.toolbar.settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开设置" } }
+      }
+    },
+    "canvas.toolbar.terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端" } }
+      }
+    },
+    "canvas.toolbar.text" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text Label" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文本标签" } }
+      }
+    },
+    "tooltip.back" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Back" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "后退" } }
+      }
+    },
+    "tooltip.config_hooks" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Configure Hooks" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "配置 Hooks" } }
+      }
+    },
+    "tooltip.hide_chrome" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hide/Show Chrome" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "隐藏/显示控制栏" } }
+      }
+    },
+    "tooltip.minimap" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Canvas Minimap" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "画布缩略图" } }
+      }
+    },
+    "tooltip.node.change_root" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change Root Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改根目录" } }
+      }
+    },
+    "tooltip.node.connect_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect to Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接到终端" } }
+      }
+    },
+    "tooltip.node.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
+      }
+    },
+    "tooltip.node.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑" } }
+      }
+    },
+    "tooltip.node.reveal_finder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reveal in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在访达中显示" } }
+      }
+    },
+    "tooltip.refresh" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } }
+      }
+    },
+    "tooltip.start_connect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Connection (L)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建连接（L）" } }
+      }
+    },
+    "tooltip.stop" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "停止" } }
+      }
+    },
+    "menu.assign_role" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Assign Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分配角色" } }
+      }
+    },
+    "menu.change_root" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Change Root Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改根目录" } }
+      }
+    },
+    "menu.clear_all" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear All" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除全部" } }
+      }
+    },
+    "menu.close" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Close" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭" } }
+      }
+    },
+    "menu.collapse_all" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Collapse All" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全部折叠" } }
+      }
+    },
+    "menu.create_connection" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建连接" } }
+      }
+    },
+    "menu.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
+      }
+    },
+    "menu.delete_connection" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除连接" } }
+      }
+    },
+    "menu.diff_view" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diff View" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "差异图" } }
+      }
+    },
+    "menu.duplicate_node" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate Node" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制节点" } }
+      }
+    },
+    "menu.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑" } }
+      }
+    },
+    "menu.icon_view" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon View" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标视图" } }
+      }
+    },
+    "menu.list_view" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "List View" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "列表视图" } }
+      }
+    },
+    "menu.lock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lock" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "锁定" } }
+      }
+    },
+    "menu.move_to" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move to…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移动到…" } }
+      }
+    },
+    "menu.navigate_into" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Navigate Into" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导航进入" } }
+      }
+    },
+    "menu.no_role_clear" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Role (Clear)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无角色（清除）" } }
+      }
+    },
+    "menu.rename" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名" } }
+      }
+    },
+    "menu.reveal_in_finder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reveal in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在访达中显示" } }
+      }
+    },
+    "menu.show_hidden_files" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show Hidden Files" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示隐藏文件" } }
+      }
+    },
+    "menu.start_connect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始连线" } }
+      }
+    },
+    "menu.undo_stroke" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Undo Stroke" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "撤销笔画" } }
+      }
+    },
+    "menu.unlock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlock" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "解锁" } }
+      }
+    },
+    "floor.branch_name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Branch Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分支名" } }
+      }
+    },
+    "floor.current_branch.unknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown Branch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知分支" } }
+      }
+    },
+    "floor.hook.manual" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Executed on manual trigger" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "手动触发时执行" } }
+      }
+    },
+    "floor.hook.post_create" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Executed after Floor is created" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建 Floor 后自动执行" } }
+      }
+    },
+    "floor.merge_success" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Merge successful! Floor complete." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "合并成功！Floor 已完成。" } }
+      }
+    },
+    "floor.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Floor Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Floor 名称" } }
+      }
+    },
+    "floor.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Floor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建 Floor" } }
+      }
+    },
+    "floor.new_button" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "+ New Floor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "+ 新建 Floor" } }
+      }
+    },
+    "floor.overview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Floor Overview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Floor 总览" } }
+      }
+    },
+    "floor.target_branch" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Target Branch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标分支" } }
+      }
+    },
+    "floor.target_branch_label" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Target Branch:" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标分支：" } }
+      }
+    },
+    "floor.use_existing_branch" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use Existing Branch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用已有分支" } }
+      }
+    },
+    "floor.work_branches" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Work Branches (Floors)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "工作分支（Floors）" } }
+      }
+    },
+    "filetree.claude_agents_label" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "CLAUDE.md / AGENTS.md (Sync)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CLAUDE.md / AGENTS.md（同步）" } }
+      }
+    },
+    "filetree.dir_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Directory Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目录路径" } }
+      }
+    },
+    "filetree.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New File Tree" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建文件树" } }
+      }
+    },
+    "filetree.sync_config" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Sync CLAUDE.md ↔ AGENTS.md" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "同步 CLAUDE.md ↔ AGENTS.md" } }
+      }
+    },
+    "filetree.sync_config.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "When either file is modified, automatically sync to the other" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "修改任意一个文件时，自动同步到另一个文件" } }
+      }
+    },
+    "portal.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Portal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建 Portal" } }
+      }
+    },
+    "portal.url_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enter URL…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "输入网址…" } }
+      }
+    },
+    "note.placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start typing your note…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在此输入笔记内容…" } }
+      }
+    },
+    "note.preview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Preview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "预览" } }
+      }
+    },
+    "note.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑" } }
+      }
+    },
+    "role.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑角色" } }
+      }
+    },
+    "role.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Role Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色名称" } }
+      }
+    },
+    "role.name_placeholder.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "e.g. Leader, Coder, Reviewer, Tester" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "例如：Leader、Coder、Reviewer、Tester" } }
+      }
+    },
+    "role.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建角色" } }
+      }
+    },
+    "role.no_custom_roles" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No custom roles. Add one in Settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无自定义角色，可在设置中添加" } }
+      }
+    },
+    "role.no_roles" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No roles yet. Click the button below to create one" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无角色，点击下方按钮创建" } }
+      }
+    },
+    "role.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无角色" } }
+      }
+    },
+    "role.none_tag" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(None)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "（无）" } }
+      }
+    },
+    "role.section" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色 (Roles)" } }
+      }
+    },
+    "role.tab" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色" } }
+      }
+    },
+    "agent.color" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Color" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "颜色" } }
+      }
+    },
+    "agent.icon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标" } }
+      }
+    },
+    "agent.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
+      }
+    },
+    "agent.onboarding.drag_hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag a terminal node from the top toolbar, choose Claude Code / Codex / Shell and more" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从顶部工具栏拖入终端节点，选择 Claude Code / Codex / Shell 等预设" } }
+      }
+    },
+    "agent.type" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } }
+      }
+    },
+    "shortcut.action" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Action" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "操作" } }
+      }
+    },
+    "shortcut.press_new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press new shortcut…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按下新快捷键…" } }
+      }
+    },
+    "shortcut.unlimited" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlimited" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无限" } }
+      }
+    },
+    "routine.auto_run_hooks" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-run Setup Hooks" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动执行 Setup Hooks" } }
+      }
+    },
+    "routine.commit_message_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Commit message..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "提交信息..." } }
+      }
+    },
+    "routine.interval_minutes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Interval (minutes)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "间隔（分钟）" } }
+      }
+    },
+    "routine.prompt_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Prompt (use && to separate multiple)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "提示（用 && 分隔多条）" } }
+      }
+    },
+    "routine.shell_command_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "shell command…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "shell 命令…" } }
+      }
+    },
+    "git.diff_view" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Diff View" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "差异图" } }
+      }
+    },
+    "git.no_diff" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(No differences)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "(无差异)" } }
+      }
+    },
+    "git.target_branch" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Target Branch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "目标分支" } }
+      }
+    },
+    "panel.move_here" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Move Here" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "移动到这里" } }
+      }
+    },
+    "panel.select_directory" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择目录" } }
+      }
+    },
+    "panel.select_target_dir.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Target Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择目标目录" } }
+      }
+    },
+    "panel.select_workspace_dir" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Workspace Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择工作区目录" } }
+      }
+    },
+    "onboarding.from_here" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Here" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从这里开始" } }
+      }
+    },
+    "onboarding.get_started" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Get Started" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始使用" } }
+      }
+    },
+    "onboarding.quick_start" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quick Start" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快速开始" } }
+      }
+    },
+    "connection.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除连接" } }
+      }
+    },
+    "connection.start" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始连线" } }
+      }
+    },
+    "label.appearance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "外观" } }
+      }
+    },
+    "label.basic_info" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Basic Info" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "基本信息" } }
+      }
+    },
+    "label.details" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "详细信息" } }
+      }
+    },
+    "label.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索" } }
+      }
+    }
+  },
+  "version" : "1"
+}
