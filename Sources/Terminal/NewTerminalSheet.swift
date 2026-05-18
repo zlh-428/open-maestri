@@ -231,7 +231,8 @@ struct NewTerminalSheet: View {
                     panel.canChooseFiles = false
                     panel.allowsMultipleSelection = false
                     panel.directoryURL = URL(fileURLWithPath: workingDirectory)
-                    if panel.runModal() == .OK, let url = panel.url {
+                    panel.begin { response in
+                        guard response == .OK, let url = panel.url else { return }
                         workingDirectory = url.path
                     }
                 }

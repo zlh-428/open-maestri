@@ -6,9 +6,8 @@ struct CreateWorkspaceSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String = ""
-    @State private var workingDirectory: String = ""
+    @State private var workingDirectory: String = FileManager.default.homeDirectoryForCurrentUser.path
     @State private var selectedIcon: String = "folder"
-    @State private var isPickingDirectory = false
 
     private let iconOptions = [
         "folder", "folder.fill", "terminal.fill", "cpu",
@@ -26,7 +25,7 @@ struct CreateWorkspaceSheet: View {
                     .keyboardShortcut(.escape)
                 Button("创建") { createWorkspace() }
                     .keyboardShortcut(.return)
-                    .disabled(name.isEmpty || workingDirectory.isEmpty)
+                    .disabled(name.isEmpty)
                     .buttonStyle(.borderedProminent)
             }
             .padding()
@@ -38,10 +37,16 @@ struct CreateWorkspaceSheet: View {
                     TextField("工作区名称", text: $name)
                         .textFieldStyle(.roundedBorder)
 
-                    HStack {
-                        TextField("工作目录", text: $workingDirectory)
-                            .textFieldStyle(.roundedBorder)
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder")
+                            .foregroundStyle(.secondary)
+                        Text(abbreviatedPath(workingDirectory))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Button("选择…") { pickDirectory() }
+                            .controlSize(.small)
                     }
                 }
 
@@ -67,13 +72,19 @@ struct CreateWorkspaceSheet: View {
         .frame(width: 480, height: 360)
     }
 
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
+    }
+
     private func pickDirectory() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.message = "选择工作区目录"
-        if panel.runModal() == .OK, let url = panel.url {
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
             workingDirectory = url.path
             if name.isEmpty {
                 name = url.lastPathComponent
