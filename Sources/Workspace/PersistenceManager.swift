@@ -125,12 +125,19 @@ final class PersistenceManager {
         )
         let tmp = url.appendingPathExtension("tmp")
         try data.write(to: tmp, options: .atomic)
-        _ = try FileManager.default.replaceItem(
-            at: url,
-            withItemAt: tmp,
-            backupItemName: nil,
-            resultingItemURL: nil
-        )
+
+        if FileManager.default.fileExists(atPath: url.path) {
+            // 目标文件已存在：使用 replaceItem 保证原子性（含崩溃恢复语义）
+            _ = try FileManager.default.replaceItem(
+                at: url,
+                withItemAt: tmp,
+                backupItemName: nil,
+                resultingItemURL: nil
+            )
+        } else {
+            // 目标文件不存在（首次创建）：直接 move tmp 到目标路径
+            try FileManager.default.moveItem(at: tmp, to: url)
+        }
     }
 
     // MARK: - 高层工作区 API（Story 1.3/1.5 使用）

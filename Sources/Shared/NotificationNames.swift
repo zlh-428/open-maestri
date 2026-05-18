@@ -27,4 +27,6 @@ extension Notification.Name {
     static let fileTreeRootChanged     = Notification.Name("OpenMaestri.fileTreeRootChanged")
     /// 终端从 active→idle（任务完成）：userInfo 含 "terminalId" UUID, "workspaceId" UUID?
     static let terminalBecameIdle      = Notification.Name("OpenMaestri.terminalBecameIdle")
+    /// 新工作区创建完成：userInfo 含 "workspaceId" UUID
+    static let workspaceCreated        = Notification.Name("OpenMaestri.workspaceCreated")
 }

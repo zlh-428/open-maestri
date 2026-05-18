@@ -51,6 +51,11 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .showCreateWorkspace)) { _ in
             showCreateWorkspace = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .workspaceCreated)) { notif in
+            if let id = notif.userInfo?["workspaceId"] as? UUID {
+                selectedWorkspaceId = id
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .nextWorkspace)) { _ in
             navigateWorkspace(direction: 1)
         }
