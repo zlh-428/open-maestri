@@ -58,6 +58,24 @@ struct CanvasToolbar: View {
                 }
                 .help("浏览器")
 
+                // Text 工具
+                FloatingToolButton(
+                    icon: "textformat.abc",
+                    isActive: activeDrawingTool == "text"
+                ) {
+                    toggleDrawingTool("text")
+                }
+                .help("文本标签")
+
+                // Drawing 工具
+                FloatingToolButton(
+                    icon: "pencil.tip.crop.circle",
+                    isActive: activeDrawingTool == "drawing"
+                ) {
+                    toggleDrawingTool("drawing")
+                }
+                .help("手绘")
+
                 // FileTree 工具
                 FloatingToolButton(
                     icon: "folder.fill",

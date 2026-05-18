@@ -7,11 +7,13 @@ enum NodeContent: Codable {
     case stickyNote(StickyNoteContent)
     case portal(PortalContent)
     case fileTree(FileTreeContent)
+    case text(TextContent)
+    case drawing(DrawingContent)
 
     // MARK: - Codable
 
     private enum TypeKeys: String, CodingKey {
-        case terminal, stickyNote, portal, fileTree
+        case terminal, stickyNote, portal, fileTree, text, drawing
     }
 
     private enum InnerKey: String, CodingKey {
@@ -32,6 +34,12 @@ enum NodeContent: Codable {
         } else if container.contains(.fileTree) {
             let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .fileTree)
             self = .fileTree(try inner.decode(FileTreeContent.self, forKey: ._0))
+        } else if container.contains(.text) {
+            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .text)
+            self = .text(try inner.decode(TextContent.self, forKey: ._0))
+        } else if container.contains(.drawing) {
+            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .drawing)
+            self = .drawing(try inner.decode(DrawingContent.self, forKey: ._0))
         } else {
             throw DecodingError.dataCorruptedError(
                 forKey: TypeKeys.terminal,
@@ -55,6 +63,12 @@ enum NodeContent: Codable {
             try inner.encode(c, forKey: ._0)
         case .fileTree(let c):
             var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .fileTree)
+            try inner.encode(c, forKey: ._0)
+        case .text(let c):
+            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .text)
+            try inner.encode(c, forKey: ._0)
+        case .drawing(let c):
+            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .drawing)
             try inner.encode(c, forKey: ._0)
         }
     }
@@ -232,5 +246,50 @@ struct FileTreeContent: Codable {
         self.name = name
         self.rootPath = rootPath
         self.viewMode = "list"
+    }
+}
+
+// MARK: - Text Content
+
+/// 画布文本标签节点（轻量级，无 header，直接编辑）
+struct TextContent: Codable {
+    var text: String
+    var fontSize: CGFloat
+    var fontWeight: String      // "regular" | "medium" | "bold"
+    var color: String           // hex
+    var alignment: String       // "left" | "center" | "right"
+
+    init(text: String = "") {
+        self.text = text
+        self.fontSize = 16
+        self.fontWeight = "regular"
+        self.color = "#000000"
+        self.alignment = "left"
+    }
+}
+
+// MARK: - Drawing Content
+
+/// 画布手绘区域节点
+struct DrawingContent: Codable {
+    var strokes: [DrawingStroke]
+    var backgroundColor: String // hex, 默认透明
+
+    init() {
+        self.strokes = []
+        self.backgroundColor = "#FFFFFF00"
+    }
+}
+
+/// 单条笔画
+struct DrawingStroke: Codable {
+    var points: [[CGFloat]]     // [[x, y], [x, y], ...]
+    var color: String           // hex
+    var width: CGFloat
+
+    init(points: [[CGFloat]] = [], color: String = "#000000", width: CGFloat = 2) {
+        self.points = points
+        self.color = color
+        self.width = width
     }
 }

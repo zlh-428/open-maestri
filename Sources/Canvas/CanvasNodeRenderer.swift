@@ -21,6 +21,8 @@ final class CanvasNodeRenderer {
     private var noteViewControllers: [UUID: NoteNodeViewController] = [:]
     private var portalViews: [UUID: PortalNodeView] = [:]
     private var fileTreeViews: [UUID: FileTreeNodeView] = [:]
+    private var textViews: [UUID: TextNodeView] = [:]
+    private var drawingViews: [UUID: DrawingNodeView] = [:]
 
     // 连线层
     private(set) var overlayView: ConnectionOverlayView?
@@ -95,6 +97,21 @@ final class CanvasNodeRenderer {
         overlay.autoresizingMask = [.width, .height]
         canvas.addSubview(overlay)
         overlayView = overlay
+
+        // 连线右键删除回调
+        overlay.onDeleteConnection = { [weak self] connectionId in
+            guard let self, let ws = self.currentWorkspace else { return }
+            // 从所有连接类型中查找并删除
+            ws.connections.removeAll { $0.id == connectionId }
+            ws.noteConnections.removeAll { $0.id == connectionId }
+            ws.portalConnections.removeAll { $0.id == connectionId }
+            ws.portalToPortalConnections.removeAll { $0.id == connectionId }
+            ws.noteToNoteConnections.removeAll { $0.id == connectionId }
+            ConnectionManager.shared.disconnect(id: connectionId)
+            overlay.removeConnection(id: connectionId)
+            self.saveWorkspace()
+            self.logger.info("Connection \(connectionId.uuidString.prefix(8)) deleted via context menu")
+        }
     }
 
     // MARK: - 同步节点列表
@@ -115,6 +132,8 @@ final class CanvasNodeRenderer {
             noteViewControllers.removeValue(forKey: id)
             portalViews.removeValue(forKey: id)
             fileTreeViews.removeValue(forKey: id)
+            textViews.removeValue(forKey: id)
+            drawingViews.removeValue(forKey: id)
             renderedNodeIds.remove(id)
         }
 
@@ -158,6 +177,10 @@ final class CanvasNodeRenderer {
             view = makePortalView(node: node, pc: pc)
         case .fileTree(let fc):
             view = makeFileTreeView(node: node, fc: fc)
+        case .text(let tc):
+            view = makeTextView(node: node, tc: tc)
+        case .drawing(let dc):
+            view = makeDrawingView(node: node, dc: dc)
         }
 
         // Resize 回写：BaseNodeView.onFrameChanged → workspace.updateNodeFrame
@@ -483,6 +506,8 @@ final class CanvasNodeRenderer {
         noteViewControllers.removeValue(forKey: id)
         portalViews.removeValue(forKey: id)
         fileTreeViews.removeValue(forKey: id)
+        textViews.removeValue(forKey: id)
+        drawingViews.removeValue(forKey: id)
         renderedNodeIds.remove(id)
         NoteRegistry.shared.unregisterByNodeId(id)
         ConnectionManager.shared.disconnectAll(involvedNode: id)
@@ -539,21 +564,38 @@ final class CanvasNodeRenderer {
 
         // Option+拖拽复制节点
         nodeView.onOptionDragDuplicate = { [weak self] in
-            guard let self, let ws = self.currentWorkspace else { return }
-            guard let original = ws.nodes.first(where: { $0.id == node.id }) else { return }
-            // 创建副本（新 ID，偏移 30px）
-            var copy = original
-            copy.id = UUID()
-            copy.frame = copy.frame.offsetBy(dx: 30, dy: 30)
-            copy.zIndex = (ws.nodes.map { $0.zIndex }.max() ?? 0) + 1
-            // 对 Terminal 内容生成新 ID
-            if case .terminal(var tc) = copy.content {
-                tc.id = UUID()
-                copy.content = .terminal(tc)
-            }
-            ws.addNode(copy)
-            self.saveWorkspace()
+            self?.duplicateNode(id: node.id)
         }
+
+        // 右键菜单"复制节点"
+        nodeView.onDuplicate = { [weak self] in
+            self?.duplicateNode(id: node.id)
+        }
+
+        // 右键菜单"创建连接"：选中当前节点并激活连线模式
+        nodeView.onConnect = { [weak self] in
+            guard let self, let canvas = self.canvas else { return }
+            canvas.selectedNodeIds = [node.id]
+            canvas.connectingFromNodeId = node.id
+            canvas.isInConnectingMode = true
+        }
+    }
+
+    /// 复制指定节点（Option+拖拽 / 右键菜单共用）
+    private func duplicateNode(id: UUID) {
+        guard let ws = currentWorkspace,
+              let original = ws.nodes.first(where: { $0.id == id }) else { return }
+        var copy = original
+        copy.id = UUID()
+        copy.frame = copy.frame.offsetBy(dx: 30, dy: 30)
+        copy.zIndex = (ws.nodes.map { $0.zIndex }.max() ?? 0) + 1
+        // 对 Terminal 内容生成新 ID
+        if case .terminal(var tc) = copy.content {
+            tc.id = UUID()
+            copy.content = .terminal(tc)
+        }
+        ws.addNode(copy)
+        saveWorkspace()
     }
 
     // MARK: - 连线同步
@@ -626,12 +668,68 @@ final class CanvasNodeRenderer {
         return rope.compute(from: startScreen, to: endScreen)
     }
 
+    // MARK: - Text 节点
+
+    private func makeTextView(node: CanvasNode, tc: TextContent) -> TextNodeView {
+        let nodeView = TextNodeView()
+        nodeView.nodeId = node.id
+        nodeView.title = "Text"
+        nodeView.isLocked = node.isLocked
+        nodeView.configure(
+            text: tc.text,
+            fontSize: tc.fontSize,
+            fontWeight: tc.fontWeight,
+            color: tc.color,
+            alignment: tc.alignment
+        )
+
+        nodeView.onTextChanged = { [weak self] newText in
+            guard let self, let ws = self.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == node.id }),
+                  case .text(var content) = ws.nodes[idx].content else { return }
+            content.text = newText
+            ws.nodes[idx].content = .text(content)
+            self.saveWorkspace()
+        }
+
+        textViews[node.id] = nodeView
+        setupLockCallback(nodeView: nodeView, node: node)
+        nodeView.onClose = { [weak self] in self?.removeNode(id: node.id, from: self?.currentWorkspace) }
+        return nodeView
+    }
+
+    // MARK: - Drawing 节点
+
+    private func makeDrawingView(node: CanvasNode, dc: DrawingContent) -> DrawingNodeView {
+        let nodeView = DrawingNodeView()
+        nodeView.nodeId = node.id
+        nodeView.title = "Drawing"
+        nodeView.isLocked = node.isLocked
+        nodeView.configure(strokes: dc.strokes, backgroundColor: dc.backgroundColor)
+
+        nodeView.onStrokesChanged = { [weak self] newStrokes in
+            guard let self, let ws = self.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == node.id }),
+                  case .drawing(var content) = ws.nodes[idx].content else { return }
+            content.strokes = newStrokes
+            ws.nodes[idx].content = .drawing(content)
+            self.saveWorkspace()
+        }
+
+        drawingViews[node.id] = nodeView
+        setupLockCallback(nodeView: nodeView, node: node)
+        nodeView.onClose = { [weak self] in self?.removeNode(id: node.id, from: self?.currentWorkspace) }
+        return nodeView
+    }
+
     private func typeLabel(_ content: NodeContent) -> String {
         switch content {
         case .terminal: return "terminal"
         case .stickyNote: return "note"
         case .portal: return "portal"
         case .fileTree: return "fileTree"
+        case .text: return "text"
+        case .drawing: return "drawing"
         }
     }
 }

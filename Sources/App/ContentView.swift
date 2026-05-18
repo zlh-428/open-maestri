@@ -187,6 +187,9 @@ struct WorkspaceCanvasView: View {
                 onFilesDropped: { paths, canvasPoint in
                     handleFilesDropped(paths: paths, at: canvasPoint)
                 },
+                onFilesDroppedOnNode: { paths, nodeId in
+                    handleFilesDroppedOnNode(paths: paths, nodeId: nodeId)
+                },
                 rolePresets: appState.preferences.rolePresets
             )
             .ignoresSafeArea()
@@ -333,6 +336,10 @@ struct WorkspaceCanvasView: View {
             showPortalSheetForDrawing = true
         case "fileTree":
             createFileTreeAtFrame(frame)
+        case "text":
+            createTextAtFrame(frame)
+        case "drawing":
+            createDrawingAtFrame(frame)
         default:
             break
         }
@@ -367,6 +374,26 @@ struct WorkspaceCanvasView: View {
         let node = CanvasNode(
             frame: frame,
             content: .fileTree(fc)
+        )
+        workspace.addNode(node)
+        Task { try? await workspace.save() }
+    }
+
+    private func createTextAtFrame(_ frame: CGRect) {
+        let tc = TextContent(text: "")
+        let node = CanvasNode(
+            frame: frame,
+            content: .text(tc)
+        )
+        workspace.addNode(node)
+        Task { try? await workspace.save() }
+    }
+
+    private func createDrawingAtFrame(_ frame: CGRect) {
+        let dc = DrawingContent()
+        let node = CanvasNode(
+            frame: frame,
+            content: .drawing(dc)
         )
         workspace.addNode(node)
         Task { try? await workspace.save() }
@@ -428,6 +455,34 @@ struct WorkspaceCanvasView: View {
             offsetY += 260  // 多文件垂直排列，间距 20pt
         }
         Task { try? await workspace.save() }
+    }
+
+    /// 文件拖入节点时的处理
+    /// - Terminal 节点：将文件路径写入 PTY（空格分隔，shell 友好转义）
+    /// - 其他节点类型：暂不处理
+    private func handleFilesDroppedOnNode(paths: [String], nodeId: UUID) {
+        guard let node = workspace.nodes.first(where: { $0.id == nodeId }) else { return }
+        switch node.content {
+        case .terminal(let tc):
+            // 将文件路径写入终端 PTY（shell 转义后空格分隔）
+            if let provider = TerminalProviderRegistry.shared.provider(for: tc.id) {
+                let escaped = paths.map { shellEscape($0) }
+                provider.write(escaped.joined(separator: " "))
+            }
+        default:
+            break
+        }
+    }
+
+    /// Shell 路径转义：对包含空格或特殊字符的路径加单引号
+    private func shellEscape(_ path: String) -> String {
+        let special = CharacterSet(charactersIn: " '\"\\$`!#&|;(){}[]<>?*~")
+        if path.unicodeScalars.contains(where: { special.contains($0) }) {
+            // 用单引号包裹，内部单引号用 '\'' 转义
+            let escaped = path.replacingOccurrences(of: "'", with: "'\\''")
+            return "'\(escaped)'"
+        }
+        return path
     }
 
     @State private var showTerminalDrawnFrame: CGRect = .zero
@@ -521,6 +576,8 @@ private func contentTypeName(_ content: NodeContent) -> String {
     case .stickyNote: return "stickyNote"
     case .portal:    return "portal"
     case .fileTree:  return "fileTree"
+    case .text:      return "text"
+    case .drawing:   return "drawing"
     }
 }
 
@@ -734,6 +791,10 @@ struct CanvasMinimapPopover: View {
             return Color(red: 1.0, green: 0.92, blue: 0.6)   // 浅黄色（Portal）
         case .fileTree:
             return Color(red: 1.0, green: 0.82, blue: 0.6)   // 浅橙色（文件树）
+        case .text:
+            return Color(red: 0.7, green: 0.7, blue: 0.9)    // 浅紫色（文本标签）
+        case .drawing:
+            return Color(red: 0.9, green: 0.75, blue: 0.85)  // 浅粉色（手绘）
         }
     }
 }
