@@ -21,6 +21,8 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
     var onSelectionChanged: ((Set<UUID>, CGRect?) -> Void)?
     /// Finder 文件拖入回调（文件路径数组 + 画布坐标落点）
     var onFilesDropped: (([String], CGPoint) -> Void)?
+    /// 文件拖入节点回调（文件路径数组 + 目标节点 ID）
+    var onFilesDroppedOnNode: (([String], UUID) -> Void)?
     /// 可用角色预设（用于 TerminalNodeView 右键菜单 Assign Role 子菜单）
     var rolePresets: [RolePreset] = []
 
@@ -44,6 +46,7 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         view.onConnectionCreated = onConnectionCreated
         view.onSelectionChanged = onSelectionChanged
         view.onFilesDropped = onFilesDropped
+        view.onFilesDroppedOnNode = onFilesDroppedOnNode
 
         let renderer = CanvasNodeRenderer(canvas: view)
         context.coordinator.renderer = renderer
@@ -78,6 +81,7 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         nsView.drawingNodeType = drawingNodeType
         nsView.onNodeDrawn = onNodeDrawn
         nsView.onFilesDropped = onFilesDropped
+        nsView.onFilesDroppedOnNode = onFilesDroppedOnNode
 
         guard let ws = workspace, let renderer = context.coordinator.renderer else { return }
 

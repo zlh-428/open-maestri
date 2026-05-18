@@ -1,7 +1,9 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// File Tree List View（NSOutlineView 包装）
+/// 支持拖拽文件到画布（Terminal 节点或空白区域）
 struct FileTreeListView: NSViewRepresentable {
     @Binding var store: FileTreeStateStore
 
@@ -15,6 +17,10 @@ struct FileTreeListView: NSViewRepresentable {
         outline.delegate = context.coordinator
         outline.dataSource = context.coordinator
 
+        // 注册拖拽类型（文件 URL）
+        outline.setDraggingSourceOperationMask(.copy, forLocal: true)
+        outline.setDraggingSourceOperationMask(.copy, forLocal: false)
+
         let scroll = NSScrollView()
         scroll.documentView = outline
         scroll.hasVerticalScroller = true
@@ -22,6 +28,7 @@ struct FileTreeListView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.store = store
         (nsView.documentView as? NSOutlineView)?.reloadData()
     }
 
@@ -52,6 +59,21 @@ struct FileTreeListView: NSViewRepresentable {
             let cell = NSTextField(labelWithString: fi.name)
             cell.font = .systemFont(ofSize: 12)
             return cell
+        }
+
+        // MARK: - 拖拽源支持
+
+        /// 允许拖拽写入 pasteboard
+        func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+            guard let fi = item as? FileTreeItem else { return nil }
+            let url = URL(fileURLWithPath: fi.id) as NSURL
+            return url
+        }
+
+        /// 拖拽会话开始
+        func outlineView(_ outlineView: NSOutlineView, draggingSession session: NSDraggingSession,
+                         willBeginAt screenPoint: NSPoint, forItems draggedItems: [Any]) {
+            session.animatesToStartingPositionsOnCancelOrFail = true
         }
     }
 }

@@ -1110,6 +1110,10 @@ final class CanvasViewportView: NSView {
             return CGSize(width: 500, height: 380)
         case "fileTree":
             return CGSize(width: 360, height: 480)
+        case "text":
+            return CGSize(width: 200, height: 60)
+        case "drawing":
+            return CGSize(width: 400, height: 300)
         default:
             return CGSize(width: 400, height: 300)
         }
@@ -1353,8 +1357,10 @@ final class CanvasViewportView: NSView {
 
     // MARK: - Finder 文件拖入（创建 Note 节点）
 
-    /// 拖入 .md/.markdown/.txt 文件时回调（canvasFrame, filePath）
+    /// 文件拖入画布空白区域回调（文件路径数组 + 画布坐标落点）
     var onFilesDropped: (([String], CGPoint) -> Void)?
+    /// 文件拖入 Terminal 节点回调（文件路径数组 + 目标节点 ID）
+    var onFilesDroppedOnNode: (([String], UUID) -> Void)?
 
     /// 注册拖放目标（在 setup() 调用）
     func registerDragTypes() {
@@ -1362,41 +1368,94 @@ final class CanvasViewportView: NSView {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard containsMarkdownFiles(sender) else { return [] }
+        guard containsFileURLs(sender) else { return [] }
         return .copy
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard containsMarkdownFiles(sender) else { return [] }
+        guard containsFileURLs(sender) else { return [] }
+        // 高亮目标节点（如果鼠标在节点上方）
+        let loc = convert(sender.draggingLocation, from: nil)
+        updateDropTargetHighlight(at: loc)
         return .copy
     }
 
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        clearDropTargetHighlight()
+    }
+
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        clearDropTargetHighlight()
         let locScreen = convert(sender.draggingLocation, from: nil)
-        let locCanvas = screenToCanvas(locScreen)
-        let urls = extractMarkdownURLs(from: sender)
+        let urls = extractFileURLs(from: sender)
         guard !urls.isEmpty else { return false }
         let paths = urls.map { $0.path }
-        onFilesDropped?(paths, locCanvas)
+
+        // 检查是否落在某个节点上
+        if let targetNodeId = nodeId(at: locScreen) {
+            onFilesDroppedOnNode?(paths, targetNodeId)
+            return true
+        }
+
+        // 落在空白区域：所有文件都创建 Note 节点
+        let locCanvas = screenToCanvas(locScreen)
+        if !paths.isEmpty {
+            onFilesDropped?(paths, locCanvas)
+        }
         return true
     }
 
-    private func containsMarkdownFiles(_ sender: NSDraggingInfo) -> Bool {
+    /// 查找指定屏幕坐标下的节点 ID
+    private func nodeId(at screenPoint: CGPoint) -> UUID? {
+        for (id, view) in nodeViews {
+            if view.frame.contains(screenPoint) {
+                return id
+            }
+        }
+        return nil
+    }
+
+    /// 拖拽悬停时高亮目标节点
+    private var dropTargetNodeId: UUID?
+
+    private func updateDropTargetHighlight(at screenPoint: CGPoint) {
+        let newTarget = nodeId(at: screenPoint)
+        if newTarget != dropTargetNodeId {
+            // 清除旧高亮
+            if let oldId = dropTargetNodeId, let oldView = nodeViews[oldId] as? BaseNodeView {
+                oldView.layer?.borderColor = NSColor(white: 0.85, alpha: 1).cgColor
+                oldView.layer?.borderWidth = 0.5
+            }
+            // 设置新高亮
+            if let newId = newTarget, let newView = nodeViews[newId] as? BaseNodeView {
+                newView.layer?.borderColor = NSColor.systemBlue.withAlphaComponent(0.8).cgColor
+                newView.layer?.borderWidth = 2
+            }
+            dropTargetNodeId = newTarget
+        }
+    }
+
+    private func clearDropTargetHighlight() {
+        if let oldId = dropTargetNodeId, let oldView = nodeViews[oldId] as? BaseNodeView {
+            oldView.layer?.borderColor = NSColor(white: 0.85, alpha: 1).cgColor
+            oldView.layer?.borderWidth = 0.5
+        }
+        dropTargetNodeId = nil
+    }
+
+    private func containsFileURLs(_ sender: NSDraggingInfo) -> Bool {
         guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else {
             return false
         }
-        return urls.contains { isMarkdownFile($0) }
+        return !urls.isEmpty
     }
 
-    private func extractMarkdownURLs(from sender: NSDraggingInfo) -> [URL] {
-        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else {
-            return []
-        }
-        return urls.filter { isMarkdownFile($0) }
+    private func extractFileURLs(from sender: NSDraggingInfo) -> [URL] {
+        sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] ?? []
     }
 
-    private func isMarkdownFile(_ url: URL) -> Bool {
-        let ext = url.pathExtension.lowercased()
+    private func isMarkdownPath(_ path: String) -> Bool {
+        let ext = (path as NSString).pathExtension.lowercased()
         return ext == "md" || ext == "markdown" || ext == "txt"
     }
 }
