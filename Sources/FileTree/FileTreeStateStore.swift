@@ -28,6 +28,10 @@ final class FileTreeStateStore {
     var gitStatus: [String: GitFileStatus] = [:]
 
     private var watcher: DirectoryWatcher?
+    /// 防抖用的 reload work item
+    private var pendingReloadWork: DispatchWorkItem?
+    /// 上次 reload 时间戳，避免过于频繁
+    private var lastReloadTime: CFAbsoluteTime = 0
 
     init(rootPath: String) {
         self.rootPath = rootPath
@@ -39,15 +43,32 @@ final class FileTreeStateStore {
     private func startWatching() {
         let w = DirectoryWatcher(path: rootPath)
         w.onChange = { [weak self] in
-            Task { await self?.reload() }
+            self?.scheduleReload()
         }
         w.start()
         watcher = w
     }
 
+    /// 防抖 reload：合并 500ms 内的多次文件系统事件
+    private func scheduleReload() {
+        pendingReloadWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                await self?.reload()
+            }
+        }
+        pendingReloadWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
+    }
+
     // MARK: - 加载文件树
 
     func reload() async {
+        // 限流：距离上次 reload 不到 300ms 则跳过
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastReloadTime > 0.3 else { return }
+        lastReloadTime = now
+
         let root = rootPath
         guard FileManager.default.fileExists(atPath: root) else {
             await MainActor.run {
@@ -61,9 +82,9 @@ final class FileTreeStateStore {
             return
         }
 
-        // 并行加载文件树和 git 状态
+        // 并行加载文件树（仅加载 1 层，子目录按需展开）和 git 状态
         async let filesTask = Task.detached(priority: .userInitiated) {
-            return Self.loadDirectory(path: root, depth: 0, maxDepth: 3)
+            return Self.loadDirectory(path: root, depth: 0, maxDepth: 1)
         }.value
         async let gitTask = Task.detached(priority: .utility) {
             return Self.loadGitStatus(workingDirectory: root)
@@ -72,8 +93,10 @@ final class FileTreeStateStore {
         let (loaded, statusMap) = await (filesTask, gitTask)
         // 将 git 状态标记到文件节点
         let annotated = Self.applyGitStatus(to: loaded, statusMap: statusMap, root: root)
-        items = annotated
-        gitStatus = statusMap
+        await MainActor.run {
+            items = annotated
+            gitStatus = statusMap
+        }
     }
 
     private static func loadGitStatus(workingDirectory: String) -> [String: GitFileStatus] {
@@ -136,11 +159,16 @@ final class FileTreeStateStore {
         }
     }
 
-    private func loadChildren(for path: String) async {
+    /// 加载指定路径的子目录，并更新到 items 树中
+    func loadChildren(for path: String) async {
         let children = await Task.detached(priority: .userInitiated) {
             return Self.loadDirectory(path: path, depth: 0, maxDepth: 1)
         }.value
-        updateChildren(children, for: path, in: &items)
+        // 应用 git 状态到加载的子节点
+        let annotated = Self.applyGitStatus(to: children, statusMap: gitStatus, root: rootPath)
+        await MainActor.run {
+            updateChildren(annotated, for: path, in: &items)
+        }
     }
 
     private func updateChildren(_ children: [FileTreeItem], for path: String, in items: inout [FileTreeItem]) {

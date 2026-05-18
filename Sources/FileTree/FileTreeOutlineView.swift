@@ -1,79 +1,54 @@
 import AppKit
-import SwiftUI
-import UniformTypeIdentifiers
 
-/// File Tree List View（NSOutlineView 包装）
-/// 支持拖拽文件到画布（Terminal 节点或空白区域）
-struct FileTreeListView: NSViewRepresentable {
-    @Binding var store: FileTreeStateStore
+/// 轻量适配器：将 FileTreeOutlineNSView 包装为 NSView（供 CanvasNodeRenderer 嵌入节点 contentView）
+final class FileTreeOutlineView: NSView {
+    private var outlineNSView: FileTreeOutlineNSView?
+    private(set) var store: FileTreeStateStore
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let outline = NSOutlineView()
-        let col = NSTableColumn(identifier: .init("name"))
-        col.title = "名称"
-        outline.addTableColumn(col)
-        outline.outlineTableColumn = col
-        outline.headerView = nil
-        outline.delegate = context.coordinator
-        outline.dataSource = context.coordinator
+    /// 单击文件夹时的回调（Finder 式导航：传入目标文件夹路径）
+    var onDirectoryClicked: ((String) -> Void)?
+    /// 单击文件时的回调
+    var onFileClicked: ((String) -> Void)?
 
-        // 注册拖拽类型（文件 URL）
-        outline.setDraggingSourceOperationMask(.copy, forLocal: true)
-        outline.setDraggingSourceOperationMask(.copy, forLocal: false)
+    init(rootPath: String) {
+        self.store = FileTreeStateStore(rootPath: rootPath)
+        super.init(frame: .zero)
 
-        let scroll = NSScrollView()
-        scroll.documentView = outline
-        scroll.hasVerticalScroller = true
-        return scroll
+        let outline = FileTreeOutlineNSView(store: store)
+        outline.frame = bounds
+        outline.autoresizingMask = [.width, .height]
+        outline.onDirectoryClicked = { [weak self] path in
+            self?.onDirectoryClicked?(path)
+        }
+        outline.onFileClicked = { [weak self] path in
+            self?.onFileClicked?(path)
+        }
+        addSubview(outline)
+        outlineNSView = outline
     }
 
-    func updateNSView(_ nsView: NSScrollView, context: Context) {
-        context.coordinator.store = store
-        (nsView.documentView as? NSOutlineView)?.reloadData()
+    required init?(coder: NSCoder) { fatalError() }
+
+    override func layout() {
+        super.layout()
+        outlineNSView?.frame = bounds
     }
 
-    func makeCoordinator() -> Coordinator { Coordinator(store: store) }
-
-    final class Coordinator: NSObject, NSOutlineViewDelegate, NSOutlineViewDataSource {
-        var store: FileTreeStateStore
-        init(store: FileTreeStateStore) { self.store = store }
-
-        func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-            if item == nil { return store.items.count }
-            if let fi = item as? FileTreeItem { return fi.children?.count ?? 0 }
-            return 0
+    /// 更换根目录（切换到新路径并刷新列表）
+    func changeRoot(to newPath: String) {
+        store = FileTreeStateStore(rootPath: newPath)
+        outlineNSView?.updateStore(store)
+        Task { @MainActor [weak self] in
+            await self?.store.reload()
+            self?.outlineNSView?.reloadData()
         }
+    }
 
-        func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-            if item == nil { return store.items[index] }
-            if let fi = item as? FileTreeItem, let children = fi.children { return children[index] }
-            return NSNull()
-        }
-
-        func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
-            (item as? FileTreeItem)?.isDirectory ?? false
-        }
-
-        func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
-            guard let fi = item as? FileTreeItem else { return nil }
-            let cell = NSTextField(labelWithString: fi.name)
-            cell.font = .systemFont(ofSize: 12)
-            return cell
-        }
-
-        // MARK: - 拖拽源支持
-
-        /// 允许拖拽写入 pasteboard
-        func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
-            guard let fi = item as? FileTreeItem else { return nil }
-            let url = URL(fileURLWithPath: fi.id) as NSURL
-            return url
-        }
-
-        /// 拖拽会话开始
-        func outlineView(_ outlineView: NSOutlineView, draggingSession session: NSDraggingSession,
-                         willBeginAt screenPoint: NSPoint, forItems draggedItems: [Any]) {
-            session.animatesToStartingPositionsOnCancelOrFail = true
+    /// 刷新文件列表
+    func refresh() {
+        Task { @MainActor [weak self] in
+            await self?.store.reload()
+            self?.outlineNSView?.reloadData()
         }
     }
 }
