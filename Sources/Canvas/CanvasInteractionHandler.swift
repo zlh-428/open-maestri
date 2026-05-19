@@ -192,7 +192,8 @@ extension CanvasViewportView {
             guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
             updateSelection(id, modifiers: event.modifierFlags)
             base.onActivated?()
-            let startFrame = nodeCanvasFrames[id] ?? .zero
+            let canvasFrame = nodeCanvasFrames[id] ?? .zero
+            let startFrame = canvasRectToScreen(canvasFrame)
             interaction = .resizingNode(id, edge: edge, startFrame: startFrame, startMouse: loc)
             edge.cursor.set()
         }
