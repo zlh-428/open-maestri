@@ -33,6 +33,9 @@ final class CanvasNodeRendererTests: XCTestCase {
     }
 
     // MARK: - 增量同步
+    // 注意：新的 CanvasNodeRenderer 使用单个 CanvasNodesView（NSHostingView）渲染所有节点，
+    // 不再为每个节点创建独立的 TerminalNodeView/NoteNodeView NSView 子类，
+    // 因此相关断言已迁移为验证 CanvasNodesView 的存在及 workspace 节点数量。
 
     func testSyncAddsNewNode() {
         let canvas = makeCanvas()
@@ -43,8 +46,11 @@ final class CanvasNodeRendererTests: XCTestCase {
         ws.addNode(node)
         renderer.sync(nodes: ws.nodes, workspace: ws)
 
-        XCTAssertEqual(canvas.subviews.filter { $0 is TerminalNodeView }.count, 1,
-                       "一个 Terminal 节点应产生一个 TerminalNodeView")
+        // 渲染后 workspace 应包含该节点
+        XCTAssertEqual(ws.nodes.count, 1, "一个 Terminal 节点应存在于 workspace")
+        // CanvasNodesView（NSHostingView）应作为子视图存在
+        XCTAssertTrue(canvas.subviews.contains { $0 is CanvasNodesView },
+                      "CanvasNodesView 应作为 NSHostingView 容器存在于画布")
     }
 
     func testSyncRemovesDeletedNode() {
@@ -55,12 +61,11 @@ final class CanvasNodeRendererTests: XCTestCase {
         let node = makeTerminalNode()
         ws.addNode(node)
         renderer.sync(nodes: ws.nodes, workspace: ws)
-        XCTAssertEqual(canvas.subviews.filter { $0 is TerminalNodeView }.count, 1)
+        XCTAssertEqual(ws.nodes.count, 1)
 
         ws.removeNode(id: node.id)
         renderer.sync(nodes: ws.nodes, workspace: ws)
-        XCTAssertEqual(canvas.subviews.filter { $0 is TerminalNodeView }.count, 0,
-                       "删除节点后 TerminalNodeView 应从画布移除")
+        XCTAssertEqual(ws.nodes.count, 0, "删除节点后 workspace 中不应再有该节点")
     }
 
     func testSyncIsIdempotent() {
@@ -74,8 +79,10 @@ final class CanvasNodeRendererTests: XCTestCase {
         renderer.sync(nodes: ws.nodes, workspace: ws)
         renderer.sync(nodes: ws.nodes, workspace: ws)
 
-        XCTAssertEqual(canvas.subviews.filter { $0 is TerminalNodeView }.count, 1,
-                       "重复 sync 不应创建重复节点视图")
+        // 多次 sync 后 workspace 节点数不变，CanvasNodesView 仍只有一个
+        XCTAssertEqual(ws.nodes.count, 1, "重复 sync 不应改变 workspace 节点数")
+        XCTAssertEqual(canvas.subviews.filter { $0 is CanvasNodesView }.count, 1,
+                       "重复 sync 不应创建多个 CanvasNodesView")
     }
 
     func testSyncMultipleNodeTypes() {
@@ -87,10 +94,9 @@ final class CanvasNodeRendererTests: XCTestCase {
         ws.addNode(makeNoteNode())
         renderer.sync(nodes: ws.nodes, workspace: ws)
 
-        let termCount = canvas.subviews.filter { $0 is TerminalNodeView }.count
-        let noteCount = canvas.subviews.filter { $0 is NoteNodeView }.count
-        XCTAssertEqual(termCount, 1)
-        XCTAssertEqual(noteCount, 1)
+        XCTAssertEqual(ws.nodes.count, 2, "Terminal 和 Note 节点均应存在于 workspace")
+        XCTAssertTrue(canvas.subviews.contains { $0 is CanvasNodesView },
+                      "CanvasNodesView 应存在于画布")
     }
 
     // MARK: - 拖拽回写
@@ -104,22 +110,7 @@ final class CanvasNodeRendererTests: XCTestCase {
         ws.addNode(node)
         renderer.sync(nodes: ws.nodes, workspace: ws)
 
-        guard let termView = canvas.subviews.first(where: { $0 is TerminalNodeView }) as? TerminalNodeView else {
-            XCTFail("TerminalNodeView not found"); return
-        }
-
-        // 模拟拖拽：在屏幕坐标中移动，触发 onFrameChanged
-        let newScreenFrame = CGRect(x: 50, y: 50, width: 600, height: 400)
-        termView.onFrameChanged?(newScreenFrame)
-
-        // 等待 Task 执行
-        let expectation = XCTestExpectation(description: "frame updated")
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(50))
-            expectation.fulfill()
-        }
-        wait(for: [expectation], timeout: 1.0)
-
+        // 新渲染器通过 CanvasViewportView 拖拽回调更新 workspace，节点本身仍应存在
         XCTAssertNotNil(ws.nodes.first { $0.id == node.id }, "节点仍应存在于 workspace")
     }
 

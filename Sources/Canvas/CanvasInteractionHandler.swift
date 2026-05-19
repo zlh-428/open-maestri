@@ -7,7 +7,7 @@ enum CanvasHitTestResult {
     case canvas
     case nodeHeader(UUID)
     case nodeContent(UUID, NSView)
-    case nodeResize(UUID, BaseNodeView.ResizeEdge)
+    case nodeResize(UUID, ResizeEdge)
 }
 
 // MARK: - 画布交互状态机
@@ -21,7 +21,7 @@ enum CanvasInteraction {
     case mayDragNode(UUID, startMouse: CGPoint, startFrame: CGRect, contentTarget: NSView?)
     case draggingNode(UUID, startMouse: CGPoint, startFrame: CGRect)
     case batchDragging([UUID: CGRect], primaryId: UUID, startMouse: CGPoint)
-    case resizingNode(UUID, edge: BaseNodeView.ResizeEdge, startFrame: CGRect, startMouse: CGPoint)
+    case resizingNode(UUID, edge: ResizeEdge, startFrame: CGRect, startMouse: CGPoint)
     case marquee(start: CGPoint)
     case panCanvas(startOrigin: CGPoint, startMouse: CGPoint)
     case drawing(start: CGPoint)
@@ -77,7 +77,7 @@ extension CanvasViewportView {
         return .canvas
     }
 
-    private func geometricResizeEdge(at localPt: CGPoint, in size: CGSize) -> BaseNodeView.ResizeEdge? {
+    private func geometricResizeEdge(at localPt: CGPoint, in size: CGSize) -> ResizeEdge? {
         let h = CanvasNodeConstants.resizeHandleSize
         let w = size.width
         let ht = size.height
@@ -383,7 +383,7 @@ extension CanvasViewportView {
     // MARK: - Resize 辅助
 
     private func applyResizeOnCanvas(id: UUID,
-                                      edge: BaseNodeView.ResizeEdge,
+                                      edge: ResizeEdge,
                                       dx: CGFloat, dy: CGFloat,
                                       startFrame: CGRect) {
         let minW = CanvasNodeConstants.minNodeWidth * zoom
