@@ -16,6 +16,9 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
     /// 单击文件时的回调
     var onFileClicked: ((String) -> Void)?
 
+    /// 上次单击时已选中的行（用于区分"首次选中"和"已选中后再点击"）
+    private var lastSelectedRow: Int = -1
+
     init(store: FileTreeStateStore) {
         self.store = store
         super.init(frame: .zero)
@@ -186,27 +189,48 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         return true
     }
 
-    // MARK: - 单击/双击
-
-    /// 单击：文件夹则导航进入
-    @objc private func handleSingleClick() {
-        let row = outlineView.clickedRow
-        guard row >= 0, let item = outlineView.item(atRow: row) as? FileTreeItem else { return }
-        if item.isDirectory {
-            onDirectoryClicked?(item.id)
-        } else {
-            onFileClicked?(item.id)
+    /// 选中行变化时（包括点击空白清除选中），重置上次选中记录
+    func outlineViewSelectionDidChange(_ notification: Notification) {
+        let selectedRow = outlineView.selectedRow
+        if selectedRow < 0 {
+            lastSelectedRow = -1
         }
     }
 
-    /// 双击：文件用默认应用打开
+    // MARK: - 单击/双击
+
+    /// 单击：
+    /// - 首次点击某行 → 仅选中（高亮），不导航
+    /// - 已选中的行再次点击 → 执行导航（文件夹进入，文件触发回调）
+    @objc private func handleSingleClick() {
+        let row = outlineView.clickedRow
+        guard row >= 0, let item = outlineView.item(atRow: row) as? FileTreeItem else {
+            // 点击空白区域，清除上次选中记录
+            lastSelectedRow = -1
+            return
+        }
+
+        if row == lastSelectedRow {
+            // 已选中行再次点击 → 执行动作
+            if item.isDirectory {
+                onDirectoryClicked?(item.id)
+            } else {
+                onFileClicked?(item.id)
+            }
+        } else {
+            // 首次点击 → 仅选中，记录行号，不导航
+            lastSelectedRow = row
+        }
+    }
+
+    /// 双击：文件用默认应用打开；文件夹导航进入
     @objc private func handleDoubleClick() {
         let row = outlineView.clickedRow
         guard row >= 0, let item = outlineView.item(atRow: row) as? FileTreeItem else { return }
+        lastSelectedRow = row
         if !item.isDirectory {
             NSWorkspace.shared.open(URL(fileURLWithPath: item.id))
         } else {
-            // 双击文件夹也是导航进入
             onDirectoryClicked?(item.id)
         }
     }

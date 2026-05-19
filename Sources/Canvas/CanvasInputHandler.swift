@@ -74,8 +74,7 @@ extension CanvasViewportView {
         // Space 释放 - 退出平移模式
         if event.keyCode == CanvasKeyCode.space {
             isSpaceHeld = false
-            spaceDragStartOrigin = nil
-            spaceDragStartMouse = nil
+            if case .panCanvas = interaction { interaction = .idle }
             NSCursor.arrow.set()
         }
         super.keyUp(with: event)
