@@ -1,6 +1,7 @@
 import Foundation
 import OSLog
 import SwiftTerm
+import AppKit
 
 /// SwiftTerm PTY 适配层
 /// - 为每个 Terminal 节点管理一个 LocalProcessTerminalView
@@ -49,9 +50,17 @@ final class SwiftTermProvider: NSObject {
             : frame
         let view = LocalProcessTerminalView(frame: effectiveFrame)
         view.processDelegate = self
-        view.configureNativeColors()
+
+        // 应用终端主题（替代简单的 configureNativeColors）
+        applyCurrentTheme(to: view)
+        // 应用终端字体
+        applyCurrentFont(to: view)
+
         terminalView = view
         isRunning = true
+
+        // 启用 Metal GPU 渲染器（如果偏好中开启）
+        enableMetalIfNeeded(view: view)
 
         // 构建环境变量：保留系统环境 + 注入 MAESTRI_* + 扩展 PATH
         var env = ProcessInfo.processInfo.environment
@@ -191,6 +200,84 @@ final class SwiftTermProvider: NSObject {
             self.write("cd '\(escapedPath)' && \(launchCmd)\n")
             self.logger.debug("Terminal \(self.terminalId.uuidString.prefix(8)) restarted in \(workingDirectory)")
         }
+    }
+
+    // MARK: - Metal 渲染器
+
+    /// 根据偏好启用或禁用 Metal GPU 渲染
+    private func enableMetalIfNeeded(view: LocalProcessTerminalView) {
+        // 读取偏好：metalRendererEnabled
+        // 注意：此处在启动时只调用一次，后续切换通过 applyMetalRenderer 实现
+        Task { @MainActor in
+            let enabled = self.resolveMetalPreference()
+            if enabled {
+                do {
+                    try view.setUseMetal(true)
+                    self.logger.debug("Metal renderer enabled for terminal \(self.terminalId.uuidString.prefix(8))")
+                } catch {
+                    self.logger.warning("Failed to enable Metal renderer: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// 动态切换 Metal 渲染状态（设置变更时调用）
+    func applyMetalRenderer(enabled: Bool) {
+        guard let view = terminalView else { return }
+        do {
+            try view.setUseMetal(enabled)
+            logger.debug("Metal renderer \(enabled ? "enabled" : "disabled") for terminal \(self.terminalId.uuidString.prefix(8))")
+        } catch {
+            logger.warning("Failed to toggle Metal renderer: \(error.localizedDescription)")
+        }
+    }
+
+    private func resolveMetalPreference() -> Bool {
+        // 从 PersistenceManager 读取偏好（避免循环依赖 AppState）
+        if let prefs = try? PersistenceManager.shared.loadPreferences() {
+            return prefs.metalRendererEnabled
+        }
+        return true // 默认启用
+    }
+
+    // MARK: - 主题应用
+
+    /// 应用当前主题到终端视图
+    func applyCurrentTheme(to view: LocalProcessTerminalView) {
+        let preference: String
+        if let prefs = try? PersistenceManager.shared.loadPreferences() {
+            preference = prefs.terminalTheme
+        } else {
+            preference = "dark"
+        }
+        let themeId = TerminalThemeRegistry.resolveThemeId(from: preference)
+        TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
+    }
+
+    /// 即时切换主题
+    func applyTheme(_ themeId: String) {
+        guard let view = terminalView else { return }
+        TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
+    }
+
+    // MARK: - 字体应用
+
+    /// 应用当前字体到终端视图
+    func applyCurrentFont(to view: LocalProcessTerminalView) {
+        if let prefs = try? PersistenceManager.shared.loadPreferences() {
+            let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
+                ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
+            view.font = font
+        }
+    }
+
+    /// 即时更新字体（无需重启终端）
+    func applyFont(family: String, size: CGFloat) {
+        guard let view = terminalView else { return }
+        let font = NSFont(name: family, size: size)
+            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        view.font = font
+        logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
     // MARK: - 停止

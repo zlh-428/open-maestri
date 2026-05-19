@@ -110,7 +110,7 @@ struct CanvasNodesSwiftUIView: View {
         case .terminal(let tc):
             TerminalNodeSwiftUIView(
                 nodeId: node.id, content: tc, isSelected: isSelected, isLocked: isLocked,
-                zoom: zoom, workspace: workspace,
+                zoom: zoom, nodeSize: node.frame.size, workspace: workspace,
                 onActivated: onActivated, onClose: onClose,
                 onRename: onRename, onDuplicate: onDuplicate, onLockToggle: onLockToggle
             )

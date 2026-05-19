@@ -2,7 +2,7 @@ import SwiftUI
 
 /// 所有节点的通用外壳，替代 BaseNodeView（NSView 子类）。
 /// 提供：背景/阴影/圆角、Header 栏、选中蓝色虚线边框、右键菜单。
-struct NodeShellView<Content: View>: View {
+struct NodeShellView<Content: View, Accessory: View>: View {
     let nodeId: UUID
     let title: String
     let isSelected: Bool
@@ -10,11 +10,42 @@ struct NodeShellView<Content: View>: View {
     let zoom: CGFloat
     let headerIcon: String?
     let headerColor: Color?
+    let headerAccessory: Accessory
     var onClose: (() -> Void)?
     var onRename: ((String) -> Void)?
     var onDuplicate: (() -> Void)?
     var onLockToggle: ((Bool) -> Void)?
     @ViewBuilder let content: () -> Content
+
+    init(
+        nodeId: UUID,
+        title: String,
+        isSelected: Bool,
+        isLocked: Bool,
+        zoom: CGFloat,
+        headerIcon: String?,
+        headerColor: Color?,
+        @ViewBuilder headerAccessory: () -> Accessory = { EmptyView() },
+        onClose: (() -> Void)? = nil,
+        onRename: ((String) -> Void)? = nil,
+        onDuplicate: (() -> Void)? = nil,
+        onLockToggle: ((Bool) -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.nodeId = nodeId
+        self.title = title
+        self.isSelected = isSelected
+        self.isLocked = isLocked
+        self.zoom = zoom
+        self.headerIcon = headerIcon
+        self.headerColor = headerColor
+        self.headerAccessory = headerAccessory()
+        self.onClose = onClose
+        self.onRename = onRename
+        self.onDuplicate = onDuplicate
+        self.onLockToggle = onLockToggle
+        self.content = content
+    }
 
     @Environment(\.dropTargetNodeId) private var dropTargetNodeId
 
@@ -37,7 +68,8 @@ struct NodeShellView<Content: View>: View {
                     title: title,
                     icon: headerIcon,
                     color: headerColor,
-                    isLocked: isLocked
+                    isLocked: isLocked,
+                    accessory: { headerAccessory }
                 )
                 .frame(height: CanvasNodeConstants.headerHeight)
 
@@ -85,12 +117,27 @@ struct NodeShellView<Content: View>: View {
     }
 }
 
-/// Header 栏（标题 + 图标 + 锁定徽章）
-struct NodeHeaderSwiftUIView: View {
+/// Header 栏（标题 + 图标 + 锁定徽章 + 可选配件）
+struct NodeHeaderSwiftUIView<Accessory: View>: View {
     let title: String
     let icon: String?
     let color: Color?
     let isLocked: Bool
+    let accessory: Accessory
+
+    init(
+        title: String,
+        icon: String?,
+        color: Color?,
+        isLocked: Bool,
+        @ViewBuilder accessory: () -> Accessory = { EmptyView() }
+    ) {
+        self.title = title
+        self.icon = icon
+        self.color = color
+        self.isLocked = isLocked
+        self.accessory = accessory()
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -104,6 +151,7 @@ struct NodeHeaderSwiftUIView: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer()
+            accessory
             if isLocked {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))

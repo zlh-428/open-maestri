@@ -37,4 +37,8 @@ extension Notification.Name {
     static let canvasJumpNumbersAssigned = Notification.Name("OpenMaestri.canvasJumpNumbersAssigned")
     /// 文件拖放目标节点变化：userInfo 含可选 "dropTargetNodeId" UUID（nil = 清除高亮）
     static let canvasDropTargetChanged   = Notification.Name("OpenMaestri.canvasDropTargetChanged")
+    /// 终端注意力状态变化：userInfo 含 "terminalId" UUID, "needsAttention" Bool
+    static let terminalAttentionChanged  = Notification.Name("OpenMaestri.terminalAttentionChanged")
+    /// 终端主题/字体变更（立即应用到所有已打开终端）
+    static let terminalAppearanceChanged = Notification.Name("OpenMaestri.terminalAppearanceChanged")
 }
