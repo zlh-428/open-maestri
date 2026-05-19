@@ -11,6 +11,19 @@ enum CanvasNodeConstants {
     static let selectionOutset: CGFloat = 8
 }
 
+// MARK: - 拖放目标 Environment Key
+
+private struct DropTargetNodeIdKey: EnvironmentKey {
+    static let defaultValue: UUID? = nil
+}
+
+extension EnvironmentValues {
+    var dropTargetNodeId: UUID? {
+        get { self[DropTargetNodeIdKey.self] }
+        set { self[DropTargetNodeIdKey.self] = newValue }
+    }
+}
+
 // MARK: - CanvasNodesView
 /// NSHostingView 子类，作为所有节点的 SwiftUI 容器。
 /// hitTest 默认返回 self（不穿透内部 SwiftUI 视图到 AppKit 层），
@@ -30,6 +43,7 @@ struct CanvasNodesSwiftUIView: View {
     let selectedNodeIds: Set<UUID>
     let lockedNodeIds: Set<UUID>
     let workspace: WorkspaceManager?
+    var dropTargetNodeId: UUID? = nil
     var onActivated: ((UUID) -> Void)?
     var onClose: ((UUID) -> Void)?
     var onRename: ((UUID, String) -> Void)?
@@ -54,6 +68,7 @@ struct CanvasNodesSwiftUIView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .environment(\.dropTargetNodeId, dropTargetNodeId)
     }
 
     @ViewBuilder

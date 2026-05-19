@@ -28,6 +28,7 @@ final class CanvasNodeRenderer {
         setupNodeDragCallback(canvas: canvas)
         setupActivationObserver()
         setupSelectionObserver()
+        setupDropTargetObserver()
     }
 
     private func setupNodesHostingView(canvas: CanvasViewportView) {
@@ -289,6 +290,35 @@ final class CanvasNodeRenderer {
                 selectedNodeIds: ids,
                 lockedNodeIds: lockedIds,
                 workspace: ws,
+                dropTargetNodeId: current?.dropTargetNodeId,
+                onActivated: current?.onActivated,
+                onClose: current?.onClose,
+                onRename: current?.onRename,
+                onDuplicate: current?.onDuplicate,
+                onLockToggle: current?.onLockToggle
+            )
+        }
+        notificationObservers.append(obs)
+    }
+
+    private func setupDropTargetObserver() {
+        let obs = NotificationCenter.default.addObserver(
+            forName: .canvasDropTargetChanged, object: nil, queue: .main
+        ) { [weak self] notif in
+            guard let self,
+                  let canvas = self.canvas,
+                  let ws = self.currentWorkspace else { return }
+            let dropTargetId = notif.userInfo?["dropTargetNodeId"] as? UUID
+            let current = self.nodesHostingView?.rootView
+            let lockedIds = Set(ws.nodes.filter { $0.isLocked }.map { $0.id })
+            self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
+                nodes: ws.nodes,
+                canvasOrigin: canvas.canvasOrigin,
+                zoom: canvas.zoom,
+                selectedNodeIds: canvas.selectedNodeIds,
+                lockedNodeIds: lockedIds,
+                workspace: ws,
+                dropTargetNodeId: dropTargetId,
                 onActivated: current?.onActivated,
                 onClose: current?.onClose,
                 onRename: current?.onRename,

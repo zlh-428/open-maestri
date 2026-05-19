@@ -35,6 +35,7 @@ coverage/
 app-builds/
 
 # Claude Code runtime
+.superpowers
 .claude/
 memory/
 

@@ -157,9 +157,10 @@ extension CanvasViewportView {
 
     func drawTemporaryConnection() {
         guard let fromId = connectingFromNodeId,
-              let fromView = nodeViews[fromId],
+              let fromCanvasFrame = nodeCanvasFrames[fromId],
               let toPoint = connectionDragPoint else { return }
-        let fromPoint = CGPoint(x: fromView.frame.midX, y: fromView.frame.midY)
+        let fromScreenFrame = canvasRectToScreen(fromCanvasFrame)
+        let fromPoint = CGPoint(x: fromScreenFrame.midX, y: fromScreenFrame.midY)
         let path = NSBezierPath()
         path.move(to: fromPoint)
         path.line(to: toPoint)
@@ -170,7 +171,7 @@ extension CanvasViewportView {
 
         // 起点节点高亮
         NSColor.systemBlue.withAlphaComponent(0.3).setFill()
-        let dot = NSBezierPath(ovalIn: fromView.frame.insetBy(dx: -3, dy: -3))
+        let dot = NSBezierPath(ovalIn: fromScreenFrame.insetBy(dx: -3, dy: -3))
         dot.fill()
     }
 
@@ -219,40 +220,37 @@ extension CanvasViewportView {
         return true
     }
 
-    /// 查找指定屏幕坐标下的节点 ID
+    /// 查找指定屏幕坐标下的节点 ID（使用 hitTestCanvas，兼容 NSHostingView 迁移后 nodeViews 为空的情况）
     func nodeId(at screenPoint: CGPoint) -> UUID? {
-        for (id, view) in nodeViews {
-            if view.frame.contains(screenPoint) {
-                return id
-            }
+        let hit = hitTestCanvas(at: screenPoint)
+        switch hit {
+        case .nodeHeader(let id), .nodeContent(let id, _), .nodeResize(let id, _):
+            return id
+        case .canvas:
+            return nil
         }
-        return nil
     }
 
-    /// 拖拽悬停时高亮目标节点
+    /// 拖拽悬停时高亮目标节点（通过 NotificationCenter 更新 SwiftUI 层 dropTargetNodeId）
     private func updateDropTargetHighlight(at screenPoint: CGPoint) {
         let newTarget = nodeId(at: screenPoint)
         if newTarget != dropTargetNodeId {
-            // 清除旧高亮
-            if let oldId = dropTargetNodeId, let oldView = nodeViews[oldId] as? BaseNodeView {
-                oldView.layer?.borderColor = NSColor(white: 0.85, alpha: 1).cgColor
-                oldView.layer?.borderWidth = 0.5
-            }
-            // 设置新高亮
-            if let newId = newTarget, let newView = nodeViews[newId] as? BaseNodeView {
-                newView.layer?.borderColor = NSColor.systemBlue.withAlphaComponent(0.8).cgColor
-                newView.layer?.borderWidth = 2
-            }
             dropTargetNodeId = newTarget
+            NotificationCenter.default.post(
+                name: .canvasDropTargetChanged,
+                object: nil,
+                userInfo: ["dropTargetNodeId": newTarget as Any]
+            )
         }
     }
 
     private func clearDropTargetHighlight() {
-        if let oldId = dropTargetNodeId, let oldView = nodeViews[oldId] as? BaseNodeView {
-            oldView.layer?.borderColor = NSColor(white: 0.85, alpha: 1).cgColor
-            oldView.layer?.borderWidth = 0.5
-        }
         dropTargetNodeId = nil
+        NotificationCenter.default.post(
+            name: .canvasDropTargetChanged,
+            object: nil,
+            userInfo: [:]
+        )
     }
 
     private func containsFileURLs(_ sender: NSDraggingInfo) -> Bool {

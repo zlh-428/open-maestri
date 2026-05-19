@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 
 /// 画布节点，frame 使用 Maestri [[x,y],[w,h]] 格式编码
-struct CanvasNode: Codable, Identifiable {
+struct CanvasNode: Codable, Identifiable, Equatable {
     var id: UUID
     var frame: CGRect
     var content: NodeContent
@@ -62,5 +62,13 @@ struct CanvasNode: Codable, Identifiable {
         try container.encode(isLocked, forKey: .isLocked)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(lastModifiedAt, forKey: .lastModifiedAt)
+    }
+
+    // MARK: - Equatable（仅比较布局相关字段，供 SwiftUI ForEach diff 使用）
+    static func == (lhs: CanvasNode, rhs: CanvasNode) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.frame == rhs.frame &&
+        lhs.zIndex == rhs.zIndex &&
+        lhs.isLocked == rhs.isLocked
     }
 }

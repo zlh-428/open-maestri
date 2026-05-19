@@ -35,4 +35,6 @@ extension Notification.Name {
     static let canvasSelectionChanged  = Notification.Name("OpenMaestri.canvasSelectionChanged")
     /// ⌘ 按住跳转数字分配：userInfo 含 "mapping" [UUID: Int]（空 mapping = 清除）
     static let canvasJumpNumbersAssigned = Notification.Name("OpenMaestri.canvasJumpNumbersAssigned")
+    /// 文件拖放目标节点变化：userInfo 含可选 "dropTargetNodeId" UUID（nil = 清除高亮）
+    static let canvasDropTargetChanged   = Notification.Name("OpenMaestri.canvasDropTargetChanged")
 }

@@ -16,6 +16,10 @@ struct NodeShellView<Content: View>: View {
     var onLockToggle: ((Bool) -> Void)?
     @ViewBuilder let content: () -> Content
 
+    @Environment(\.dropTargetNodeId) private var dropTargetNodeId
+
+    private var isDropTarget: Bool { dropTargetNodeId == nodeId }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             // 背景
@@ -54,6 +58,13 @@ struct NodeShellView<Content: View>: View {
                     )
                     .foregroundStyle(.blue)
                     .padding(-CanvasNodeConstants.selectionOutset)
+                    .allowsHitTesting(false)
+            }
+
+            // 拖放目标高亮蓝色实线边框
+            if isDropTarget {
+                RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
+                    .strokeBorder(Color.blue.opacity(0.8), lineWidth: 2)
                     .allowsHitTesting(false)
             }
         }

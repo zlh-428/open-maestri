@@ -404,11 +404,10 @@ final class CanvasViewportView: NSView {
 
     private func reportSelectionChange() {
         guard let callback = onSelectionChanged else { return }
-        if let firstId = selectedNodeIds.first, let view = nodeViews[firstId] {
-            callback(selectedNodeIds, view.frame)
-        } else {
-            callback(selectedNodeIds, nil)
-        }
+        let frame = selectedNodeIds.first
+            .flatMap { nodeCanvasFrames[$0] }
+            .map { canvasRectToScreen($0) }
+        callback(selectedNodeIds, frame)
     }
 
     // MARK: - 统一交互状态机
