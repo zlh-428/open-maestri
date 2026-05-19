@@ -161,14 +161,15 @@ final class FileTreeNodeView: BaseNodeView {
 
         viewModeButton.frame = CGRect(x: w - viewBtnWidth - 8, y: btnY, width: viewBtnWidth, height: btnSize)
 
-        // 搜索栏置底
-        searchBar.frame = CGRect(x: 0, y: 0, width: w, height: searchBarHeight)
+        // 搜索栏置底（对齐底部边缘热区上方）
+        let ew = BaseNodeView.resizeEdgeWidth
+        searchBar.frame = CGRect(x: 0, y: ew, width: w, height: searchBarHeight)
         searchField.frame = CGRect(x: 8, y: 6, width: w - 16, height: searchBarHeight - 12)
 
-        // 内容区域（中间）
-        let contentY = searchBarHeight
-        let contentH = h - navBarHeight - searchBarHeight
-        contentView.frame = CGRect(x: 0, y: contentY, width: w, height: max(contentH, 0))
+        // 内容区域：内缩左右和底部边缘热区，使 contentEventRouter 不覆盖 resize 热区
+        let contentY = ew + searchBarHeight
+        let contentH = h - navBarHeight - searchBarHeight - ew
+        contentView.frame = CGRect(x: ew, y: contentY, width: max(w - ew * 2, 0), height: max(contentH, 0))
     }
 
     // MARK: - 导航
