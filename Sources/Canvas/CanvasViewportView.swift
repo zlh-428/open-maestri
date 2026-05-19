@@ -14,6 +14,7 @@ final class CanvasViewportView: NSView {
         didSet {
             needsLayout = true
             needsDisplay = true
+            backgroundView?.canvasOrigin = canvasOrigin
         }
     }
 
@@ -21,13 +22,20 @@ final class CanvasViewportView: NSView {
         didSet {
             needsLayout = true
             needsDisplay = true
+            backgroundView?.zoom = zoom
         }
     }
 
     /// 画布背景模式（从 Preferences 读取）
     var backgroundMode: String = "dotGrid" {
-        didSet { needsDisplay = true }
+        didSet {
+            backgroundView?.backgroundMode = backgroundMode
+        }
     }
+
+    // MARK: - 分层视图
+
+    private var backgroundView: CanvasBackground?
 
     /// 节点视图映射（nodeId → NSView）
     private(set) var nodeViews: [UUID: NSView] = [:]
@@ -124,6 +132,17 @@ final class CanvasViewportView: NSView {
         allowedTouchTypes = [.indirect, .direct]
         registerDragTypes()
         setupNotificationObservers()
+        setupBackgroundView()
+    }
+
+    private func setupBackgroundView() {
+        let bg = CanvasBackground(frame: bounds)
+        bg.autoresizingMask = [.width, .height]
+        bg.canvasOrigin = canvasOrigin
+        bg.zoom = zoom
+        bg.backgroundMode = backgroundMode
+        addSubview(bg)
+        backgroundView = bg
     }
 
     private func setupNotificationObservers() {
@@ -463,70 +482,16 @@ final class CanvasViewportView: NSView {
         onViewportChanged?(canvasOrigin, zoom)
     }
 
-    // MARK: - 背景绘制
+    // MARK: - 前景覆盖物绘制
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-
-        // 先绘制背景
-        switch backgroundMode {
-        case "dotGrid":
-            drawLineGrid(in: dirtyRect)
-        case "solid":
-            NSColor(white: 0.98, alpha: 1).setFill()
-            dirtyRect.fill()
-        case "transparent":
-            NSColor.clear.setFill()
-            dirtyRect.fill()
-        default:
-            drawLineGrid(in: dirtyRect)
-        }
-
-        // 再绘制前景覆盖物（连线、绘制矩形、框选矩形、磁力对齐参考线）
+        // 背景由 CanvasBackground 子视图负责绘制
+        // 此处只绘制前景覆盖物（连线、绘制矩形、框选矩形、磁力对齐参考线）
         drawTemporaryConnection()
         drawDrawingRect()
         drawSelectionRect()
         drawSnapGuidelines()
-    }
-
-    /// 白色背景 + 浅灰色网格线（对标 Maestri 产品样式）
-    private func drawLineGrid(in rect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-
-        // 白色背景填充
-        ctx.setFillColor(NSColor.white.cgColor)
-        ctx.fill(rect)
-
-        let gridSpacing: CGFloat = Constants.canvasGridSpacing * zoom
-        let lineColor = Constants.canvasGridLineColor.cgColor
-        let lineWidth = Constants.canvasGridLineWidth
-
-        // 计算画布偏移以保持网格与画布坐标对齐
-        let offsetX = -(canvasOrigin.x * zoom).truncatingRemainder(dividingBy: gridSpacing)
-        let offsetY = -(canvasOrigin.y * zoom).truncatingRemainder(dividingBy: gridSpacing)
-
-        ctx.setStrokeColor(lineColor)
-        ctx.setLineWidth(lineWidth)
-
-        // 批量绘制垂直线
-        let startX = rect.minX - rect.minX.truncatingRemainder(dividingBy: gridSpacing) + offsetX
-        var x = startX
-        while x <= rect.maxX {
-            ctx.move(to: CGPoint(x: x, y: rect.minY))
-            ctx.addLine(to: CGPoint(x: x, y: rect.maxY))
-            x += gridSpacing
-        }
-
-        // 批量绘制水平线
-        let startY = rect.minY - rect.minY.truncatingRemainder(dividingBy: gridSpacing) + offsetY
-        var y = startY
-        while y <= rect.maxY {
-            ctx.move(to: CGPoint(x: rect.minX, y: y))
-            ctx.addLine(to: CGPoint(x: rect.maxX, y: y))
-            y += gridSpacing
-        }
-
-        ctx.strokePath()
     }
 }
 
