@@ -5,7 +5,7 @@ import SwiftTerm
 /// SwiftTerm PTY 适配层
 /// - 为每个 Terminal 节点管理一个 LocalProcessTerminalView
 /// - 实现 VT100/xterm-256color 完整支持
-/// - 启动时注入 OMAESTRI_* 环境变量，使 CLI 可用
+/// - 启动时注入 MAESTRI_* 环境变量，使 CLI 可用
 @MainActor
 final class SwiftTermProvider: NSObject {
     private let logger = Logger.make(category: "SwiftTermProvider")
@@ -53,11 +53,15 @@ final class SwiftTermProvider: NSObject {
         terminalView = view
         isRunning = true
 
-        // 构建环境变量：保留系统环境 + 注入 OMAESTRI_* + 扩展 PATH
+        // 构建环境变量：保留系统环境 + 注入 MAESTRI_* + 扩展 PATH
         var env = ProcessInfo.processInfo.environment
-        env["OMAESTRI_TERMINAL_ID"] = terminalId.uuidString
-        env["OMAESTRI_HOST"] = "\(Constants.interAgentServerHost):\(serverPort)"
-        env["OMAESTRI_CLI"] = ""
+        // Maestri 兼容变量
+        env["MAESTRI_TERMINAL_ID"] = terminalId.uuidString
+        env["OMAESTRI_TERMINAL_ID"] = terminalId.uuidString  // 向后兼容
+        // Unix socket 路径
+        if let socketPath = InterAgentServer.shared.currentSocketPath {
+            env["MAESTRI_SOCKET"] = socketPath
+        }
         env["TERM"] = "xterm-256color"
         // 确保 PATH 包含常用工具目录（解决 "claude" 等命令无法被 execve 找到的问题）
         let existingPath = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
@@ -67,7 +71,13 @@ final class SwiftTermProvider: NSObject {
             "/opt/homebrew/bin",
             "/usr/local/bin",
         ].filter { FileManager.default.fileExists(atPath: $0) }
-        env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+        // CLI 二进制路径 + PATH 注入（resourcePath 放最前面）
+        if let resourcePath = Bundle.main.resourcePath {
+            env["MAESTRI_CLI"] = "\(resourcePath)/omaestri"
+            env["PATH"] = ([resourcePath] + extraPaths + [existingPath]).joined(separator: ":")
+        } else {
+            env["PATH"] = (extraPaths + [existingPath]).joined(separator: ":")
+        }
 
         let args: [String]
         let execName: String
