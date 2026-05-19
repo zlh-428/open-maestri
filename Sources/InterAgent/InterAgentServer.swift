@@ -13,6 +13,21 @@ final class InterAgentServer {
     private var listener: NWListener?
     private(set) var port: UInt16 = 0
 
+    // MARK: - Unix Socket 支持
+    private var unixSocketFd: Int32 = -1
+    private var unixSocketSource: DispatchSourceRead?
+    private var activeWorkspaceId: UUID?
+
+    /// 当前活跃的 Unix socket 路径（供 SwiftTermProvider 注入 MAESTRI_SOCKET）
+    private(set) var currentSocketPath: String?
+
+    /// 计算 workspace 对应的 socket 文件路径
+    static func socketPath(for workspaceId: UUID) -> String {
+        let runDir = PersistenceManager.shared.appDataURL
+            .appendingPathComponent("run").path
+        return "\(runDir)/\(workspaceId.uuidString).sock"
+    }
+
     private init() {}
 
     // MARK: - 启动
@@ -54,9 +69,125 @@ final class InterAgentServer {
         logger.debug("InterAgentServer starting on \(Constants.interAgentServerHost):\(self.port)")
     }
 
+    // MARK: - Unix Socket 生命周期
+
+    func switchWorkspace(to workspaceId: UUID) {
+        stopUnixSocket()
+        do {
+            try startUnixSocket(workspaceId: workspaceId)
+        } catch {
+            logger.error("InterAgentServer: Unix socket start failed: \(error)")
+        }
+    }
+
+    private func startUnixSocket(workspaceId: UUID) throws {
+        activeWorkspaceId = workspaceId
+        let path = Self.socketPath(for: workspaceId)
+        currentSocketPath = path
+
+        // 创建 run/ 目录
+        let runDir = (path as NSString).deletingLastPathComponent
+        try FileManager.default.createDirectory(
+            atPath: runDir,
+            withIntermediateDirectories: true,
+            attributes: nil
+        )
+
+        // 清理旧 socket 文件（防崩溃残留）
+        unlink(path)
+
+        // 创建 Unix socket
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else {
+            throw NSError(domain: "InterAgentServer", code: Int(errno),
+                          userInfo: [NSLocalizedDescriptionKey: "socket() failed: \(String(cString: strerror(errno)))"])
+        }
+        unixSocketFd = fd
+
+        // 绑定
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let pathBytes = path.utf8.prefix(103)
+        withUnsafeMutableBytes(of: &addr.sun_path) { ptr in
+            pathBytes.enumerated().forEach { ptr[$0.offset] = $0.element }
+        }
+        let bindResult = withUnsafePointer(to: &addr) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(fd, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        guard bindResult == 0 else {
+            close(fd)
+            throw NSError(domain: "InterAgentServer", code: Int(errno),
+                          userInfo: [NSLocalizedDescriptionKey: "bind() failed: \(String(cString: strerror(errno)))"])
+        }
+
+        // 监听
+        guard listen(fd, 10) == 0 else {
+            close(fd)
+            throw NSError(domain: "InterAgentServer", code: Int(errno),
+                          userInfo: [NSLocalizedDescriptionKey: "listen() failed"])
+        }
+
+        // DispatchSource accept 循环
+        let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: .global(qos: .userInitiated))
+        source.setEventHandler { [weak self] in
+            self?.acceptUnixConnection(serverFd: fd)
+        }
+        source.resume()
+        unixSocketSource = source
+        logger.info("InterAgentServer Unix socket ready at \(path)")
+    }
+
+    private func stopUnixSocket() {
+        unixSocketSource?.cancel()
+        unixSocketSource = nil
+        if unixSocketFd >= 0 {
+            close(unixSocketFd)
+            unixSocketFd = -1
+        }
+        if let path = currentSocketPath {
+            unlink(path)
+        }
+        currentSocketPath = nil
+        activeWorkspaceId = nil
+    }
+
+    private func acceptUnixConnection(serverFd: Int32) {
+        let clientFd = accept(serverFd, nil, nil)
+        guard clientFd >= 0 else { return }
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.handleUnixClient(fd: clientFd)
+        }
+    }
+
+    private func handleUnixClient(fd: Int32) {
+        defer { close(fd) }
+        var accumulated = Data()
+        var buffer = [UInt8](repeating: 0, count: 65536)
+        // 接收完整 HTTP 请求
+        while true {
+            let n = recv(fd, &buffer, buffer.count, 0)
+            guard n > 0 else { break }
+            accumulated.append(contentsOf: buffer[..<n])
+            // 检查 HTTP 请求是否完整
+            if let headerEnd = accumulated.range(of: Data("\r\n\r\n".utf8)) {
+                let headerStr = String(decoding: accumulated[..<headerEnd.upperBound], as: UTF8.self)
+                let contentLength = Self.parseContentLength(from: headerStr)
+                let bodyReceived = accumulated.count - headerEnd.upperBound
+                if contentLength <= 0 || bodyReceived >= contentLength { break }
+            }
+        }
+        guard !accumulated.isEmpty else { return }
+        let responseBody = processHTTPRequest(accumulated)
+        let responseData = buildHTTPResponse(body: responseBody)
+        responseData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
+    }
+
     func stop() {
         listener?.cancel()
         listener = nil
+        stopUnixSocket()
         logger.debug("InterAgentServer stopped")
     }
 
