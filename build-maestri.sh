@@ -17,12 +17,9 @@ for arg in "$@"; do
   [[ "$arg" == "--launch" ]] && LAUNCH=true
 done
 
-echo "🔨 Building omaestri CLI..."
+echo "🔨 Building open-maestri app + omaestri CLI..."
 cd "$PROJECT_DIR"
-swift build -c release --target omaestri 2>&1
-
-echo "🔨 Building open-maestri app..."
-swift build -c release --target open-maestri 2>&1
+swift build -c release 2>&1
 
 if [ ! -f "$EXEC" ]; then
   echo "✗ Build failed: executable not found at $EXEC"
