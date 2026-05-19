@@ -58,12 +58,12 @@ enum Transport {
             fputs("error: header encoding failed\n", stderr)
             exit(1)
         }
-        let sendResult = headerData.withUnsafeBytes { send(fd, $0.baseAddress, $0.count, 0) }
+        let sendResult = headerData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
         guard sendResult >= 0 else {
             fputs("error: send failed\n", stderr)
             exit(1)
         }
-        let sendBodyResult = bodyData.withUnsafeBytes { send(fd, $0.baseAddress, $0.count, 0) }
+        let sendBodyResult = bodyData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
         guard sendBodyResult >= 0 else {
             fputs("error: send body failed\n", stderr)
             exit(1)
