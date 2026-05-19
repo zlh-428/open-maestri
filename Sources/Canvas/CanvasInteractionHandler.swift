@@ -197,4 +197,247 @@ extension CanvasViewportView {
             edge.cursor.set()
         }
     }
+
+    // MARK: - 拖动处理
+
+    private static let dragThreshold: CGFloat = 3.0
+
+    override func mouseDragged(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        switch interaction {
+
+        // --- 画布平移 ---
+        case .panCanvas(let startOrigin, let startMouse):
+            let dx = (loc.x - startMouse.x) / zoom
+            let dy = (loc.y - startMouse.y) / zoom
+            canvasOrigin = CGPoint(x: startOrigin.x - dx, y: startOrigin.y - dy)
+            needsLayout = true
+            notifyViewportChanged()
+
+        // --- 等待判断（点击 or 拖动）---
+        case .mayDragNode(let id, let startMouse, let startFrame, let contentTarget):
+            let dx = loc.x - startMouse.x
+            let dy = loc.y - startMouse.y
+            let dist = sqrt(dx * dx + dy * dy)
+            guard dist >= Self.dragThreshold else { return }
+            // 安全检查：必须有物理左键按下，防止触控板双指滚动误触
+            guard NSEvent.pressedMouseButtons & 1 != 0 else { return }
+
+            // Option+拖动 → 触发节点复制而非移动
+            if event.modifierFlags.contains(.option),
+               let base = nodeViews[id] as? BaseNodeView {
+                interaction = .idle
+                base.onDuplicate?()
+                return
+            }
+
+            // 若已透传 mouseDown 给内容区，发合成 mouseUp 取消其内部状态
+            if let target = contentTarget {
+                if let cancelEvent = NSEvent.mouseEvent(
+                    with: .leftMouseUp,
+                    location: event.locationInWindow,
+                    modifierFlags: [],
+                    timestamp: ProcessInfo.processInfo.systemUptime,
+                    windowNumber: event.windowNumber,
+                    context: nil,
+                    eventNumber: event.eventNumber,
+                    clickCount: 1,
+                    pressure: 0
+                ) {
+                    target.mouseUp(with: cancelEvent)
+                }
+            }
+
+            // 切换为真正拖动
+            let canvasMouse = screenToCanvas(startMouse)
+            if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
+                var startFrames: [UUID: CGRect] = [:]
+                for sid in selectedNodeIds {
+                    startFrames[sid] = nodeCanvasFrames[sid] ?? .zero
+                }
+                interaction = .batchDragging(startFrames, primaryId: id, startMouse: canvasMouse)
+            } else {
+                interaction = .draggingNode(id, startMouse: canvasMouse, startFrame: startFrame)
+            }
+            // 立即处理第一帧拖动（递归调用）
+            mouseDragged(with: event)
+
+        // --- 单节点拖动 ---
+        case .draggingNode(let id, let startMouse, let startFrame):
+            guard let view = nodeViews[id] else { return }
+            let currentCanvas = screenToCanvas(loc)
+            let rawDX = currentCanvas.x - startMouse.x
+            let rawDY = currentCanvas.y - startMouse.y
+            var newOrigin = CGPoint(x: startFrame.origin.x + rawDX, y: startFrame.origin.y + rawDY)
+            var newFrame = CGRect(origin: newOrigin, size: startFrame.size)
+
+            let otherFrames = nodeCanvasFrames.filter { $0.key != id }.map { $0.value }
+            if event.modifierFlags.contains(.command) {
+                let (snapped, guidelines) = TileSnapping.snap(draggingFrame: newFrame, against: otherFrames)
+                let snapActive = snapped != newOrigin
+                newOrigin = snapped
+                newFrame = CGRect(origin: newOrigin, size: startFrame.size)
+                dragGuidelines = guidelines
+                if snapActive && !lastSnapActive {
+                    NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                }
+                lastSnapActive = snapActive
+            } else {
+                let (nodeSnapped, guidelines) = TileSnapping.snap(draggingFrame: newFrame, against: otherFrames)
+                let nodeSnapActive = nodeSnapped != newOrigin
+                if nodeSnapActive {
+                    newOrigin = nodeSnapped
+                    dragGuidelines = guidelines
+                    if !lastSnapActive {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                    }
+                    lastSnapActive = true
+                } else {
+                    dragGuidelines = []
+                    let gridSnapped = snapToGrid(newOrigin, size: startFrame.size)
+                    let gridChanged = gridSnapped != lastSnappedGridOrigin
+                    newOrigin = gridSnapped
+                    if gridChanged && lastSnappedGridOrigin != nil {
+                        NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+                    }
+                    lastSnappedGridOrigin = gridSnapped
+                    lastSnapActive = false
+                }
+                newFrame = CGRect(origin: newOrigin, size: startFrame.size)
+            }
+
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            view.frame = canvasRectToScreen(newFrame)
+            view.setBoundsSize(newFrame.size)
+            nodeCanvasFrames[id] = newFrame
+            CATransaction.commit()
+
+        // --- 批量拖动 ---
+        case .batchDragging(let startFrames, let primaryId, let startMouse):
+            let currentCanvas = screenToCanvas(loc)
+            let rawDX = currentCanvas.x - startMouse.x
+            let rawDY = currentCanvas.y - startMouse.y
+
+            guard let primaryStart = startFrames[primaryId] else { return }
+            let primaryRaw = CGRect(
+                origin: CGPoint(x: primaryStart.origin.x + rawDX, y: primaryStart.origin.y + rawDY),
+                size: primaryStart.size
+            )
+            let otherFrames = nodeCanvasFrames.filter { !startFrames.keys.contains($0.key) }.map { $0.value }
+            let (snapped, guidelines) = TileSnapping.snap(draggingFrame: primaryRaw, against: otherFrames)
+            let finalDX = snapped.x - primaryStart.origin.x
+            let finalDY = snapped.y - primaryStart.origin.y
+            dragGuidelines = guidelines
+            let snapActive = snapped != primaryRaw.origin
+            if snapActive && !lastSnapActive {
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            }
+            lastSnapActive = snapActive
+
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            for (sid, sFrame) in startFrames {
+                guard let sView = nodeViews[sid] else { continue }
+                let newOrigin = CGPoint(x: sFrame.origin.x + finalDX, y: sFrame.origin.y + finalDY)
+                let newFrame = CGRect(origin: newOrigin, size: sFrame.size)
+                sView.frame = canvasRectToScreen(newFrame)
+                sView.setBoundsSize(newFrame.size)
+                nodeCanvasFrames[sid] = newFrame
+            }
+            CATransaction.commit()
+
+        // --- Resize ---
+        case .resizingNode(let id, let edge, let startFrame, let startMouse):
+            guard let view = nodeViews[id] as? BaseNodeView else { return }
+            let dx = loc.x - startMouse.x
+            let dy = loc.y - startMouse.y
+            applyResizeOnCanvas(id: id, view: view, edge: edge, dx: dx, dy: dy, startFrame: startFrame)
+
+        // --- 框选 ---
+        case .marquee:
+            marqueeCurrentPoint = loc
+            needsDisplay = true
+
+        // --- 节点绘制模式 ---
+        case .drawing:
+            drawingCurrentPoint = loc
+            needsDisplay = true
+
+        // --- idle（连线工具跟踪）---
+        case .idle:
+            if connectingFromNodeId != nil {
+                connectionDragPoint = loc
+                needsDisplay = true
+            }
+        }
+    }
+
+    // MARK: - Resize 辅助
+
+    private func applyResizeOnCanvas(id: UUID, view: BaseNodeView,
+                                      edge: BaseNodeView.ResizeEdge,
+                                      dx: CGFloat, dy: CGFloat,
+                                      startFrame: CGRect) {
+        let minW = BaseNodeView.minNodeWidth * zoom
+        let minH = BaseNodeView.minNodeHeight * zoom
+
+        var x = startFrame.origin.x
+        var y = startFrame.origin.y
+        var w = startFrame.width
+        var h = startFrame.height
+
+        // startFrame 是屏幕坐标（缩放后），dx/dy 亦为屏幕坐标
+        // isFlipped = false：y=0 在底部，dy>0 向上
+        switch edge {
+        case .right:
+            w = max(w + dx, minW)
+        case .left:
+            let newW = max(w - dx, minW)
+            x = startFrame.maxX - newW
+            w = newW
+        case .bottom:
+            let top = y + h
+            let newH = max(h - dy, minH)
+            y = top - newH
+            h = newH
+        case .top:
+            h = max(h + dy, minH)
+        case .bottomLeft:
+            let newW = max(w - dx, minW)
+            x = startFrame.maxX - newW
+            w = newW
+            let top = y + h
+            let newH = max(h - dy, minH)
+            y = top - newH
+            h = newH
+        case .bottomRight:
+            w = max(w + dx, minW)
+            let top = y + h
+            let newH = max(h - dy, minH)
+            y = top - newH
+            h = newH
+        case .topLeft:
+            let newW = max(w - dx, minW)
+            x = startFrame.maxX - newW
+            w = newW
+            h = max(h + dy, minH)
+        case .topRight:
+            w = max(w + dx, minW)
+            h = max(h + dy, minH)
+        }
+
+        let newScreenFrame = CGRect(x: x, y: y, width: w, height: h)
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        view.frame = newScreenFrame
+        view.setBoundsSize(CGSize(width: w / zoom, height: h / zoom))
+        let canvasOriginPt = screenToCanvas(newScreenFrame.origin)
+        nodeCanvasFrames[id] = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
+                                       width: w / zoom, height: h / zoom)
+        CATransaction.commit()
+
+        if view.isNodeSelected { view.needsLayout = true }
+    }
 }
