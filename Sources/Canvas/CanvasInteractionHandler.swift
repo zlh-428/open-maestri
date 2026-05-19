@@ -26,3 +26,19 @@ enum CanvasInteraction {
     case panCanvas(startOrigin: CGPoint, startMouse: CGPoint)
     case drawing(start: CGPoint)
 }
+
+// MARK: - CanvasViewportView selectionRect helper
+
+extension CanvasViewportView {
+    /// 当前框选矩形（从 interaction.marquee 状态读取）
+    var selectionRect: CGRect? {
+        guard case .marquee(let start) = interaction,
+              let current = marqueeCurrentPoint else { return nil }
+        return CGRect(
+            x: min(start.x, current.x),
+            y: min(start.y, current.y),
+            width: abs(current.x - start.x),
+            height: abs(current.y - start.y)
+        )
+    }
+}

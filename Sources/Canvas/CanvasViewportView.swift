@@ -186,32 +186,66 @@ final class CanvasViewportView: NSView {
         guard let myWindow = self.window else { return event }
         if let eventWindow = event.window, eventWindow !== myWindow { return event }
 
-        // 用 hitTest 判断事件是否发生在本视图或其子视图上
-        let locInWindow = event.locationInWindow
-        let hitView = myWindow.contentView?.hitTest(locInWindow)
-        let isInCanvas = hitView != nil && (hitView === self || hitView?.isDescendant(of: self) == true)
-        guard isInCanvas else { return event }
+        // 用画布坐标系的 frame 判断鼠标是否在本视图（画布）范围内
+        // 避免依赖 hitTest + isDescendant（NSHostingView 的 flipped 视图会导致误判）
+        let locInCanvas = convert(event.locationInWindow, from: nil)
+        guard bounds.contains(locInCanvas) else { return event }
 
-        if event.type == .magnify || event.type == .scrollWheel {
-            // 判断鼠标是否悬停在某个选中节点上
-            let hoveredNodeId = nodeIdForHitView(hitView)
-            let isOverSelectedNode = hoveredNodeId.map { selectedNodeIds.contains($0) } ?? false
-
-            if isOverSelectedNode, event.type == .scrollWheel,
-               let hId = hoveredNodeId,
-               let nodeView = nodeViews[hId] as? BaseNodeView {
-                // 鼠标在选中节点上 + scrollWheel：手动转发给节点内容区域，
-                // 然后吞掉事件（return nil），确保画布不再收到此 scroll
-                nodeView.contentView.scrollWheel(with: event)
-                return nil
-            }
-
-            // 其余情况（空白区域 / 未选中节点 / magnify）：由画布统一处理
-            self.handle(scrollOrMagnify: event)
+        // magnify 始终由画布处理（捏合缩放画布视口）
+        if event.type == .magnify {
+            self.magnify(with: event)
             return nil
         }
+        guard event.type == .scrollWheel else { return event }
 
-        return event
+        // 用 frame 直接判断鼠标是否在某个选中节点的内容区内
+        // 这比 hitView.isDescendant 更可靠：不受子视图 isFlipped 或 overlay 影响
+        let locInWindow = event.locationInWindow
+        for selectedId in selectedNodeIds {
+            guard let nodeView = nodeViews[selectedId] as? BaseNodeView else { continue }
+            // 用屏幕坐标（nodeView.frame 已是缩放后的屏幕坐标）做 frame 命中测试
+            guard nodeView.frame.contains(locInCanvas) else { continue }
+            // 进一步确认：鼠标在 contentView 区域内（排除 header、resize 边缘）
+            let localInContent = nodeView.contentView.convert(locInWindow, from: nil)
+            guard nodeView.contentView.bounds.contains(localInContent) else { continue }
+            // 在 contentView 子视图树中找可滚动目标
+            if let target = findScrollTarget(in: nodeView.contentView, at: localInContent) {
+                target.scrollWheel(with: event)
+                return nil
+            }
+            // 找不到可滚动目标（Note 内容未溢出等情况）：回退给画布平移，不要吃掉事件
+            break
+        }
+
+        // 画布处理：平移
+        self.scrollWheel(with: event)
+        return nil
+    }
+
+    /// 在视图树（以 root 为根，point 为 root 的 bounds 坐标）中，
+    /// 查找最合适的滚动目标：
+    ///  1. NSScrollView（最优先，包括 Terminal 内的 scrollView）
+    ///  2. 非标准自定义 NSView（如 SwiftTerm TerminalView）
+    /// 故意跳过 NSHostingView（SwiftUI 容器，不可靠）。
+    private func findScrollTarget(in root: NSView, at point: CGPoint) -> NSView? {
+        guard root.bounds.contains(point), !root.isHidden, root.alphaValue > 0 else { return nil }
+        // NSScrollView 直接命中（最高优先级，不再深入）
+        if root is NSScrollView { return root }
+        // NSHostingView：排除，不递归其内部（SwiftUI 视图中的 NSScrollView 不可直接控制）
+        let rootTypeName = String(describing: type(of: root))
+        if rootTypeName.contains("HostingView") || rootTypeName.contains("Hosting") { return nil }
+        // 递归子视图（深度优先）
+        for sub in root.subviews.reversed() {
+            let subPoint = root.convert(point, to: sub)
+            if let found = findScrollTarget(in: sub, at: subPoint) {
+                return found
+            }
+        }
+        // 非标准 NSView（如 SwiftTerm TerminalView，type != NSView && != NSClipView）
+        if type(of: root) != NSView.self && !(root is NSClipView) {
+            return root
+        }
+        return nil
     }
 
     private func handle(scrollOrMagnify event: NSEvent) {
@@ -288,13 +322,23 @@ final class CanvasViewportView: NSView {
 
     override func layout() {
         super.layout()
-        // 重新应用所有节点的位置和缩放变换（zoom/origin 变化时）
-        // 跳过正在拖动的节点——其 frame 由 mouseDragged 直接维护，避免双重更新导致闪烁
-        let draggedIds: Set<UUID> = isBatchDragging ? Set(batchDragStartFrames.keys) : (draggingNodeId.map { [$0] } ?? [])
+        // 跳过正在被交互的节点（其 frame 由 CanvasInteractionHandler 直接维护）
+        let skipIds: Set<UUID>
+        switch interaction {
+        case .draggingNode(let id, _, _):
+            skipIds = [id]
+        case .batchDragging(let frames, _, _):
+            skipIds = Set(frames.keys)
+        case .resizingNode(let id, _, _, _):
+            skipIds = [id]
+        case .mayDragNode(let id, _, _, _):
+            skipIds = [id]
+        default:
+            skipIds = []
+        }
         for (id, view) in nodeViews {
-            if draggedIds.contains(id) { continue }
+            if skipIds.contains(id) { continue }
             if let canvasFrame = nodeCanvasFrames[id] {
-                // frame = 缩放后的屏幕尺寸，bounds = 画布原始尺寸
                 view.frame = canvasRectToScreen(canvasFrame)
                 view.setBoundsSize(canvasFrame.size)
             }
@@ -324,13 +368,15 @@ final class CanvasViewportView: NSView {
 
     func updateNodeFrame(id: UUID, canvasFrame: CGRect) {
         guard let view = nodeViews[id] else { return }
-        // 拖动期间不允许外部覆盖被拖动节点的 frame
-        if draggingNodeId != nil {
-            let isDragged = (id == draggingNodeId) || batchDragStartFrames.keys.contains(id)
-            if isDragged { return }
+        // 拖动/resize 期间不允许外部覆盖被交互节点的 frame
+        switch interaction {
+        case .draggingNode(let did, _, _) where did == id: return
+        case .batchDragging(let frames, _, _) where frames.keys.contains(id): return
+        case .resizingNode(let rid, _, _, _) where rid == id: return
+        case .mayDragNode(let mid, _, _, _) where mid == id: return
+        default: break
         }
         nodeCanvasFrames[id] = canvasFrame
-        // frame = 缩放后屏幕尺寸，bounds = 画布原始尺寸（子视图以原始比例 layout）
         view.frame = canvasRectToScreen(canvasFrame)
         view.setBoundsSize(canvasFrame.size)
     }
@@ -379,58 +425,42 @@ final class CanvasViewportView: NSView {
         }
     }
 
-    // MARK: - 节点拖动状态（由 CanvasDragHandler 扩展使用）
+    // MARK: - 统一交互状态机
 
-    var draggingNodeId: UUID? = nil
-    var dragStartCanvasMouse: CGPoint? = nil
-    var dragStartCanvasFrame: CGRect? = nil
-    /// 上次触发磁力吸附的状态（用于检测从无→有触发 haptic）
-    var lastSnapActive: Bool = false
-    /// 上次网格吸附后的坐标（用于检测是否跨格，nil = 拖动尚未开始）
-    var lastSnappedGridOrigin: CGPoint? = nil
-    /// 当前拖动中的参考线（用于绘制）
+    /// 当前画布交互状态（替换所有散落的拖动/选择/resize 状态变量）
+    var interaction: CanvasInteraction = .idle
+
+    /// 拖动期间用于 drag guideline 绘制
     var dragGuidelines: [GuideLine] = [] {
         didSet { needsDisplay = true }
     }
-    /// 批量拖动：所有被拖动节点的初始 frame（不含主节点）
-    var batchDragStartFrames: [UUID: CGRect] = [:]
-    /// 是否正在进行批量拖动
-    var isBatchDragging: Bool { !batchDragStartFrames.isEmpty }
-    /// 拖动过程中是否发生了实际位移（用于区分点击和拖动）
-    var didDragMove = false
 
+    // 以下保留（与状态机无关，供外部回调）
     var onNodeDragEnded: ((UUID, CGRect) -> Void)?
     var onBatchNodeDragEnded: (([UUID: CGRect]) -> Void)?
+    /// resize 结束时回调（替换 onFrameChanged 的旧机制）
+    var onNodeResizeEnded: ((UUID, CGRect) -> Void)?
 
     // MARK: - 平移模式状态（由 CanvasInputHandler 扩展使用）
 
     var isPanMode = false
     var isSpaceHeld = false
-    var spaceDragStartOrigin: CGPoint?
-    var spaceDragStartMouse: CGPoint?
 
-    // MARK: - 框选状态（由 CanvasDragHandler 扩展使用）
-
-    var selectionStartPoint: CGPoint?
-    var selectionCurrentPoint: CGPoint?
-
-    var selectionRect: CGRect? {
-        guard let start = selectionStartPoint, let current = selectionCurrentPoint else { return nil }
-        return CGRect(
-            x: min(start.x, current.x),
-            y: min(start.y, current.y),
-            width: abs(current.x - start.x),
-            height: abs(current.y - start.y)
-        )
-    }
-
-    // MARK: - 节点绘制模式状态（由 CanvasDragHandler 扩展使用）
+    // MARK: - 节点绘制模式状态
 
     var isInDrawingMode: Bool = false
     var drawingNodeType: String = "terminal"
-    var drawingStartPoint: CGPoint?
-    var drawingCurrentPoint: CGPoint?
     var onNodeDrawn: ((String, CGRect) -> Void)?
+
+    // MARK: - 框选/绘制/snap 辅助状态（由 CanvasInteractionHandler 维护）
+
+    /// 框选当前鼠标位置（仅在 interaction == .marquee 时有效）
+    var marqueeCurrentPoint: CGPoint?
+    /// 节点绘制模式当前鼠标位置
+    var drawingCurrentPoint: CGPoint?
+    /// 磁吸/网格 snap 辅助状态
+    var lastSnapActive: Bool = false
+    var lastSnappedGridOrigin: CGPoint? = nil
 
     // MARK: - 文件拖放状态（由 CanvasDragHandler 扩展使用）
 
