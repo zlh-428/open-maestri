@@ -97,6 +97,13 @@ final class CanvasViewportView: NSView {
     /// option+拖拽复制节点回调
     var onDuplicateNode: ((UUID) -> Void)?
 
+    /// 右键菜单：关闭节点回调（由 CanvasNodeRenderer 设置）
+    var onContextMenuClose: ((UUID) -> Void)?
+    /// 右键菜单：重命名节点回调（由 CanvasNodeRenderer 设置）
+    var onContextMenuRename: ((UUID) -> Void)?
+    /// 右键菜单：锁定/解锁节点回调（由 CanvasNodeRenderer 设置）
+    var onContextMenuLockToggle: ((UUID) -> Void)?
+
     // MARK: - 初始化
 
     override init(frame: NSRect) {
@@ -207,22 +214,27 @@ final class CanvasViewportView: NSView {
         }
         guard event.type == .scrollWheel else { return event }
 
-        // 用 frame 直接判断鼠标是否在某个选中节点的内容区内
-        // 这比 hitView.isDescendant 更可靠：不受子视图 isFlipped 或 overlay 影响
-        let locInWindow = event.locationInWindow
+        // 用 canvasFrame 做命中测试：不依赖 nodeViews（NSHostingView 迁移后为空）
         for selectedId in selectedNodeIds {
-            guard let nodeView = nodeViews[selectedId] as? BaseNodeView else { continue }
-            // 用屏幕坐标（nodeView.frame 已是缩放后的屏幕坐标）做 frame 命中测试
-            guard nodeView.frame.contains(locInCanvas) else { continue }
-            // 进一步确认：鼠标在 contentView 区域内（排除 header、resize 边缘）
-            let localInContent = nodeView.contentView.convert(locInWindow, from: nil)
-            guard nodeView.contentView.bounds.contains(localInContent) else { continue }
-            // 在 contentView 子视图树中找可滚动目标
-            if let target = findScrollTarget(in: nodeView.contentView, at: localInContent) {
-                target.scrollWheel(with: event)
+            guard let canvasFrame = nodeCanvasFrames[selectedId] else { continue }
+            let screenFrame = canvasRectToScreen(canvasFrame)
+            guard screenFrame.contains(locInCanvas) else { continue }
+            // 排除 header 区域（header 高度用画布坐标系计算）
+            let headerScreenHeight = CanvasNodeConstants.headerHeight * zoom
+            let contentScreenFrame = CGRect(
+                x: screenFrame.minX,
+                y: screenFrame.minY,
+                width: screenFrame.width,
+                height: screenFrame.height - headerScreenHeight
+            )
+            guard contentScreenFrame.contains(locInCanvas) else { break }
+            // Terminal 节点：路由滚动事件给 TerminalView
+            if let provider = TerminalProviderRegistry.shared.provider(for: selectedId),
+               let terminalView = provider.terminalView {
+                terminalView.scrollWheel(with: event)
                 return nil
             }
-            // 找不到可滚动目标（Note 内容未溢出等情况）：回退给画布平移，不要吃掉事件
+            // 非 Terminal 节点（Note/Portal/FileTree）：由 NSHostingView 自行处理滚动
             break
         }
 
@@ -319,26 +331,27 @@ final class CanvasViewportView: NSView {
 
     override func layout() {
         super.layout()
-        // 跳过正在被交互的节点（其 frame 由 CanvasInteractionHandler 直接维护）
-        let skipIds: Set<UUID>
-        switch interaction {
-        case .draggingNode(let id, _, _):
-            skipIds = [id]
-        case .batchDragging(let frames, _, _):
-            skipIds = Set(frames.keys)
-        case .resizingNode(let id, _, _, _):
-            skipIds = [id]
-        case .mayDragNode(let id, _, _, _):
-            skipIds = [id]
-        default:
-            skipIds = []
-        }
-        for (id, view) in nodeViews {
-            if skipIds.contains(id) { continue }
-            if let canvasFrame = nodeCanvasFrames[id] {
-                view.frame = canvasRectToScreen(canvasFrame)
-                view.setBoundsSize(canvasFrame.size)
-            }
+
+        // 更新 CanvasNodesView 的 frame 以填满画布视口
+        nodesHostingView?.frame = bounds
+
+        // 更新 SwiftUI 节点树的 canvasOrigin/zoom，触发节点重新定位
+        if let hostingView = nodesHostingView {
+            let current = hostingView.rootView
+            let lockedIds = Set(currentNodes.filter { $0.isLocked }.map { $0.id })
+            hostingView.rootView = CanvasNodesSwiftUIView(
+                nodes: currentNodes,
+                canvasOrigin: canvasOrigin,
+                zoom: zoom,
+                selectedNodeIds: selectedNodeIds,
+                lockedNodeIds: lockedIds,
+                workspace: current.workspace,
+                onActivated: current.onActivated,
+                onClose: current.onClose,
+                onRename: current.onRename,
+                onDuplicate: current.onDuplicate,
+                onLockToggle: current.onLockToggle
+            )
         }
     }
 
@@ -515,6 +528,89 @@ final class CanvasViewportView: NSView {
         }
 
         ctx.strokePath()
+    }
+}
+
+// MARK: - Context Menu
+
+extension CanvasViewportView {
+
+    /// 右键菜单：在 AppKit 层处理，避免 SwiftUI allowsHitTesting(false) 阻断问题
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let loc = convert(event.locationInWindow, from: nil)
+        let hit = hitTestCanvas(at: loc)
+
+        let nodeId: UUID?
+        switch hit {
+        case .nodeHeader(let id), .nodeContent(let id, _), .nodeResize(let id, _):
+            nodeId = id
+        case .canvas:
+            nodeId = nil
+        }
+
+        guard let id = nodeId else { return super.menu(for: event) }
+
+        let node = currentNodes.first { $0.id == id }
+        let menu = NSMenu()
+
+        let renameItem = NSMenuItem(
+            title: NSLocalizedString("Rename", comment: "Context menu: rename node"),
+            action: #selector(contextMenuRename(_:)),
+            keyEquivalent: ""
+        )
+        renameItem.representedObject = id
+        menu.addItem(renameItem)
+
+        let duplicateItem = NSMenuItem(
+            title: NSLocalizedString("Duplicate", comment: "Context menu: duplicate node"),
+            action: #selector(contextMenuDuplicate(_:)),
+            keyEquivalent: ""
+        )
+        duplicateItem.representedObject = id
+        menu.addItem(duplicateItem)
+
+        let lockTitle = (node?.isLocked == true)
+            ? NSLocalizedString("Unlock", comment: "Context menu: unlock node")
+            : NSLocalizedString("Lock", comment: "Context menu: lock node")
+        let lockItem = NSMenuItem(
+            title: lockTitle,
+            action: #selector(contextMenuLockToggle(_:)),
+            keyEquivalent: ""
+        )
+        lockItem.representedObject = id
+        menu.addItem(lockItem)
+
+        menu.addItem(NSMenuItem.separator())
+
+        let closeItem = NSMenuItem(
+            title: NSLocalizedString("Close", comment: "Context menu: close node"),
+            action: #selector(contextMenuClose(_:)),
+            keyEquivalent: ""
+        )
+        closeItem.representedObject = id
+        menu.addItem(closeItem)
+
+        return menu
+    }
+
+    @objc private func contextMenuRename(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuRename?(id)
+    }
+
+    @objc private func contextMenuDuplicate(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onDuplicateNode?(id)
+    }
+
+    @objc private func contextMenuLockToggle(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuLockToggle?(id)
+    }
+
+    @objc private func contextMenuClose(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuClose?(id)
     }
 }
 

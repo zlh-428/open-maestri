@@ -69,6 +69,24 @@ final class CanvasNodeRenderer {
         canvas.onDuplicateNode = { [weak self] id in
             self?.handleDuplicate(id: id)
         }
+        // 右键菜单回调
+        canvas.onContextMenuClose = { [weak self] id in
+            self?.removeNode(id: id, from: self?.currentWorkspace)
+        }
+        canvas.onContextMenuRename = { [weak self] id in
+            // 通过通知让 UI 层弹出重命名输入框
+            NotificationCenter.default.post(
+                name: .editTerminalRequested,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
+        }
+        canvas.onContextMenuLockToggle = { [weak self] id in
+            guard let ws = self?.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == id }) else { return }
+            let newLocked = !ws.nodes[idx].isLocked
+            self?.handleLockToggle(id: id, locked: newLocked)
+        }
     }
 
     private func saveWorkspace() {

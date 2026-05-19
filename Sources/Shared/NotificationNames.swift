@@ -33,4 +33,6 @@ extension Notification.Name {
     static let canvasNodeActivated     = Notification.Name("OpenMaestri.canvasNodeActivated")
     /// 画布选中节点变化：userInfo 含 "selectedIds" Set<UUID>
     static let canvasSelectionChanged  = Notification.Name("OpenMaestri.canvasSelectionChanged")
+    /// ⌘ 按住跳转数字分配：userInfo 含 "mapping" [UUID: Int]（空 mapping = 清除）
+    static let canvasJumpNumbersAssigned = Notification.Name("OpenMaestri.canvasJumpNumbersAssigned")
 }

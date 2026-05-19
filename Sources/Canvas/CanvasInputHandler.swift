@@ -93,12 +93,25 @@ extension CanvasViewportView {
 
     /// ⌘ 按住时为所有 Terminal 节点分配跳转数字（1~9），松开时清除
     private func assignJumpNumbers(visible: Bool) {
-        let terminalViews = nodeViews.values
-            .compactMap { $0 as? TerminalNodeView }
-            .sorted { $0.frame.minX < $1.frame.minX || ($0.frame.minX == $1.frame.minX && $0.frame.minY < $1.frame.minY) }
-        for (i, tv) in terminalViews.enumerated() {
-            tv.jumpNumber = visible ? (i < 9 ? i + 1 : nil) : nil
+        // NSHostingView 迁移后 nodeViews 为空；跳转数字通过通知传递给 SwiftUI 层
+        let terminalIds = currentNodes
+            .filter { if case .terminal = $0.content { return true }; return false }
+            .sorted { lhs, rhs in
+                let lf = lhs.frame, rf = rhs.frame
+                return lf.minX < rf.minX || (lf.minX == rf.minX && lf.minY < rf.minY)
+            }
+            .map { $0.id }
+        var mapping: [UUID: Int] = [:]
+        if visible {
+            for (i, id) in terminalIds.enumerated() where i < 9 {
+                mapping[id] = i + 1
+            }
         }
+        NotificationCenter.default.post(
+            name: .canvasJumpNumbersAssigned,
+            object: nil,
+            userInfo: ["mapping": mapping]
+        )
     }
 
     // MARK: - ⌘+数字 终端跳转
@@ -167,27 +180,36 @@ extension CanvasViewportView {
     }
 
     private func jumpToTerminal(number: Int) {
-        // 找第 number 个 Terminal 节点视图
-        let terminalViews = nodeViews.values.compactMap { $0 as? TerminalNodeView }
-        let sorted = terminalViews.enumerated().sorted { $0.element.frame.minX < $1.element.frame.minX }
+        // NSHostingView 迁移后改用 currentNodes + nodeCanvasFrames
+        let sorted = currentNodes
+            .filter { if case .terminal = $0.content { return true }; return false }
+            .sorted { lhs, rhs in
+                let lf = lhs.frame, rf = rhs.frame
+                return lf.minX < rf.minX || (lf.minX == rf.minX && lf.minY < rf.minY)
+            }
         guard number - 1 < sorted.count else { return }
-        let target = sorted[number - 1].element
-        window?.makeFirstResponder(target)
+        let targetNode = sorted[number - 1]
+        // 聚焦到对应 TerminalView
+        if let provider = TerminalProviderRegistry.shared.provider(for: targetNode.id),
+           let tv = provider.terminalView {
+            window?.makeFirstResponder(tv)
+        }
+        selectedNodeIds = [targetNode.id]
         // 平滑滚动视口使目标居中
-        scrollToViewAnimated(target)
+        scrollToCanvasFrame(targetNode.frame)
     }
 
     // MARK: - ⌃Tab 终端循环切换
 
     /// 按画布横坐标排序，循环切换到下一个/上一个终端节点
     private func cycleTerminalFocus(forward: Bool) {
-        let sorted = sortedTerminalViews()
+        let sorted = sortedTerminalNodes()
         guard !sorted.isEmpty else { return }
 
         // 找当前聚焦的终端索引
         let currentIndex: Int
         if let firstId = selectedNodeIds.first,
-           let idx = sorted.firstIndex(where: { nodeId(forView: $0) == firstId }) {
+           let idx = sorted.firstIndex(where: { $0.id == firstId }) {
             currentIndex = idx
         } else {
             currentIndex = forward ? sorted.count - 1 : 0
@@ -201,21 +223,25 @@ extension CanvasViewportView {
         }
 
         let target = sorted[nextIndex]
-        if let targetId = nodeId(forView: target) {
-            selectedNodeIds = [targetId]
+        selectedNodeIds = [target.id]
+        if let provider = TerminalProviderRegistry.shared.provider(for: target.id),
+           let tv = provider.terminalView {
+            window?.makeFirstResponder(tv)
         }
-        window?.makeFirstResponder(target)
-        scrollToViewAnimated(target)
+        scrollToCanvasFrame(target.frame)
     }
 
-    /// 按画布 x 坐标排序的终端节点视图列表
-    private func sortedTerminalViews() -> [TerminalNodeView] {
-        nodeViews.values
-            .compactMap { $0 as? TerminalNodeView }
-            .sorted { $0.frame.minX < $1.frame.minX || ($0.frame.minX == $1.frame.minX && $0.frame.minY < $1.frame.minY) }
+    /// 按画布 x 坐标排序的终端节点列表
+    private func sortedTerminalNodes() -> [CanvasNode] {
+        currentNodes
+            .filter { if case .terminal = $0.content { return true }; return false }
+            .sorted { lhs, rhs in
+                let lf = lhs.frame, rf = rhs.frame
+                return lf.minX < rf.minX || (lf.minX == rf.minX && lf.minY < rf.minY)
+            }
     }
 
-    /// 反查节点视图对应的 UUID（供内部循环使用）
+    /// 反查节点视图对应的 UUID（供内部循环使用，兼容旧代码）
     func nodeId(forView view: NSView) -> UUID? {
         nodeId(for: view)
     }
@@ -224,17 +250,15 @@ extension CanvasViewportView {
 
     /// 切换当前选中终端节点的自动滚动锁定状态
     private func toggleAutoScrollLock() {
-        let targets = selectedNodeIds.isEmpty
-            ? nodeViews.values.compactMap { $0 as? TerminalNodeView }
-            : selectedNodeIds.compactMap { nodeViews[$0] as? TerminalNodeView }
+        // NSHostingView 迁移后通过 TerminalProviderRegistry 操作，不依赖 TerminalNodeView
+        let targetIds: [UUID] = selectedNodeIds.isEmpty
+            ? currentNodes.filter { if case .terminal = $0.content { return true }; return false }.map { $0.id }
+            : Array(selectedNodeIds)
 
-        for tv in targets {
-            tv.autoScrollLocked.toggle()
-            // 通知对应 SwiftTermProvider 更新滚动行为
-            if let nodeId = nodeId(forView: tv),
-               let provider = TerminalProviderRegistry.shared.provider(for: nodeId) {
-                provider.setAutoScrollLocked(tv.autoScrollLocked)
-            }
+        for id in targetIds {
+            guard let provider = TerminalProviderRegistry.shared.provider(for: id) else { continue }
+            let newLocked = !provider.isAutoScrollLocked
+            provider.setAutoScrollLocked(newLocked)
         }
     }
 
@@ -242,36 +266,44 @@ extension CanvasViewportView {
 
     func focusSelectedNodeInViewport() {
         guard let firstId = selectedNodeIds.first,
-              let view = nodeViews[firstId] else { return }
-        scrollToViewAnimated(view)
+              let frame = nodeCanvasFrames[firstId] else { return }
+        scrollToCanvasFrame(frame)
         onFocusSelectedNode?()
     }
 
-    /// 立即（无动画）跳转到指定视图（内部同步使用）
-    func scrollToView(_ view: NSView) {
-        let screenCenter = CGPoint(x: view.frame.midX, y: view.frame.midY)
-        let canvasCenter = screenToCanvas(screenCenter)
-        let newOriginX = canvasCenter.x - (bounds.width / 2) / zoom
-        let newOriginY = canvasCenter.y - (bounds.height / 2) / zoom
+    /// 立即（无动画）跳转到指定画布 frame（内部同步使用）
+    func scrollToCanvasFrame(_ canvasFrame: CGRect) {
+        let newOriginX = canvasFrame.midX - (bounds.width / 2) / zoom
+        let newOriginY = canvasFrame.midY - (bounds.height / 2) / zoom
         canvasOrigin = CGPoint(x: newOriginX, y: newOriginY)
         notifyViewportChanged()
     }
 
-    /// 平滑动画跳转到指定视图（NSAnimationContext，duration=0.35s easeInOut）
-    func scrollToViewAnimated(_ view: NSView, duration: TimeInterval = 0.35) {
-        let screenCenter = CGPoint(x: view.frame.midX, y: view.frame.midY)
-        let canvasCenter = screenToCanvas(screenCenter)
-        let targetOriginX = canvasCenter.x - (bounds.width / 2) / zoom
-        let targetOriginY = canvasCenter.y - (bounds.height / 2) / zoom
+    /// 平滑动画跳转到指定画布 frame（duration=0.35s easeInOut）
+    func scrollToCanvasFrameAnimated(_ canvasFrame: CGRect, duration: TimeInterval = 0.35) {
+        let targetOriginX = canvasFrame.midX - (bounds.width / 2) / zoom
+        let targetOriginY = canvasFrame.midY - (bounds.height / 2) / zoom
         let targetOrigin = CGPoint(x: targetOriginX, y: targetOriginY)
-
-        let startOrigin = canvasOrigin
         let startTime = CACurrentMediaTime()
+        animateOrigin(from: canvasOrigin, to: targetOrigin, startTime: startTime, duration: duration)
+    }
 
-        // 使用 DisplayLink 级别的定时器实现平滑动画
-        // NSAnimationContext 不直接驱动自定义属性，这里用 CVDisplayLink 等效方案：
-        // 通过 DispatchSource 每帧更新 canvasOrigin
-        animateOrigin(from: startOrigin, to: targetOrigin, startTime: startTime, duration: duration)
+    /// 平滑动画跳转到指定视图（兼容旧调用：传 NSView）
+    func scrollToViewAnimated(_ view: NSView, duration: TimeInterval = 0.35) {
+        // 通过 viewToNodeId 反查 canvasFrame，避免依赖 nodeViews
+        if let id = viewToNodeId[ObjectIdentifier(view)],
+           let frame = nodeCanvasFrames[id] {
+            scrollToCanvasFrameAnimated(frame, duration: duration)
+        } else {
+            // 降级：使用 view.frame（屏幕坐标）反算画布坐标
+            let screenCenter = CGPoint(x: view.frame.midX, y: view.frame.midY)
+            let canvasCenter = screenToCanvas(screenCenter)
+            let targetOriginX = canvasCenter.x - (bounds.width / 2) / zoom
+            let targetOriginY = canvasCenter.y - (bounds.height / 2) / zoom
+            let startTime = CACurrentMediaTime()
+            animateOrigin(from: canvasOrigin, to: CGPoint(x: targetOriginX, y: targetOriginY),
+                          startTime: startTime, duration: duration)
+        }
     }
 
     /// 逐帧插值 canvasOrigin（easeInOut 缓动），使用 Timer 60fps 驱动

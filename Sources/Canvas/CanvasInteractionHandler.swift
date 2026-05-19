@@ -273,7 +273,6 @@ extension CanvasViewportView {
 
         // --- 单节点拖动 ---
         case .draggingNode(let id, let startMouse, let startFrame):
-            guard let view = nodeViews[id] else { return }
             let currentCanvas = screenToCanvas(loc)
             let rawDX = currentCanvas.x - startMouse.x
             let rawDY = currentCanvas.y - startMouse.y
@@ -315,12 +314,12 @@ extension CanvasViewportView {
                 newFrame = CGRect(origin: newOrigin, size: startFrame.size)
             }
 
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            view.frame = canvasRectToScreen(newFrame)
-            view.setBoundsSize(newFrame.size)
             nodeCanvasFrames[id] = newFrame
-            CATransaction.commit()
+            currentNodes = currentNodes.map { node in
+                guard node.id == id else { return node }
+                var updated = node; updated.frame = newFrame; return updated
+            }
+            needsLayout = true
 
         // --- 批量拖动 ---
         case .batchDragging(let startFrames, let primaryId, let startMouse):
@@ -344,17 +343,16 @@ extension CanvasViewportView {
             }
             lastSnapActive = snapActive
 
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
             for (sid, sFrame) in startFrames {
-                guard let sView = nodeViews[sid] else { continue }
                 let newOrigin = CGPoint(x: sFrame.origin.x + finalDX, y: sFrame.origin.y + finalDY)
                 let newFrame = CGRect(origin: newOrigin, size: sFrame.size)
-                sView.frame = canvasRectToScreen(newFrame)
-                sView.setBoundsSize(newFrame.size)
                 nodeCanvasFrames[sid] = newFrame
             }
-            CATransaction.commit()
+            currentNodes = currentNodes.map { node in
+                guard let newFrame = nodeCanvasFrames[node.id] else { return node }
+                var n = node; n.frame = newFrame; return n
+            }
+            needsLayout = true
 
         // --- Resize ---
         case .resizingNode(let id, let edge, let startFrame, let startMouse):
@@ -497,10 +495,10 @@ extension CanvasViewportView {
                     height: abs(current.y - start.y)
                 )
                 if rect.width > 4 || rect.height > 4 {
-                    var hitIds = Set<UUID>()
-                    for (id, view) in nodeViews {
-                        if view.frame.intersects(rect) { hitIds.insert(id) }
-                    }
+                    let canvasRect = screenRectToCanvas(rect)
+                    let hitIds = Set(nodeCanvasFrames.compactMap { (id, frame) in
+                        frame.intersects(canvasRect) ? id : nil
+                    })
                     selectedNodeIds = hitIds
                 }
             }
