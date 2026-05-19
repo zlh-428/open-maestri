@@ -108,4 +108,93 @@ extension CanvasViewportView {
             // 如果节点已在选中集合内（批量选中状态），mouseUp 时再收窄
         }
     }
+
+    // MARK: - 统一鼠标事件处理
+
+    override func mouseDown(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        // 1. Space+点击 → 平移模式
+        if isSpaceHeld {
+            interaction = .panCanvas(startOrigin: canvasOrigin, startMouse: loc)
+            NSCursor.closedHand.set()
+            return
+        }
+
+        // 2. 连线模式：点击节点建立连接，点击空白取消
+        if isInConnectingMode {
+            let hit = hitTestCanvas(at: loc)
+            if case .nodeHeader(let id) = hit {
+                handleConnectionClick(nodeId: id)
+            } else if case .nodeContent(let id, _) = hit {
+                handleConnectionClick(nodeId: id)
+            } else {
+                deactivateConnectionMode()
+            }
+            return
+        }
+
+        // 兼容：程序触发的连线起点
+        if connectingFromNodeId != nil {
+            let hit = hitTestCanvas(at: loc)
+            if case .nodeHeader(let id) = hit {
+                handleConnectionClick(nodeId: id)
+                return
+            } else if case .nodeContent(let id, _) = hit {
+                handleConnectionClick(nodeId: id)
+                return
+            } else {
+                connectingFromNodeId = nil
+                connectionDragPoint = nil
+                needsDisplay = true
+                return
+            }
+        }
+
+        // 3. 节点绘制模式：空白区域开始绘制
+        if isInDrawingMode {
+            let hit = hitTestCanvas(at: loc)
+            if case .canvas = hit {
+                interaction = .drawing(start: loc)
+                return
+            }
+            // 绘制模式下点击节点 → fall through 正常走节点交互
+        }
+
+        // 4. 语义化命中测试 → 分发
+        let hit = hitTestCanvas(at: loc)
+        switch hit {
+        case .canvas:
+            if !event.modifierFlags.contains(.command) {
+                selectedNodeIds.removeAll()
+            }
+            window?.makeFirstResponder(self)
+            interaction = .marquee(start: loc)
+            marqueeCurrentPoint = nil
+
+        case .nodeHeader(let id):
+            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+            updateSelection(id, modifiers: event.modifierFlags)
+            base.onActivated?()
+            let startFrame = nodeCanvasFrames[id] ?? .zero
+            interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+
+        case .nodeContent(let id, let deepHit):
+            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+            updateSelection(id, modifiers: event.modifierFlags)
+            base.onActivated?()
+            // 立即将 mouseDown 透传给内容区目标（Terminal 获焦等）
+            deepHit.mouseDown(with: event)
+            let startFrame = nodeCanvasFrames[id] ?? .zero
+            interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: deepHit)
+
+        case .nodeResize(let id, let edge):
+            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+            updateSelection(id, modifiers: event.modifierFlags)
+            base.onActivated?()
+            let startFrame = nodeCanvasFrames[id] ?? .zero
+            interaction = .resizingNode(id, edge: edge, startFrame: startFrame, startMouse: loc)
+            edge.cursor.set()
+        }
+    }
 }
