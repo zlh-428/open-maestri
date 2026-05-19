@@ -233,11 +233,18 @@ struct FileTreeRepresentable: NSViewRepresentable {
     let workspace: WorkspaceManager?
 
     func makeNSView(context: Context) -> NSView {
+        // 复用已注册的 view（避免切换工作区时重建）
+        if let existing = FileTreeViewRegistry.shared.view(for: nodeId) {
+            return existing
+        }
+
         let fileTreeView = FileTreeOutlineView(rootPath: content.rootPath)
-        // 设置导航回调：点击文件夹 → 更新根路径
+        // 设置导航回调：双击文件夹 → 更新根路径
         fileTreeView.onDirectoryClicked = { [weak fileTreeView] dirPath in
             fileTreeView?.changeRoot(to: dirPath)
         }
+        // 注册到全局 registry，供画布路由滚动事件
+        FileTreeViewRegistry.shared.register(nodeId: nodeId, view: fileTreeView)
         return fileTreeView
     }
 

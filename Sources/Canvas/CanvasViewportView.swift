@@ -284,7 +284,23 @@ final class CanvasViewportView: NSView {
                 terminalView.scrollWheel(with: event)
                 return nil
             }
-            // 非 Terminal 节点（Note/Portal/FileTree）：由 NSHostingView 自行处理滚动
+            // FileTree 节点：路由滚动事件给内部 NSScrollView
+            if let fileTreeView = FileTreeViewRegistry.shared.view(for: selectedId),
+               let scrollView = fileTreeView.innerScrollView {
+                scrollView.scrollWheel(with: event)
+                return nil
+            }
+            // Note 节点：路由滚动事件给 NSTextView 的 ScrollView
+            if let noteScrollView = NoteScrollViewRegistry.shared.scrollView(for: selectedId) {
+                noteScrollView.scrollWheel(with: event)
+                return nil
+            }
+            // Portal 节点：路由滚动事件给 WKWebView
+            if let webView = PortalWebViewStore.shared.webView(for: selectedId) {
+                webView.scrollWheel(with: event)
+                return nil
+            }
+            // 其他节点：交由画布处理
             break
         }
 

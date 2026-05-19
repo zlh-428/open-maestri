@@ -5,6 +5,8 @@ struct NoteEditingView: View {
     @State private var isFormatted: Bool = false
     @Binding var content: String
     let filePath: String
+    /// 节点 ID（传递给 NoteImagePasteTextEditor 用于注册 ScrollView）
+    var nodeId: UUID? = nil
     let onSave: (String) -> Void
     /// 首行文本变化时回调（用于自动更新节点标题）
     var onFirstLineChanged: ((String) -> Void)? = nil
@@ -35,6 +37,7 @@ struct NoteEditingView: View {
                     NoteImagePasteTextEditor(
                         text: $content,
                         noteFilePath: filePath,
+                        nodeId: nodeId,
                         onChange: { newValue in
                             onSave(newValue)
                         },

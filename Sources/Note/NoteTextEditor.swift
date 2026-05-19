@@ -2,6 +2,31 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Note ScrollView 注册表
+
+/// 全局注册表：nodeId → NSScrollView（供画布路由滚动事件使用）
+final class NoteScrollViewRegistry {
+    static let shared = NoteScrollViewRegistry()
+    private var scrollViews: [UUID: NSScrollView] = [:]
+    private let lock = NSLock()
+    private init() {}
+
+    func register(nodeId: UUID, scrollView: NSScrollView) {
+        lock.lock(); defer { lock.unlock() }
+        scrollViews[nodeId] = scrollView
+    }
+
+    func unregister(nodeId: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        scrollViews.removeValue(forKey: nodeId)
+    }
+
+    func scrollView(for nodeId: UUID) -> NSScrollView? {
+        lock.lock(); defer { lock.unlock() }
+        return scrollViews[nodeId]
+    }
+}
+
 // MARK: - 支持粘贴图片的 Note 文本编辑器
 
 /// AppKit 包装的文本编辑器，支持从剪贴板粘贴图片
@@ -10,6 +35,8 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
     @Binding var text: String
     /// Note 所在目录（图片存储子目录 `images/` 位于此目录下）
     let noteFilePath: String
+    /// 节点 ID（用于注册 ScrollView 到全局注册表）
+    var nodeId: UUID? = nil
     /// 内容变化回调
     var onChange: ((String) -> Void)? = nil
     /// 首行变化回调
@@ -34,6 +61,10 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
         textView.string = text
         // 设置 coordinator 弱引用到 textView
         context.coordinator.textView = textView
+        // 注册 ScrollView 到全局注册表（供画布路由滚动事件）
+        if let nodeId {
+            NoteScrollViewRegistry.shared.register(nodeId: nodeId, scrollView: scrollView)
+        }
         return scrollView
     }
 

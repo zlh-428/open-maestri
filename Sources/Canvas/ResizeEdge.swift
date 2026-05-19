@@ -6,7 +6,7 @@ enum ResizeEdge {
     case right, left, top, bottom
     case topLeft, topRight, bottomLeft, bottomRight
 
-    /// macOS 原生风格的 resize 光标
+    /// macOS 原生 resize 光标（从系统光标资源加载）
     var cursor: NSCursor {
         switch self {
         case .right, .left:
@@ -21,64 +21,25 @@ enum ResizeEdge {
     }
 }
 
-// MARK: - 对角线 Resize 光标
+// MARK: - 系统原生对角线 Resize 光标
 
-/// 生成 macOS 原生风格的对角线 resize 双箭头光标。
-/// 通过 CoreGraphics 绘制，无需私有 API。
+/// 从 macOS 系统光标资源目录加载原生对角线 resize 光标。
+/// 路径：HIServices.framework/Resources/cursors/
 private enum ResizeCursors {
-    /// ↘↖ 对角线（左上-右下）
-    static let nwse: NSCursor = makeDiagonalCursor(angle: .pi / 4)
-    /// ↗↙ 对角线（右上-左下）
-    static let nesw: NSCursor = makeDiagonalCursor(angle: -.pi / 4)
+    /// ↘↖ 对角线（左上-右下 / NW-SE）
+    static let nwse: NSCursor = loadSystemCursor(name: "resizenorthwestsoutheast", hotSpot: NSPoint(x: 11, y: 11))
+    /// ↗↙ 对角线（右上-左下 / NE-SW）
+    static let nesw: NSCursor = loadSystemCursor(name: "resizenortheastsouthwest", hotSpot: NSPoint(x: 11, y: 11))
 
-    private static func makeDiagonalCursor(angle: CGFloat) -> NSCursor {
-        let size: CGFloat = 20
-        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
-            guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-            let center = CGPoint(x: rect.midX, y: rect.midY)
+    private static func loadSystemCursor(name: String, hotSpot: NSPoint) -> NSCursor {
+        let basePath = "/System/Library/Frameworks/ApplicationServices.framework/Versions/A/Frameworks/HIServices.framework/Versions/A/Resources/cursors"
+        let cursorPath = "\(basePath)/\(name)/cursor.pdf"
 
-            ctx.saveGState()
-            ctx.translateBy(x: center.x, y: center.y)
-            ctx.rotate(by: angle)
-
-            // 箭头线参数
-            let halfLen: CGFloat = 7.5
-            let arrowSize: CGFloat = 4.0
-            let lineWidth: CGFloat = 1.5
-
-            // 绘制白色描边（阴影效果）
-            ctx.setStrokeColor(NSColor.white.cgColor)
-            ctx.setLineWidth(lineWidth + 2)
-            ctx.setLineCap(.round)
-            ctx.setLineJoin(.round)
-            drawArrowPath(ctx: ctx, halfLen: halfLen, arrowSize: arrowSize)
-            ctx.strokePath()
-
-            // 绘制黑色主体
-            ctx.setStrokeColor(NSColor.black.cgColor)
-            ctx.setLineWidth(lineWidth)
-            drawArrowPath(ctx: ctx, halfLen: halfLen, arrowSize: arrowSize)
-            ctx.strokePath()
-
-            ctx.restoreGState()
-            return true
+        if let image = NSImage(contentsOfFile: cursorPath) {
+            return NSCursor(image: image, hotSpot: hotSpot)
         }
-        return NSCursor(image: image, hotSpot: NSPoint(x: size / 2, y: size / 2))
-    }
 
-    private static func drawArrowPath(ctx: CGContext, halfLen: CGFloat, arrowSize: CGFloat) {
-        // 主轴线（垂直方向，旋转后变为对角线）
-        ctx.move(to: CGPoint(x: 0, y: -halfLen))
-        ctx.addLine(to: CGPoint(x: 0, y: halfLen))
-
-        // 上箭头
-        ctx.move(to: CGPoint(x: -arrowSize, y: -halfLen + arrowSize))
-        ctx.addLine(to: CGPoint(x: 0, y: -halfLen))
-        ctx.addLine(to: CGPoint(x: arrowSize, y: -halfLen + arrowSize))
-
-        // 下箭头
-        ctx.move(to: CGPoint(x: -arrowSize, y: halfLen - arrowSize))
-        ctx.addLine(to: CGPoint(x: 0, y: halfLen))
-        ctx.addLine(to: CGPoint(x: arrowSize, y: halfLen - arrowSize))
+        // 降级：使用公开 API 的 resizeLeftRight（不应该发生）
+        return .crosshair
     }
 }

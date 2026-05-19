@@ -21,7 +21,7 @@ final class NoteNodeViewController: NSViewController {
 
     override func loadView() {
         let binding = Binding(get: { self.content }, set: { self.content = $0 })
-        var editingView = NoteEditingView(content: binding, filePath: filePath) { [weak self] newContent in
+        var editingView = NoteEditingView(content: binding, filePath: filePath, nodeId: noteId) { [weak self] newContent in
             guard let self else { return }
             try? NoteFileManager.shared.write(filePath: filePath, content: newContent)
         }
