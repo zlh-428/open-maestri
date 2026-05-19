@@ -26,7 +26,10 @@ struct WorkspaceCanvasView: View {
                 CanvasToolbar(workspace: workspace, isConnecting: $isConnecting, activeDrawingTool: $activeDrawingTool)
 
                 // 二级操作工具栏（选中节点时显示，固定在一级工具栏正下方）
-                if !selectedNodeIds.isEmpty {
+                // 仅当选中的节点确实存在于 workspace 中时才显示
+                if !selectedNodeIds.isEmpty && selectedNodeIds.contains(where: { id in
+                    workspace.nodes.contains { $0.id == id }
+                }) {
                     if selectedNodeContentType == "fileTree" {
                         FileTreeContextToolbar(
                             onRevealInFinder: { revealFileTreeInFinder() },

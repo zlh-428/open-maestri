@@ -121,6 +121,45 @@ final class CanvasViewportView: NSView {
     /// 右键菜单：锁定/解锁节点回调（由 CanvasNodeRenderer 设置）
     var onContextMenuLockToggle: ((UUID) -> Void)?
 
+    /// 节点 zIndex 变化回调（节点ID → 新 zIndex），由 WorkspaceManager 持久化
+    var onNodeZIndexChanged: ((UUID, Int) -> Void)?
+
+    // MARK: - 节点层级管理
+
+    /// 将指定节点提升到最高层级（zIndex 最大值 + 1）
+    func bringNodesToFront(_ ids: Set<UUID>) {
+        guard !ids.isEmpty else { return }
+        let maxZ = currentNodes.map { $0.zIndex }.max() ?? 0
+
+        // 判断是否已经独占最高层：选中节点的 zIndex 都等于 maxZ，
+        // 且没有其他未选中节点也在 maxZ（即选中节点已是唯一最高层）
+        let otherNodesAtMax = currentNodes.contains { node in
+            !ids.contains(node.id) && node.zIndex >= maxZ
+        }
+        let selectedAllAtMax = ids.allSatisfy { id in
+            currentNodes.first { $0.id == id }?.zIndex == maxZ
+        }
+        if selectedAllAtMax && !otherNodesAtMax { return }
+
+        let newZ = maxZ + 1
+        var changed = false
+        for i in currentNodes.indices {
+            if ids.contains(currentNodes[i].id) {
+                currentNodes[i].zIndex = newZ
+                onNodeZIndexChanged?(currentNodes[i].id, newZ)
+                changed = true
+            }
+        }
+        // 层级变化后通知渲染层刷新节点绘制顺序
+        if changed {
+            NotificationCenter.default.post(
+                name: .canvasSelectionChanged,
+                object: nil,
+                userInfo: ["selectedIds": selectedNodeIds]
+            )
+        }
+    }
+
     // MARK: - 初始化
 
     override init(frame: NSRect) {

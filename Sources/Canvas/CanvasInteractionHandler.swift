@@ -117,7 +117,7 @@ extension CanvasViewportView {
 
     // MARK: - 选中逻辑
 
-    /// 根据修饰键更新 selectedNodeIds
+    /// 根据修饰键更新 selectedNodeIds，并将选中节点提升到最高层
     func updateSelection(_ id: UUID, modifiers: NSEvent.ModifierFlags) {
         if modifiers.contains(.command) {
             if selectedNodeIds.contains(id) {
@@ -131,6 +131,8 @@ extension CanvasViewportView {
             }
             // 如果节点已在选中集合内（批量选中状态），mouseUp 时再收窄
         }
+        // 将选中的节点提升到最高层级，确保重叠时操作正确
+        bringNodesToFront([id])
     }
 
     // MARK: - 统一鼠标事件处理

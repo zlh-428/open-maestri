@@ -21,7 +21,7 @@ struct CanvasToolbar: View {
             Spacer()
 
             HStack(spacing: 2) {
-                // 选择工具（默认）
+                // 1. 选择工具（鼠标指针）
                 FloatingToolButton(
                     icon: "cursorarrow",
                     tooltip: "选择工具",
@@ -31,7 +31,7 @@ struct CanvasToolbar: View {
                     isConnecting = false
                 }
 
-                // Terminal 工具
+                // 2. Terminal 工具
                 FloatingToolButton(
                     icon: "terminal.fill",
                     tooltip: "终端",
@@ -40,74 +40,58 @@ struct CanvasToolbar: View {
                     toggleDrawingTool("terminal")
                 }
 
-                // Note 工具
+                // 3. Note 工具
                 FloatingToolButton(
-                    icon: "note.text",
+                    icon: "doc.richtext",
                     tooltip: "笔记",
                     isActive: activeDrawingTool == "stickyNote"
                 ) {
                     toggleDrawingTool("stickyNote")
                 }
 
-                // Portal 工具
+                // 4. 链接文件（占位，暂未实现）
                 FloatingToolButton(
-                    icon: "globe",
-                    tooltip: "浏览器",
-                    isActive: activeDrawingTool == "portal"
+                    icon: "paperclip",
+                    tooltip: "链接文件",
+                    isActive: activeDrawingTool == "linkedFile"
                 ) {
-                    toggleDrawingTool("portal")
+                    toggleDrawingTool("linkedFile")
                 }
 
-                // Text 工具
+                // 5. FileTree 工具
                 FloatingToolButton(
-                    icon: "textformat.abc",
-                    tooltip: "文本标签",
-                    isActive: activeDrawingTool == "text"
-                ) {
-                    toggleDrawingTool("text")
-                }
-
-                // Drawing 工具
-                FloatingToolButton(
-                    icon: "pencil.tip.crop.circle",
-                    tooltip: "手绘",
-                    isActive: activeDrawingTool == "drawing"
-                ) {
-                    toggleDrawingTool("drawing")
-                }
-
-                // FileTree 工具
-                FloatingToolButton(
-                    icon: "folder.fill",
+                    icon: "folder",
                     tooltip: "文件树",
                     isActive: activeDrawingTool == "fileTree"
                 ) {
                     toggleDrawingTool("fileTree")
                 }
 
-                // 分割线
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.2))
-                    .frame(width: 1, height: 20)
-                    .padding(.horizontal, 4)
-
-                // 连线工具（L）
+                // 6. Portal 工具
                 FloatingToolButton(
-                    icon: "link",
-                    tooltip: "创建连接（L）",
-                    isActive: isConnecting
+                    icon: "globe",
+                    tooltip: "门户网站",
+                    isActive: activeDrawingTool == "portal"
                 ) {
-                    isConnecting.toggle()
-                    activeDrawingTool = nil
+                    toggleDrawingTool("portal")
                 }
 
-                // 格式工具（预留）
+                // 7. 格式（文本标签）
                 FloatingToolButton(
                     icon: "textformat",
                     tooltip: "格式",
-                    isActive: false
+                    isActive: activeDrawingTool == "text"
                 ) {
-                    // 预留
+                    toggleDrawingTool("text")
+                }
+
+                // 8. 手绘工具
+                FloatingToolButton(
+                    icon: "pencil.and.scribble",
+                    tooltip: "手绘",
+                    isActive: activeDrawingTool == "drawing"
+                ) {
+                    toggleDrawingTool("drawing")
                 }
             }
             .padding(.horizontal, 10)

@@ -92,6 +92,12 @@ final class CanvasNodeRenderer {
             let newLocked = !ws.nodes[idx].isLocked
             self?.handleLockToggle(id: id, locked: newLocked)
         }
+        // 节点层级变更：同步到 workspace 持久化
+        canvas.onNodeZIndexChanged = { [weak self] nodeId, newZIndex in
+            guard let ws = self?.currentWorkspace,
+                  let idx = ws.nodes.firstIndex(where: { $0.id == nodeId }) else { return }
+            ws.nodes[idx].zIndex = newZIndex
+        }
     }
 
     private func saveWorkspace() {
