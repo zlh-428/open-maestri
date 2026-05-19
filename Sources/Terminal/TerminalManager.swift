@@ -3,7 +3,6 @@ import OSLog
 
 /// 终端生命周期管理器
 /// - 为每个 Terminal 节点创建/销毁 PTY 会话
-/// - 通过 EnvironmentInjector 注入 OMAESTRI_* 环境变量
 /// - 所有 PTY 写入操作必须通过此类（架构约束）
 @MainActor
 final class TerminalManager {

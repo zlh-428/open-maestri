@@ -58,9 +58,42 @@ final class SSHManager {
 
     // MARK: - 安装 omaestri 脚本
 
+    /// 生成 omaestri shell 脚本内容（用于安装到远程服务器）
+    private func buildRemoteScript(host: String) -> String {
+        """
+        #!/usr/bin/env bash
+        export OMAESTRI_HOST="\(host)"
+        export MAESTRI_HOST="\(host)"
+        json_array() {
+          if command -v jq >/dev/null 2>&1; then
+            printf '%s\\n' "$@" | jq -R . | jq -s .
+          else
+            printf '['
+            local first=true
+            for arg in "$@"; do
+              $first || printf ','
+              first=false
+              printf '"%s"' "$(printf '%s' "$arg" | \\
+                sed 's/\\\\/\\\\\\\\/g' | sed 's/"/\\\\"/g' | \\
+                sed ':a;N;$!ba;s/\\n/\\\\n/g' | \\
+                sed 's/\\t/\\\\t/g' | sed 's/\\r/\\\\r/g')"
+            done
+            printf ']'
+          fi
+        }
+        omaestri() {
+          curl -sf --max-time 30 \\
+            -H "Content-Type:application/json" \\
+            -d "{\\"args\\":$(json_array "$@")}" \\
+            "http://$OMAESTRI_HOST/cli"
+        }
+        maestri() { omaestri "$@"; }
+        """
+    }
+
     private func installOmaestri(config: SSHConfig) async throws {
         let tunnelHost = "127.0.0.1:\(config.tunnelPort)"
-        let scriptContent = SkillInjector.shared.buildSkillScript(terminalId: UUID(), host: tunnelHost)
+        let scriptContent = buildRemoteScript(host: tunnelHost)
 
         // 使用 base64 编码避免引号/变量展开转义问题
         guard let scriptData = scriptContent.data(using: .utf8) else { return }
