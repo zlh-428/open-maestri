@@ -423,7 +423,6 @@ final class CanvasViewportView: NSView {
     }
 
     func updateNodeFrame(id: UUID, canvasFrame: CGRect) {
-        guard let view = nodeViews[id] else { return }
         // 拖动/resize 期间不允许外部覆盖被交互节点的 frame
         switch interaction {
         case .draggingNode(let did, _, _) where did == id: return
@@ -433,8 +432,12 @@ final class CanvasViewportView: NSView {
         default: break
         }
         nodeCanvasFrames[id] = canvasFrame
-        view.frame = canvasRectToScreen(canvasFrame)
-        view.setBoundsSize(canvasFrame.size)
+        currentNodes = currentNodes.map { node in
+            guard node.id == id else { return node }
+            return CanvasNode(id: node.id, frame: canvasFrame, content: node.content,
+                              zIndex: node.zIndex, isLocked: node.isLocked)
+        }
+        needsLayout = true
     }
 
 
