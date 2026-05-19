@@ -94,32 +94,6 @@ extension CanvasViewportView {
         return CGPoint(x: origin.x + dx, y: origin.y + dy)
     }
 
-    // MARK: - 磁力对齐参考线绘制
-
-    func drawSnapGuidelines() {
-        guard !dragGuidelines.isEmpty else { return }
-        NSColor.systemBlue.withAlphaComponent(0.7).setStroke()
-        for line in dragGuidelines {
-            let path = NSBezierPath()
-            path.lineWidth = 1.0
-            path.setLineDash([4, 3], count: 2, phase: 0)
-            if line.axis == .vertical {
-                let screenX = canvasToScreen(CGPoint(x: line.position, y: 0)).x
-                let screenStart = canvasToScreen(CGPoint(x: 0, y: line.start)).y
-                let screenEnd = canvasToScreen(CGPoint(x: 0, y: line.end)).y
-                path.move(to: CGPoint(x: screenX, y: screenStart))
-                path.line(to: CGPoint(x: screenX, y: screenEnd))
-            } else {
-                let screenY = canvasToScreen(CGPoint(x: 0, y: line.position)).y
-                let screenStart = canvasToScreen(CGPoint(x: line.start, y: 0)).x
-                let screenEnd = canvasToScreen(CGPoint(x: line.end, y: 0)).x
-                path.move(to: CGPoint(x: screenStart, y: screenY))
-                path.line(to: CGPoint(x: screenEnd, y: screenY))
-            }
-            path.stroke()
-        }
-    }
-
     // MARK: - 绘制矩形预览
 
     func drawDrawingRect() {

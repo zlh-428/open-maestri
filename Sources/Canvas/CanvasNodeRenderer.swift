@@ -173,6 +173,11 @@ final class CanvasNodeRenderer {
         if let overlay = overlayView {
             canvas.addSubview(overlay)
         }
+
+        // 保证 snapGuideView 始终在最顶层
+        if let snapView = canvas.snapGuideView {
+            canvas.addSubview(snapView)
+        }
     }
 
     // MARK: - 节点删除

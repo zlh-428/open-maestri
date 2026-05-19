@@ -15,6 +15,7 @@ final class CanvasViewportView: NSView {
             needsLayout = true
             needsDisplay = true
             backgroundView?.canvasOrigin = canvasOrigin
+            snapGuideView?.canvasOrigin = canvasOrigin
         }
     }
 
@@ -23,6 +24,7 @@ final class CanvasViewportView: NSView {
             needsLayout = true
             needsDisplay = true
             backgroundView?.zoom = zoom
+            snapGuideView?.zoom = zoom
         }
     }
 
@@ -36,6 +38,7 @@ final class CanvasViewportView: NSView {
     // MARK: - 分层视图
 
     private var backgroundView: CanvasBackground?
+    private(set) var snapGuideView: MagneticSnapGuideView?
 
     /// 节点视图映射（nodeId → NSView）
     private(set) var nodeViews: [UUID: NSView] = [:]
@@ -133,6 +136,7 @@ final class CanvasViewportView: NSView {
         registerDragTypes()
         setupNotificationObservers()
         setupBackgroundView()
+        setupSnapGuideView()
     }
 
     private func setupBackgroundView() {
@@ -143,6 +147,13 @@ final class CanvasViewportView: NSView {
         bg.backgroundMode = backgroundMode
         addSubview(bg)
         backgroundView = bg
+    }
+
+    private func setupSnapGuideView() {
+        let snapView = MagneticSnapGuideView(frame: bounds)
+        snapView.autoresizingMask = [.width, .height]
+        addSubview(snapView)
+        snapGuideView = snapView
     }
 
     private func setupNotificationObservers() {
@@ -436,7 +447,9 @@ final class CanvasViewportView: NSView {
 
     /// 拖动期间用于 drag guideline 绘制
     var dragGuidelines: [GuideLine] = [] {
-        didSet { needsDisplay = true }
+        didSet {
+            snapGuideView?.guidelines = dragGuidelines
+        }
     }
 
     // 以下保留（与状态机无关，供外部回调）
@@ -487,11 +500,11 @@ final class CanvasViewportView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         // 背景由 CanvasBackground 子视图负责绘制
-        // 此处只绘制前景覆盖物（连线、绘制矩形、框选矩形、磁力对齐参考线）
+        // 磁吸辅助线由 MagneticSnapGuideView 子视图负责绘制
+        // 此处只绘制临时连线、绘制矩形、框选矩形
         drawTemporaryConnection()
         drawDrawingRect()
         drawSelectionRect()
-        drawSnapGuidelines()
     }
 }
 
