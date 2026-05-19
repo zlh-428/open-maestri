@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// 分配角色 Sheet（从右键菜单 "Assign Role" 触发）
-/// 展示可用角色列表，选择后回调
+/// 展示可用角色列表，支持分配和取消分配
 struct AssignRoleSheet: View {
     let roles: [RolePreset]
+    let currentRoleId: UUID?
     let onAssign: (RolePreset) -> Void
+    let onUnassign: () -> Void
     let onDismiss: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -41,9 +43,42 @@ struct AssignRoleSheet: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        ForEach(roles) { role in
+                        // 取消分配选项（仅当已有角色时显示）
+                        if currentRoleId != nil {
                             Button {
-                                onAssign(role)
+                                onUnassign()
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "xmark.circle")
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 24, height: 24)
+
+                                    Text("取消分配")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(.primary)
+
+                                    Spacer()
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            Divider()
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                        }
+
+                        // 角色列表
+                        ForEach(roles) { role in
+                            let isCurrentRole = role.id == currentRoleId
+                            Button {
+                                if !isCurrentRole {
+                                    onAssign(role)
+                                }
                                 dismiss()
                             } label: {
                                 HStack(spacing: 10) {
@@ -65,19 +100,23 @@ struct AssignRoleSheet: View {
                                     }
 
                                     Spacer()
+
+                                    // 当前已分配标记
+                                    if isCurrentRole {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundStyle(.green)
+                                    }
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(isCurrentRole ? Color.accentColor.opacity(0.08) : Color.clear)
+                                )
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6)
-                                    .fill(Color.clear)
-                            )
-                            .onHover { hovering in
-                                // hover 效果由 SwiftUI 自动处理
-                            }
                         }
                     }
                     .padding(.vertical, 8)
@@ -85,6 +124,6 @@ struct AssignRoleSheet: View {
                 }
             }
         }
-        .frame(width: 320, height: 320)
+        .frame(width: 340, height: 360)
     }
 }

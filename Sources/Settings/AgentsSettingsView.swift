@@ -218,9 +218,20 @@ struct RoleEditSheet: View {
     @State private var prompt: String
     @State private var color: String
     @State private var icon: String
+    @State private var selectedTab: Int = 0
 
-    private let colorOptions = ["#007AFF", "#34C759", "#FF9500", "#FF3B30", "#AF52DE", "#5856D6"]
-    private let iconOptions  = ["person.fill", "wrench.fill", "magnifyingglass", "pencil", "doc.text.fill", "shield.fill", "hammer.fill", "lightbulb.fill"]
+    private let colorOptions = [
+        "#007AFF", "#34C759", "#FF9500", "#FF3B30", "#AF52DE", "#5856D6",
+        "#FF2D55", "#5AC8FA", "#FFCC00", "#4CD964", "#8E8E93", "#FF6482"
+    ]
+    private let iconOptions = [
+        "person.fill", "wrench.fill", "magnifyingglass", "pencil",
+        "doc.text.fill", "shield.fill", "hammer.fill", "lightbulb.fill",
+        "brain", "eye.fill", "checkmark.seal.fill", "ant.fill",
+        "terminal", "gear", "paintbrush.fill", "scissors",
+        "flag.fill", "bolt.fill", "leaf.fill", "star.fill",
+        "heart.fill", "hand.raised.fill", "scope", "chart.bar.fill"
+    ]
 
     init(role: RolePreset?, onSave: @escaping (RolePreset) -> Void) {
         self.role = role
@@ -233,6 +244,7 @@ struct RoleEditSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            // Header
             HStack {
                 Text(role == nil ? "role.new" : "role.edit").font(.headline)
                 Spacer()
@@ -243,43 +255,158 @@ struct RoleEditSheet: View {
                     .buttonStyle(.borderedProminent)
             }.padding()
             Divider()
-            Form {
-                TextField("role.name", text: $name)
-                    .help(String(localized: "role.name_placeholder.help"))
+
+            // Tab 切换
+            Picker("", selection: $selectedTab) {
+                Text("基本信息").tag(0)
+                Text("指令预览").tag(1)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            // Tab 内容
+            if selectedTab == 0 {
+                roleBasicInfoTab
+            } else {
+                roleInstructionPreviewTab
+            }
+        }
+        .frame(width: 500, height: 560)
+    }
+
+    // MARK: - 基本信息 Tab
+
+    @ViewBuilder
+    private var roleBasicInfoTab: some View {
+        Form {
+            TextField("role.name", text: $name)
+                .help(String(localized: "role.name_placeholder.help"))
+
+            Section("角色指令") {
                 TextEditor(text: $prompt)
-                    .frame(height: 100)
+                    .frame(height: 120)
                     .font(.system(.body, design: .monospaced))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-                Section("agent.color") {
-                    HStack {
-                        ForEach(colorOptions, id: \.self) { c in
-                            Button { color = c } label: {
-                                Circle()
-                                    .fill(Color(hex: c) ?? .blue)
-                                    .frame(width: 20, height: 20)
-                                    .overlay(Circle().stroke(Color.white, lineWidth: color == c ? 2 : 0))
-                            }
-                            .buttonStyle(.plain)
+            }
+
+            Section("agent.color") {
+                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: 8) {
+                    ForEach(colorOptions, id: \.self) { c in
+                        Button { color = c } label: {
+                            Circle()
+                                .fill(Color(hex: c) ?? .blue)
+                                .frame(width: 24, height: 24)
+                                .overlay(
+                                    Circle().stroke(Color.white, lineWidth: color == c ? 2.5 : 0)
+                                )
+                                .shadow(color: color == c ? (Color(hex: c) ?? .blue).opacity(0.4) : .clear, radius: 3)
                         }
-                    }
-                }
-                Section("agent.icon") {
-                    LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 6) {
-                        ForEach(iconOptions, id: \.self) { i in
-                            Button { icon = i } label: {
-                                Image(systemName: i)
-                                    .frame(width: 28, height: 28)
-                                    .background(icon == i ? Color.accentColor.opacity(0.2) : Color.clear)
-                                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                            }
-                            .buttonStyle(.plain)
-                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
-            .formStyle(.grouped).padding()
+
+            Section("agent.icon") {
+                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 6) {
+                    ForEach(iconOptions, id: \.self) { i in
+                        Button { icon = i } label: {
+                            Image(systemName: i)
+                                .font(.system(size: 13))
+                                .frame(width: 28, height: 28)
+                                .background(icon == i ? Color.accentColor.opacity(0.2) : Color.clear)
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
-        .frame(width: 440, height: 460)
+        .formStyle(.grouped)
+        .padding(.horizontal, 4)
+    }
+
+    // MARK: - 指令预览 Tab（CLAUDE.md / AGENTS.md 预览）
+
+    @ViewBuilder
+    private var roleInstructionPreviewTab: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 预览说明
+            HStack(spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text("分配角色后，以下内容将写入 CLAUDE.md / AGENTS.md 文件")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+
+            // 文件预览
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 10))
+                    Text("CLAUDE.md / AGENTS.md")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 16)
+
+                ScrollView {
+                    Text(generatedFileContent)
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                }
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(nsColor: .textBackgroundColor))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+                )
+                .padding(.horizontal, 16)
+            }
+
+            // 存储路径提示
+            HStack(spacing: 4) {
+                Image(systemName: "folder")
+                    .font(.system(size: 10))
+                Text(roleDirectoryPath)
+                    .font(.system(size: 10, design: .monospaced))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .foregroundStyle(.tertiary)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// 生成的文件内容预览
+    private var generatedFileContent: String {
+        let rolePrompt = prompt.isEmpty ? "(请输入角色指令)" : prompt
+        return """
+        <your_assigned_role>
+        \(rolePrompt)
+        </your_assigned_role>
+
+        <working_directory>
+        IMPORTANT: You were started in this directory to receive the above role assignment. The actual project you should be working on is located at:
+        {工作区目录}
+        </working_directory>
+        """
+    }
+
+    /// 角色文件存储路径
+    private var roleDirectoryPath: String {
+        let id = role?.id ?? UUID()
+        return "~/.open-maestri/roles/\(id.uuidString.prefix(8))…/"
     }
 
     private func save() {

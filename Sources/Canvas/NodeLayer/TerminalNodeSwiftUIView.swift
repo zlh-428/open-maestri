@@ -25,7 +25,7 @@ struct TerminalNodeSwiftUIView: View {
             zoom: zoom,
             headerIcon: content.icon,
             headerColor: Color(hex: content.color),
-            headerAccessory: { attentionDot },
+            headerAccessory: { headerAccessoryContent },
             onClose: { onClose?(nodeId) },
             onRename: { onRename?(nodeId, $0) },
             onDuplicate: { onDuplicate?(nodeId) },
@@ -64,13 +64,54 @@ struct TerminalNodeSwiftUIView: View {
         }
     }
 
+    // MARK: - Header Accessory（角色徽章 + 注意力圆点）
+
     @ViewBuilder
-    private var attentionDot: some View {
-        if needsAttention {
-            Circle()
-                .fill(.red)
-                .frame(width: 8, height: 8)
-                .transition(.scale.combined(with: .opacity))
+    private var headerAccessoryContent: some View {
+        HStack(spacing: 4) {
+            // 角色徽章
+            if content.assignedRoleId != nil {
+                roleBadge
+            }
+            // Maestro 标记
+            if content.isManager {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.purple)
+            }
+            // 注意力圆点
+            if needsAttention {
+                Circle()
+                    .fill(.red)
+                    .frame(width: 8, height: 8)
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
+    }
+
+    @ViewBuilder
+    private var roleBadge: some View {
+        if let roleName = resolvedRoleName {
+            Text(roleName)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(
+                    Capsule()
+                        .fill(Color(hex: content.color) ?? .blue)
+                )
+        }
+    }
+
+    /// 解析角色名称（从 AppState 中查找）
+    private var resolvedRoleName: String? {
+        guard let roleId = content.assignedRoleId else { return nil }
+        // 从 TerminalManager session 中获取 roleName
+        if let session = TerminalManager.shared.terminals[content.id] {
+            return session.roleName
+        }
+        // 回退：显示简短的 Role ID
+        return String(roleId.uuidString.prefix(4))
     }
 }

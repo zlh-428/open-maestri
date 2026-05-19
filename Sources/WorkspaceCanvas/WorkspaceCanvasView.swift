@@ -254,8 +254,13 @@ struct WorkspaceCanvasView: View {
         .sheet(isPresented: $showAssignRoleSheet) {
             AssignRoleSheet(
                 roles: appState.preferences.rolePresets,
+                currentRoleId: currentAssignedRoleId,
                 onAssign: { role in
                     applyRole(role, toNodeId: assignRoleNodeId)
+                    showAssignRoleSheet = false
+                },
+                onUnassign: {
+                    unassignRole(fromNodeId: assignRoleNodeId)
                     showAssignRoleSheet = false
                 },
                 onDismiss: { showAssignRoleSheet = false }
@@ -545,7 +550,15 @@ struct WorkspaceCanvasView: View {
         Task { try? await workspace.save() }
     }
 
-    /// 为终端节点分配角色
+    /// 当前要分配角色的节点已有的角色 ID
+    private var currentAssignedRoleId: UUID? {
+        guard let nodeId = assignRoleNodeId,
+              let node = workspace.nodes.first(where: { $0.id == nodeId }),
+              case .terminal(let tc) = node.content else { return nil }
+        return tc.assignedRoleId
+    }
+
+    /// 为终端节点分配角色，同时调用 RoleInjector 写入文件
     private func applyRole(_ role: RolePreset, toNodeId nodeId: UUID?) {
         guard let nodeId,
               let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
@@ -554,7 +567,104 @@ struct WorkspaceCanvasView: View {
         tc.color = role.color
         tc.icon = role.icon
         workspace.nodes[idx].content = .terminal(tc)
+
+        // 写入 CLAUDE.md / AGENTS.md 到角色目录
+        let workDir = tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory
+        RoleInjector.shared.prepareRoleDirectory(
+            roleId: role.id,
+            rolePrompt: role.prompt,
+            workingDirectory: workDir
+        )
+
+        // 重启终端以应用新角色（在角色目录下启动）
+        restartTerminalWithRole(terminalId: tc.id, role: role, workingDirectory: workDir)
+
         Task { try? await workspace.save() }
+    }
+
+    /// 取消终端节点的角色分配
+    private func unassignRole(fromNodeId nodeId: UUID?) {
+        guard let nodeId,
+              let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .terminal(var tc) = workspace.nodes[idx].content else { return }
+        let oldRoleId = tc.assignedRoleId
+        tc.assignedRoleId = nil
+        // 恢复默认颜色和图标
+        tc.color = "#007AFF"
+        tc.icon = "terminal"
+        workspace.nodes[idx].content = .terminal(tc)
+
+        // 清理角色目录（如果没有其他终端使用该角色）
+        if let roleId = oldRoleId {
+            let stillUsed = workspace.nodes.contains { node in
+                if case .terminal(let otherTc) = node.content, otherTc.assignedRoleId == roleId, node.id != nodeId {
+                    return true
+                }
+                return false
+            }
+            if !stillUsed {
+                // 不删除角色目录，因为其他工作区可能使用
+            }
+        }
+
+        // 重启终端在原始工作目录
+        restartTerminalInOriginalDir(terminalId: tc.id, workingDirectory: tc.workingDirectory)
+
+        Task { try? await workspace.save() }
+    }
+
+    /// 重启终端并应用角色
+    private func restartTerminalWithRole(terminalId: UUID, role: RolePreset, workingDirectory: String) {
+        // 先移除旧终端
+        TerminalManager.shared.removeTerminal(id: terminalId)
+        TerminalProviderRegistry.shared.unregister(terminalId: terminalId)
+
+        // 查找对应的 AgentPreset
+        guard let node = workspace.nodes.first(where: {
+            if case .terminal(let tc) = $0.content { return tc.id == terminalId }
+            return false
+        }), case .terminal(let tc) = node.content else { return }
+
+        let preset = AgentPreset(
+            id: UUID(), name: tc.name, command: tc.command,
+            icon: tc.icon, agentType: tc.agentType,
+            color: tc.color, isActive: true, isBuiltIn: false
+        )
+
+        // 重新创建终端（RoleInjector 已在 applyRole 中写入文件）
+        _ = TerminalManager.shared.createTerminal(
+            id: terminalId,
+            workingDirectory: workingDirectory,
+            preset: preset,
+            role: role,
+            workspaceId: workspace.id
+        )
+    }
+
+    /// 重启终端在原始工作目录（取消角色后）
+    private func restartTerminalInOriginalDir(terminalId: UUID, workingDirectory: String) {
+        TerminalManager.shared.removeTerminal(id: terminalId)
+        TerminalProviderRegistry.shared.unregister(terminalId: terminalId)
+
+        guard let node = workspace.nodes.first(where: {
+            if case .terminal(let tc) = $0.content { return tc.id == terminalId }
+            return false
+        }), case .terminal(let tc) = node.content else { return }
+
+        let preset = AgentPreset(
+            id: UUID(), name: tc.name, command: tc.command,
+            icon: tc.icon, agentType: tc.agentType,
+            color: tc.color, isActive: true, isBuiltIn: false
+        )
+        let dir = workingDirectory.isEmpty ? workspace.workingDirectory : workingDirectory
+
+        _ = TerminalManager.shared.createTerminal(
+            id: terminalId,
+            workingDirectory: dir,
+            preset: preset,
+            role: nil,
+            workspaceId: workspace.id
+        )
     }
 
     /// 获取当前选中节点的内容类型（单选时）
