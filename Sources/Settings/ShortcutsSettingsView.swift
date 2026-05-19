@@ -6,27 +6,27 @@ struct ShortcutsSettingsView: View {
     @State private var capturingActionId: String? = nil
 
     private let actions: [ShortcutAction] = [
-        ShortcutAction(id: "switchWorkspaceUp",   name: "切换上一个工作区",    defaultKey: "⌘↑"),
-        ShortcutAction(id: "switchWorkspaceDown",  name: "切换下一个工作区",    defaultKey: "⌘↓"),
-        ShortcutAction(id: "focusTerminal",        name: "跳转终端（⌘+数字）", defaultKey: "⌘1-9"),
-        ShortcutAction(id: "cycleTerminalNext",    name: "下一个终端",         defaultKey: "⌃Tab"),
-        ShortcutAction(id: "cycleTerminalPrev",    name: "上一个终端",         defaultKey: "⌃⇧Tab"),
-        ShortcutAction(id: "centerNode",           name: "居中选中节点",       defaultKey: "\\"),
-        ShortcutAction(id: "deleteNode",           name: "删除选中节点",       defaultKey: "⌘W"),
-        ShortcutAction(id: "connectNodes",         name: "开始连线",           defaultKey: "⌘L"),
-        ShortcutAction(id: "toggleScrollLock",     name: "锁定/解锁自动滚动",  defaultKey: "⌘⇧B"),
-        ShortcutAction(id: "floorOverview",        name: "Floor 总览",        defaultKey: "⌘⇧\\"),
-        ShortcutAction(id: "filterSearch",         name: "过滤/搜索",          defaultKey: "⌘P"),
-        ShortcutAction(id: "openSettings",         name: "打开设置",           defaultKey: "⌘,"),
+        ShortcutAction(id: "switchWorkspaceUp",   nameKey: "shortcut.switch_workspace_up",   defaultKey: "⌘↑"),
+        ShortcutAction(id: "switchWorkspaceDown",  nameKey: "shortcut.switch_workspace_down",  defaultKey: "⌘↓"),
+        ShortcutAction(id: "focusTerminal",        nameKey: "shortcut.focus_terminal",         defaultKey: "⌘1-9"),
+        ShortcutAction(id: "cycleTerminalNext",    nameKey: "shortcut.cycle_terminal_next",    defaultKey: "⌃Tab"),
+        ShortcutAction(id: "cycleTerminalPrev",    nameKey: "shortcut.cycle_terminal_prev",    defaultKey: "⌃⇧Tab"),
+        ShortcutAction(id: "centerNode",           nameKey: "shortcut.center_node",            defaultKey: "\\"),
+        ShortcutAction(id: "deleteNode",           nameKey: "shortcut.delete_node",            defaultKey: "⌘W"),
+        ShortcutAction(id: "connectNodes",         nameKey: "shortcut.connect_nodes",          defaultKey: "⌘L"),
+        ShortcutAction(id: "toggleScrollLock",     nameKey: "shortcut.toggle_scroll_lock",     defaultKey: "⌘⇧B"),
+        ShortcutAction(id: "floorOverview",        nameKey: "shortcut.floor_overview",         defaultKey: "⌘⇧\\"),
+        ShortcutAction(id: "filterSearch",         nameKey: "shortcut.filter_search",          defaultKey: "⌘P"),
+        ShortcutAction(id: "openSettings",         nameKey: "shortcut.open_settings",          defaultKey: "⌘,"),
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Table(actions) {
-                TableColumn("操作") { action in
-                    Text(action.name).font(.body)
+                TableColumn("shortcut.action") { action in
+                    Text(LocalizedStringKey(action.nameKey)).font(.body)
                 }
-                TableColumn("快捷键") { action in
+                TableColumn("shortcut.key") { action in
                     HStack {
                         Text(currentKey(for: action))
                             .font(.system(.body, design: .monospaced))
@@ -37,10 +37,10 @@ struct ShortcutsSettingsView: View {
                                 lineWidth: 1
                             ))
                         if capturingActionId == action.id {
-                            Text("按下新快捷键…").font(.caption).foregroundStyle(.secondary)
-                            Button("取消") { capturingActionId = nil }.controlSize(.small)
+                            Text("shortcut.press_new").font(.caption).foregroundStyle(.secondary)
+                            Button("button.cancel") { capturingActionId = nil }.controlSize(.small)
                         } else {
-                            Button("修改") { capturingActionId = action.id }.controlSize(.small)
+                            Button("button.modify") { capturingActionId = action.id }.controlSize(.small)
                         }
                     }
                 }
@@ -49,7 +49,7 @@ struct ShortcutsSettingsView: View {
 
             HStack {
                 Spacer()
-                Button("恢复默认") { resetAll() }.buttonStyle(.bordered)
+                Button("button.restore_defaults") { resetAll() }.buttonStyle(.bordered)
             }
             .padding()
         }
@@ -82,7 +82,7 @@ struct ShortcutsSettingsView: View {
 
 struct ShortcutAction: Identifiable {
     let id: String
-    let name: String
+    let nameKey: String
     let defaultKey: String
 }
 

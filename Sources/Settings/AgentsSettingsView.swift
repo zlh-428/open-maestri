@@ -10,22 +10,22 @@ struct AgentsSettingsView: View {
         @Bindable var state = appState
         Form {
             // MARK: - Agent 预设
-            Section("Agent 预设") {
+            Section("agent.section.presets") {
                 ForEach(appState.preferences.agentPresets) { preset in
                     AgentPresetRow(preset: preset, onToggle: { togglePreset(preset) })
                         .contextMenu {
                             if !preset.isBuiltIn {
-                                Button("删除", role: .destructive) { deletePreset(preset) }
+                                Button("button.delete", role: .destructive) { deletePreset(preset) }
                             }
                         }
                 }
-                Button("添加自定义预设…") { showAddPreset = true }
+                Button("button.add_custom_preset") { showAddPreset = true }
             }
 
             // MARK: - 角色管理
             Section {
                 if appState.preferences.rolePresets.isEmpty {
-                    Text("暂无角色，点击下方按钮创建")
+                    Text("role.no_roles")
                         .foregroundStyle(.secondary)
                         .font(.caption)
                 } else {
@@ -37,11 +37,11 @@ struct AgentsSettingsView: View {
                         }
                     }
                 }
-                Button("新建角色…") { showAddRole = true }
+                Button("button.add_role") { showAddRole = true }
             } header: {
-                Text("角色 (Roles)")
+                Text("role.section")
             } footer: {
-                Text("角色为终端提供初始指令。Maestro 招募子 Agent 时可指定角色。")
+                Text("agent.role.footer")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -148,7 +148,7 @@ struct RoleRow: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("编辑") { onEdit() }.buttonStyle(.bordered).controlSize(.small)
+            Button("button.edit") { onEdit() }.buttonStyle(.bordered).controlSize(.small)
             Button(role: .destructive) { onDelete() } label: {
                 Image(systemName: "trash")
             }.buttonStyle(.plain)
@@ -170,20 +170,20 @@ struct AddAgentPresetSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("新建 Agent 预设").font(.headline)
+                Text("agent.new_preset").font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.escape)
-                Button("创建") { create() }
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.create") { create() }
                     .disabled(name.isEmpty || command.isEmpty)
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
             }.padding()
             Divider()
             Form {
-                TextField("名称", text: $name)
-                TextField("命令", text: $command)
-                    .help("Agent 启动命令（如 claude、codex、gemini）")
-                Picker("类型", selection: $agentType) {
+                TextField("agent.name", text: $name)
+                TextField("terminal.command", text: $command)
+                    .help(String(localized: "agent.command.help"))
+                Picker("agent.type", selection: $agentType) {
                     Text("Claude Code").tag("claude_code")
                     Text("Codex").tag("codex")
                     Text("Gemini CLI").tag("gemini_cli")
@@ -234,23 +234,23 @@ struct RoleEditSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text(role == nil ? "新建角色" : "编辑角色").font(.headline)
+                Text(role == nil ? "role.new" : "role.edit").font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.escape)
-                Button("保存") { save() }
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.save") { save() }
                     .disabled(name.isEmpty || prompt.isEmpty)
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
             }.padding()
             Divider()
             Form {
-                TextField("角色名称", text: $name)
-                    .help("例如：Leader、Coder、Reviewer、Tester")
+                TextField("role.name", text: $name)
+                    .help(String(localized: "role.name_placeholder.help"))
                 TextEditor(text: $prompt)
                     .frame(height: 100)
                     .font(.system(.body, design: .monospaced))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
-                Section("颜色") {
+                Section("agent.color") {
                     HStack {
                         ForEach(colorOptions, id: \.self) { c in
                             Button { color = c } label: {
@@ -263,7 +263,7 @@ struct RoleEditSheet: View {
                         }
                     }
                 }
-                Section("图标") {
+                Section("agent.icon") {
                     LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 6) {
                         ForEach(iconOptions, id: \.self) { i in
                             Button { icon = i } label: {

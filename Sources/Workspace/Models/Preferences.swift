@@ -8,10 +8,11 @@ struct Preferences: Codable, Equatable {
     var rolePresets: [RolePreset]
     var terminalFontFamily: String
     var terminalFontSize: CGFloat
-    var terminalTheme: String           // "system" | "dark" | "light"
+    var terminalTheme: String           // "system"|"dark"|"light"|"dracula"|"solarized-dark"|"solarized-light"|"nord"|"one-dark"|"tokyo-night"
     var canvasBackground: String        // "dotGrid" | "solid" | "transparent"
     var defaultNoteColor: String
     var preferredIDE: String            // "cursor" | "vscode" | "xcode"
+    var language: String                // "en" | "zh-Hans" — 应用界面语言
     var shortcuts: ShortcutConfig
     var sshEnabled: Bool
     var sshTunnelPort: Int
@@ -32,6 +33,7 @@ struct Preferences: Codable, Equatable {
         self.canvasBackground = "dotGrid"
         self.defaultNoteColor = Constants.noteDefaultColor
         self.preferredIDE = "cursor"
+        self.language = "en"
         self.shortcuts = ShortcutConfig()
         self.sshEnabled = false
         self.sshTunnelPort = 7433

@@ -4,6 +4,7 @@ import SwiftUI
 struct OpenMaestriApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var appState = AppState()
+    @State private var l10n = LocalizationManager.shared
     @State private var showRoutines = false
     @State private var showCreateWorkspace = false
 
@@ -11,8 +12,11 @@ struct OpenMaestriApp: App {
         WindowGroup {
             ContentView()
                 .environment(appState)
+                .environment(\.locale, l10n.locale)
                 .task {
                     await appState.loadOnLaunch()
+                    // 启动后同步语言设置到 LocalizationManager
+                    LocalizationManager.shared.sync(from: appState.preferences.language)
                     appState.startAutosave()
                     BackupManager.shared.startHourlyBackups()
                     // InterAgentServer 已在 AppDelegate.applicationDidFinishLaunching 启动
@@ -36,6 +40,7 @@ struct OpenMaestriApp: App {
                 .sheet(isPresented: $showRoutines) {
                     RoutineManagerView()
                         .environment(appState)
+                        .environment(\.locale, l10n.locale)
                 }
         }
         .commands {
@@ -127,6 +132,7 @@ struct OpenMaestriApp: App {
         Settings {
             SettingsWindow()
                 .environment(appState)
+                .environment(\.locale, l10n.locale)
         }
     }
 }

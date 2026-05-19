@@ -223,6 +223,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无备份" } }
       }
     },
+    "general.backup_list.restored" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Confirmed files:" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已确认文件数：" } }
+      }
+    },
     "general.backup_list.title" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Backup List" } },
@@ -233,6 +239,12 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Canvas Background" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "画布背景" } }
+      }
+    },
+    "general.language" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言" } }
       }
     },
     "general.metal_renderer" : {
@@ -277,6 +289,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "集成" } }
       }
     },
+    "general.section.language" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "语言偏好" } }
+      }
+    },
     "general.section.update" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Update" } },
@@ -319,6 +337,60 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户名" } }
       }
     },
+    "agent.color" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Color" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "颜色" } }
+      }
+    },
+    "agent.command.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent launch command (e.g. claude, codex, gemini)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Agent 启动命令（如 claude、codex、gemini）" } }
+      }
+    },
+    "agent.icon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标" } }
+      }
+    },
+    "agent.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
+      }
+    },
+    "agent.new_preset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Agent Preset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建 Agent 预设" } }
+      }
+    },
+    "agent.onboarding.drag_hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag a terminal node from the top toolbar, choose Claude Code / Codex / Shell and more" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从顶部工具栏拖入终端节点，选择 Claude Code / Codex / Shell 等预设" } }
+      }
+    },
+    "agent.role.footer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles provide initial instructions for terminals. Maestro can assign roles when recruiting sub-agents." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色为终端提供初始指令。Maestro 招募子 Agent 时可指定角色。" } }
+      }
+    },
+    "agent.section.presets" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent Presets" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Agent 预设" } }
+      }
+    },
+    "agent.type" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } }
+      }
+    },
     "settings.tab.agents" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Agents" } },
@@ -351,8 +423,8 @@
     },
     "settings.terminal.font.help" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font changes take effect in new terminals; existing terminals require restart" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体变更在新建终端时生效，已有终端需重启。" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font changes apply immediately to all open terminals." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体变更立即应用到所有已打开的终端。" } }
       }
     },
     "settings.terminal.font_size" : {
@@ -375,7 +447,7 @@
     },
     "settings.terminal.theme.help" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme changes apply immediately to all open terminals" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme changes apply immediately to all open terminals." } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主题变更立即应用到所有已打开的终端。" } }
       }
     },
@@ -387,8 +459,104 @@
     },
     "settings.terminal.theme.system" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Follow System" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跟随系统" } }
+      }
+    },
+    "shortcut.action" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Action" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "操作" } }
+      }
+    },
+    "shortcut.key" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shortcut" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快捷键" } }
+      }
+    },
+    "shortcut.press_new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press new shortcut…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按下新快捷键…" } }
+      }
+    },
+    "shortcut.unlimited" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlimited" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无限" } }
+      }
+    },
+    "shortcut.switch_workspace_up" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换上一个工作区" } }
+      }
+    },
+    "shortcut.switch_workspace_down" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换下一个工作区" } }
+      }
+    },
+    "shortcut.focus_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Jump to Terminal (⌘+number)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "跳转终端（⌘+数字）" } }
+      }
+    },
+    "shortcut.cycle_terminal_next" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一个终端" } }
+      }
+    },
+    "shortcut.cycle_terminal_prev" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一个终端" } }
+      }
+    },
+    "shortcut.center_node" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Center Selected Node" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "居中选中节点" } }
+      }
+    },
+    "shortcut.delete_node" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete Selected Node" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除选中节点" } }
+      }
+    },
+    "shortcut.connect_nodes" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Connection" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始连线" } }
+      }
+    },
+    "shortcut.toggle_scroll_lock" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Lock/Unlock Auto-scroll" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "锁定/解锁自动滚动" } }
+      }
+    },
+    "shortcut.floor_overview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Floor Overview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Floor 总览" } }
+      }
+    },
+    "shortcut.filter_search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filter / Search" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "过滤/搜索" } }
+      }
+    },
+    "shortcut.open_settings" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open Settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开设置" } }
       }
     },
     "terminal.auto_scroll_lock" : {
@@ -1103,54 +1271,6 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色" } }
-      }
-    },
-    "agent.color" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Color" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "颜色" } }
-      }
-    },
-    "agent.icon" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标" } }
-      }
-    },
-    "agent.name" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
-      }
-    },
-    "agent.onboarding.drag_hint" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag a terminal node from the top toolbar, choose Claude Code / Codex / Shell and more" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从顶部工具栏拖入终端节点，选择 Claude Code / Codex / Shell 等预设" } }
-      }
-    },
-    "agent.type" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } }
-      }
-    },
-    "shortcut.action" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Action" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "操作" } }
-      }
-    },
-    "shortcut.press_new" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Press new shortcut…" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按下新快捷键…" } }
-      }
-    },
-    "shortcut.unlimited" : {
-      "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unlimited" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无限" } }
       }
     },
     "routine.auto_run_hooks" : {

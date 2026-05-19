@@ -9,30 +9,44 @@ struct GeneralSettingsView: View {
     var body: some View {
         @Bindable var state = appState
         Form {
-            Section("外观") {
-                Picker("画布背景", selection: $state.preferences.canvasBackground) {
-                    Text("点阵网格").tag("dotGrid")
-                    Text("纯色").tag("solid")
-                    Text("透明").tag("transparent")
+            Section("general.section.language") {
+                Picker("general.language", selection: $state.preferences.language) {
+                    ForEach(LocalizationManager.supportedLanguages, id: \.id) { lang in
+                        Text("\(lang.localName) (\(lang.name))").tag(lang.id)
+                    }
                 }
-                Toggle("Metal 渲染器（终端高性能模式）",
-                       isOn: $state.preferences.metalRendererEnabled)
-                    .help("使用 Metal GPU 加速终端渲染，可降低大量输出时的 CPU 占用")
+                .onChange(of: state.preferences.language) { _, newLang in
+                    LocalizationManager.shared.sync(from: newLang)
+                }
             }
 
-            Section("集成") {
-                Picker("首选 IDE", selection: $state.preferences.preferredIDE) {
+            Section("general.section.appearance") {
+                Picker("general.canvas_background", selection: $state.preferences.canvasBackground) {
+                    Text("general.background.dot_grid").tag("dotGrid")
+                    Text("general.background.solid").tag("solid")
+                    Text("general.background.transparent").tag("transparent")
+                }
+                Toggle("general.metal_renderer",
+                       isOn: $state.preferences.metalRendererEnabled)
+                    .help(String(localized: "general.metal_renderer.help"))
+                    .onChange(of: state.preferences.metalRendererEnabled) { _, enabled in
+                        applyMetalToAll(enabled: enabled)
+                    }
+            }
+
+            Section("general.section.integration") {
+                Picker("general.preferred_ide", selection: $state.preferences.preferredIDE) {
                     Text("Cursor").tag("cursor")
                     Text("VS Code").tag("vscode")
                     Text("Xcode").tag("xcode")
                 }
-                .help("在「View → Open in Editor」时使用的编辑器")
+                .help(String(localized: "general.preferred_ide.help"))
 
-                Toggle("启用 Remote SSH", isOn: $state.preferences.sshEnabled)
+                Toggle("general.ssh_enabled", isOn: $state.preferences.sshEnabled)
                 if appState.preferences.sshEnabled {
                     TextField("Host", text: $state.preferences.sshHost)
                         .textFieldStyle(.roundedBorder)
-                    TextField("用户名", text: $state.preferences.sshUser)
+                    TextField("general.ssh_username", text: $state.preferences.sshUser)
                         .textFieldStyle(.roundedBorder)
                     LabeledContent("SSH Port") {
                         TextField("", value: $state.preferences.sshPort, format: .number)
@@ -42,12 +56,12 @@ struct GeneralSettingsView: View {
                         TextField("", value: $state.preferences.sshTunnelPort, format: .number)
                             .frame(width: 70)
                     }
-                    .help("SSH 反向隧道端口（默认 7433），远端 omaestri CLI 通过此端口回连")
-                    TextField("脚本路径", text: $state.preferences.sshScriptPath)
+                    .help(String(localized: "general.ssh_tunnel.help"))
+                    TextField("general.ssh_script_path", text: $state.preferences.sshScriptPath)
                         .textFieldStyle(.roundedBorder)
-                        .help("omaestri 脚本安装路径（默认 ~/.local/bin/omaestri）")
-                    Toggle("添加到 PATH", isOn: $state.preferences.sshAddToPath)
-                    Button("连接") {
+                        .help(String(localized: "general.ssh_script_path.help"))
+                    Toggle("general.ssh_add_to_path", isOn: $state.preferences.sshAddToPath)
+                    Button("button.connect") {
                         connectSSH()
                     }
                     .disabled(appState.preferences.sshHost.isEmpty || appState.preferences.sshUser.isEmpty)
@@ -55,18 +69,18 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Section("备份") {
-                LabeledContent("自动备份") {
-                    Text("每小时").foregroundStyle(.secondary)
+            Section("general.section.backup") {
+                LabeledContent("general.auto_backup") {
+                    Text("general.auto_backup.hourly").foregroundStyle(.secondary)
                 }
-                Button("查看备份…") {
+                Button("button.view_backups") {
                     backupList = BackupManager.shared.listBackups()
                     showBackups = true
                 }
             }
 
-            Section("更新") {
-                Button("检查更新…") {
+            Section("general.section.update") {
+                Button("button.check_updates") {
                     (NSApp.delegate as? AppDelegate)?.checkForUpdates()
                 }
             }
@@ -81,6 +95,16 @@ struct GeneralSettingsView: View {
         }
         .sheet(isPresented: $showBackups) {
             BackupListView(backups: backupList)
+        }
+    }
+
+    private func applyMetalToAll(enabled: Bool) {
+        Task { @MainActor in
+            for id in TerminalManager.shared.terminals.keys {
+                if let provider = TerminalProviderRegistry.shared.provider(for: id) {
+                    provider.applyMetalRenderer(enabled: enabled)
+                }
+            }
         }
     }
 
@@ -131,17 +155,17 @@ struct BackupListView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("备份列表")
+                Text("general.backup_list.title")
                     .font(.headline)
                 Spacer()
-                Button("关闭") { dismiss() }
+                Button("button.close") { dismiss() }
             }
             .padding()
 
             Divider()
 
             if backups.isEmpty {
-                Text("暂无备份")
+                Text("general.backup_list.empty")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -156,9 +180,9 @@ struct BackupListView: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        Button("恢复") {
+                        Button("button.restore") {
                             if let count = try? BackupManager.shared.restoreFromBackup(url: backup) {
-                                restoreResult = "已确认 \(count) 个文件"
+                                restoreResult = "\(String(localized: "general.backup_list.restored")) \(count)"
                             }
                         }
                         .buttonStyle(.bordered)
