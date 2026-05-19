@@ -8,7 +8,7 @@ enum CanvasNodeConstants {
     static let minNodeHeight: CGFloat = 80
     static let resizeHandleSize: CGFloat = 12
     static let cornerRadius: CGFloat = 10
-    static let selectionOutset: CGFloat = 8
+    static let selectionOutset: CGFloat = 3
 }
 
 // MARK: - 拖放目标 Environment Key

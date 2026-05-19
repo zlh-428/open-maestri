@@ -135,7 +135,7 @@ final class FileTreeStateStore {
             .filter({ !$0.hasPrefix(".") })
             .sorted() else { return [] }
 
-        return entries.compactMap { name -> FileTreeItem? in
+        let items = entries.compactMap { name -> FileTreeItem? in
             let fullPath = (path as NSString).appendingPathComponent(name)
             var isDir: ObjCBool = false
             fm.fileExists(atPath: fullPath, isDirectory: &isDir)
@@ -145,6 +145,11 @@ final class FileTreeStateStore {
                 isDirectory: isDir.boolValue,
                 children: isDir.boolValue ? [] : nil
             )
+        }
+        // 排序：文件夹在前、文件在后（与 Maestri / Finder 一致）
+        return items.sorted { a, b in
+            if a.isDirectory != b.isDirectory { return a.isDirectory }
+            return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
     }
 

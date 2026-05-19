@@ -42,8 +42,8 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
         outlineView.headerView = nil
         outlineView.delegate = self
         outlineView.dataSource = self
-        outlineView.rowHeight = 24
-        outlineView.indentationPerLevel = 14
+        outlineView.rowHeight = 32
+        outlineView.indentationPerLevel = 16
         outlineView.selectionHighlightStyle = .regular
         outlineView.style = .sourceList
         outlineView.target = self
@@ -121,6 +121,14 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
             cell = NSTableCellView()
             cell.identifier = cellId
 
+            // 文件夹展开箭头（放在最左边，对标 Maestri 参考 UI）
+            let chevron = NSImageView()
+            chevron.translatesAutoresizingMaskIntoConstraints = false
+            chevron.identifier = NSUserInterfaceItemIdentifier("chevron")
+            chevron.imageScaling = .scaleProportionallyDown
+            chevron.contentTintColor = .tertiaryLabelColor
+            cell.addSubview(chevron)
+
             let imgView = NSImageView()
             imgView.translatesAutoresizingMaskIntoConstraints = false
             cell.addSubview(imgView)
@@ -133,33 +141,28 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
             cell.addSubview(textField)
             cell.textField = textField
 
-            // 文件夹展开箭头指示器
-            let chevron = NSImageView()
-            chevron.translatesAutoresizingMaskIntoConstraints = false
-            chevron.identifier = NSUserInterfaceItemIdentifier("chevron")
-            chevron.imageScaling = .scaleProportionallyDown
-            chevron.contentTintColor = .tertiaryLabelColor
-            cell.addSubview(chevron)
-
             NSLayoutConstraint.activate([
-                imgView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
-                imgView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                imgView.widthAnchor.constraint(equalToConstant: 16),
-                imgView.heightAnchor.constraint(equalToConstant: 16),
-                textField.leadingAnchor.constraint(equalTo: imgView.trailingAnchor, constant: 6),
-                textField.trailingAnchor.constraint(equalTo: chevron.leadingAnchor, constant: -4),
-                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-                chevron.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+                // 左侧展开箭头
+                chevron.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
                 chevron.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
                 chevron.widthAnchor.constraint(equalToConstant: 10),
                 chevron.heightAnchor.constraint(equalToConstant: 10),
+                // 文件图标
+                imgView.leadingAnchor.constraint(equalTo: chevron.trailingAnchor, constant: 6),
+                imgView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+                imgView.widthAnchor.constraint(equalToConstant: 18),
+                imgView.heightAnchor.constraint(equalToConstant: 18),
+                // 文件名
+                textField.leadingAnchor.constraint(equalTo: imgView.trailingAnchor, constant: 8),
+                textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
             ])
         }
 
         cell.textField?.stringValue = fi.name
         cell.imageView?.image = fileIcon(for: fi)
 
-        // 文件夹显示展开箭头 ">"
+        // 文件夹显示左侧展开箭头 ">"（对标参考 UI）
         let chevron = cell.subviews.first { $0.identifier?.rawValue == "chevron" } as? NSImageView
         if fi.isDirectory {
             chevron?.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)

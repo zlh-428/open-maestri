@@ -25,6 +25,8 @@ enum CanvasInteraction {
     case marquee(start: CGPoint)
     case panCanvas(startOrigin: CGPoint, startMouse: CGPoint)
     case drawing(start: CGPoint)
+    /// 鼠标正在与节点内容区交互（如终端文字选中）；事件转发给 contentTarget
+    case contentInteraction(UUID, contentTarget: NSView)
 }
 
 // MARK: - CanvasViewportView selectionRect helper
@@ -202,15 +204,36 @@ extension CanvasViewportView {
 
         case .nodeContent(let id, _):
             guard !isNodeLocked(id) else { return }
+            let wasAlreadySelected = selectedNodeIds.contains(id)
             updateSelection(id, modifiers: event.modifierFlags)
-            // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
-            // 不进入 mayDragNode 状态，保持 idle
             // 发送激活通知（聚焦终端等）
             NotificationCenter.default.post(
                 name: .canvasNodeActivated,
                 object: nil,
                 userInfo: ["nodeId": id]
             )
+            // 如果节点已经处于选中状态，将鼠标事件路由给终端视图（支持文字选中）
+            if wasAlreadySelected,
+               let provider = TerminalProviderRegistry.shared.provider(for: id),
+               let terminalView = provider.terminalView {
+                interaction = .contentInteraction(id, contentTarget: terminalView)
+                // 转发原始 mouseDown 事件给终端视图（SwiftTerm 自行做坐标转换）
+                if let syntheticEvent = NSEvent.mouseEvent(
+                    with: .leftMouseDown,
+                    location: event.locationInWindow,
+                    modifierFlags: event.modifierFlags,
+                    timestamp: event.timestamp,
+                    windowNumber: event.windowNumber,
+                    context: nil,
+                    eventNumber: event.eventNumber,
+                    clickCount: event.clickCount,
+                    pressure: event.pressure
+                ) {
+                    terminalView.mouseDown(with: syntheticEvent)
+                }
+                window?.makeFirstResponder(terminalView)
+            }
+            // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
 
         case .nodeResize(let id, let edge):
             guard !isNodeLocked(id) else { return }
@@ -400,6 +423,10 @@ extension CanvasViewportView {
             snapGuideView?.drawingRect = rect
             needsDisplay = true
 
+        // --- 内容区交互（终端文字选中等）---
+        case .contentInteraction(_, let contentTarget):
+            contentTarget.mouseDragged(with: event)
+
         // --- idle（连线工具跟踪）---
         case .idle:
             if connectingFromNodeId != nil {
@@ -570,6 +597,9 @@ extension CanvasViewportView {
             drawingCurrentPoint = nil
             snapGuideView?.drawingRect = nil
             needsDisplay = true
+
+        case .contentInteraction(_, let contentTarget):
+            contentTarget.mouseUp(with: event)
 
         case .panCanvas:
             if isSpaceHeld { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
