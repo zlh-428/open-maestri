@@ -440,4 +440,125 @@ extension CanvasViewportView {
 
         if view.isNodeSelected { view.needsLayout = true }
     }
+
+    // MARK: - mouseUp
+
+    override func mouseUp(with event: NSEvent) {
+        defer {
+            interaction = .idle
+            lastSnapActive = false
+            lastSnappedGridOrigin = nil
+        }
+
+        switch interaction {
+
+        case .mayDragNode(let id, _, _, let contentTarget):
+            // 没有发生拖动 = 点击
+            if let target = contentTarget {
+                // mouseDown 已透传，补发 mouseUp 完成点击序列
+                target.mouseUp(with: event)
+            }
+            // 单击已在多选集合中的节点 → 收窄为单选
+            if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
+                selectedNodeIds = [id]
+            }
+
+        case .draggingNode(let id, _, _):
+            dragGuidelines = []
+            if let finalFrame = nodeCanvasFrames[id] {
+                onNodeDragEnded?(id, finalFrame)
+            }
+
+        case .batchDragging(let startFrames, _, _):
+            dragGuidelines = []
+            var finalFrames: [UUID: CGRect] = [:]
+            for id in startFrames.keys {
+                if let f = nodeCanvasFrames[id] { finalFrames[id] = f }
+            }
+            onBatchNodeDragEnded?(finalFrames)
+
+        case .resizingNode(let id, _, _, _):
+            NSCursor.arrow.set()
+            if let finalFrame = nodeCanvasFrames[id] {
+                onNodeResizeEnded?(id, finalFrame)
+            }
+
+        case .marquee(let start):
+            if let current = marqueeCurrentPoint {
+                let rect = CGRect(
+                    x: min(start.x, current.x),
+                    y: min(start.y, current.y),
+                    width: abs(current.x - start.x),
+                    height: abs(current.y - start.y)
+                )
+                if rect.width > 4 || rect.height > 4 {
+                    var hitIds = Set<UUID>()
+                    for (id, view) in nodeViews {
+                        if view.frame.intersects(rect) { hitIds.insert(id) }
+                    }
+                    selectedNodeIds = hitIds
+                }
+            }
+            marqueeCurrentPoint = nil
+            needsDisplay = true
+
+        case .drawing(let start):
+            let current = drawingCurrentPoint ?? start
+            let rect = CGRect(
+                x: min(start.x, current.x),
+                y: min(start.y, current.y),
+                width: abs(current.x - start.x),
+                height: abs(current.y - start.y)
+            )
+            if rect.width > 20 && rect.height > 20 {
+                let canvasRect = CGRect(
+                    origin: screenToCanvas(rect.origin),
+                    size: CGSize(width: rect.width / zoom, height: rect.height / zoom)
+                )
+                onNodeDrawn?(drawingNodeType, canvasRect)
+            } else {
+                let defaultSize = defaultNodeSize(for: drawingNodeType)
+                let canvasPoint = screenToCanvas(start)
+                let canvasRect = CGRect(
+                    x: canvasPoint.x - defaultSize.width / 2,
+                    y: canvasPoint.y - defaultSize.height / 2,
+                    width: defaultSize.width,
+                    height: defaultSize.height
+                )
+                onNodeDrawn?(drawingNodeType, canvasRect)
+            }
+            drawingCurrentPoint = nil
+            needsDisplay = true
+
+        case .panCanvas:
+            if isSpaceHeld { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
+
+        case .idle:
+            break
+        }
+    }
+
+    // MARK: - mouseMoved
+
+    override func mouseMoved(with event: NSEvent) {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        // 连线工具：跟踪鼠标位置
+        if connectingFromNodeId != nil {
+            connectionDragPoint = loc
+            needsDisplay = true
+        }
+
+        // 光标：根据命中区域设置
+        if isSpaceHeld {
+            NSCursor.openHand.set()
+            return
+        }
+        switch hitTestCanvas(at: loc) {
+        case .nodeResize(_, let edge):
+            edge.cursor.set()
+        case .nodeHeader, .nodeContent, .canvas:
+            NSCursor.arrow.set()
+        }
+    }
 }
