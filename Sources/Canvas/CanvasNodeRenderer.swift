@@ -25,6 +25,7 @@ final class CanvasNodeRenderer {
         self.canvas = canvas
         setupNodesHostingView(canvas: canvas)
         setupOverlay(canvas: canvas)
+        setupDrawingOverlay(canvas: canvas)
         setupNodeDragCallback(canvas: canvas)
         setupActivationObserver()
         setupSelectionObserver()
@@ -101,6 +102,15 @@ final class CanvasNodeRenderer {
         }
     }
 
+    private func setupDrawingOverlay(canvas: CanvasViewportView) {
+        let overlay = DrawingOverlayView(frame: canvas.bounds)
+        overlay.autoresizingMask = [.width, .height]
+        overlay.canvasOrigin = canvas.canvasOrigin
+        overlay.zoom = canvas.zoom
+        canvas.addSubview(overlay)
+        canvas.drawingOverlayView = overlay
+    }
+
     private func setupOverlay(canvas: CanvasViewportView) {
         let overlay = ConnectionOverlayView(frame: canvas.bounds)
         overlay.autoresizingMask = [.width, .height]
@@ -172,6 +182,11 @@ final class CanvasNodeRenderer {
 
         if let overlay = overlayView {
             canvas.addSubview(overlay)
+        }
+
+        // drawingOverlayView 在连接线层上方
+        if let drawingOverlay = canvas.drawingOverlayView {
+            canvas.addSubview(drawingOverlay)
         }
 
         // 保证 snapGuideView 始终在最顶层

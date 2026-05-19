@@ -15,6 +15,8 @@ final class CanvasViewportView: NSView {
             needsLayout = true
             needsDisplay = true
             backgroundView?.canvasOrigin = canvasOrigin
+            drawingLayerView?.canvasOrigin = canvasOrigin
+            drawingOverlayView?.canvasOrigin = canvasOrigin
             snapGuideView?.canvasOrigin = canvasOrigin
         }
     }
@@ -24,6 +26,8 @@ final class CanvasViewportView: NSView {
             needsLayout = true
             needsDisplay = true
             backgroundView?.zoom = zoom
+            drawingLayerView?.zoom = zoom
+            drawingOverlayView?.zoom = zoom
             snapGuideView?.zoom = zoom
         }
     }
@@ -38,6 +42,8 @@ final class CanvasViewportView: NSView {
     // MARK: - 分层视图
 
     private var backgroundView: CanvasBackground?
+    var drawingLayerView: DrawingLayerView?
+    var drawingOverlayView: DrawingOverlayView?
     private(set) var snapGuideView: MagneticSnapGuideView?
 
     /// 节点视图映射（nodeId → NSView）
@@ -136,6 +142,7 @@ final class CanvasViewportView: NSView {
         registerDragTypes()
         setupNotificationObservers()
         setupBackgroundView()
+        setupDrawingLayerView()
         setupSnapGuideView()
     }
 
@@ -147,6 +154,15 @@ final class CanvasViewportView: NSView {
         bg.backgroundMode = backgroundMode
         addSubview(bg)
         backgroundView = bg
+    }
+
+    private func setupDrawingLayerView() {
+        let drawLayer = DrawingLayerView(frame: bounds)
+        drawLayer.autoresizingMask = [.width, .height]
+        drawLayer.canvasOrigin = canvasOrigin
+        drawLayer.zoom = zoom
+        addSubview(drawLayer)
+        drawingLayerView = drawLayer
     }
 
     private func setupSnapGuideView() {
