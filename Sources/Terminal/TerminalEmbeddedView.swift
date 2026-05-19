@@ -12,6 +12,13 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
     @MainActor
     func makeNSView(context: Context) -> LocalProcessTerminalView {
+        // 复用已有 provider（切换工作区后 Canvas 重建时不重启 PTY）
+        if let existing = TerminalProviderRegistry.shared.provider(for: terminalId),
+           let existingView = existing.terminalView {
+            existing.terminalView?.removeFromSuperview()
+            return existingView
+        }
+
         let provider = SwiftTermProvider(
             terminalId: terminalId,
             command: command,
@@ -24,7 +31,6 @@ struct TerminalEmbeddedView: NSViewRepresentable {
         let view = provider.start(in: .zero)
 
         // 单一的输出链路：PTY 输出 → TerminalSession 缓存 + ScrollbackStore
-        // TerminalProviderRegistry.register 不再覆盖此回调
         if let session = TerminalManager.shared.terminals[terminalId] {
             provider.onOutput = { text in
                 Task { @MainActor in

@@ -6,6 +6,7 @@ import CoreGraphics
 /// - 点击任意位置：视口跳转到对应区域（300ms 动画）
 /// - 实时更新（节点移动/添加时）
 final class MinimapView: NSView {
+    override var isFlipped: Bool { true }
 
     // MARK: - 数据
 

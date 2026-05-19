@@ -209,6 +209,10 @@ final class CanvasViewportView: NSView {
         animateOrigin(from: canvasOrigin, to: target, startTime: CACurrentMediaTime(), duration: duration)
     }
 
+    // MARK: - 坐标系
+
+    override var isFlipped: Bool { true }
+
     // MARK: - 第一响应者
 
     override var acceptsFirstResponder: Bool { true }
@@ -265,11 +269,11 @@ final class CanvasViewportView: NSView {
             guard let canvasFrame = nodeCanvasFrames[selectedId] else { continue }
             let screenFrame = canvasRectToScreen(canvasFrame)
             guard screenFrame.contains(locInCanvas) else { continue }
-            // 排除 header 区域（header 高度用画布坐标系计算）
+            // 排除 header 区域（header 在顶部，flipped 坐标系 minY = 顶边）
             let headerScreenHeight = CanvasNodeConstants.headerHeight * zoom
             let contentScreenFrame = CGRect(
                 x: screenFrame.minX,
-                y: screenFrame.minY,
+                y: screenFrame.minY + headerScreenHeight,
                 width: screenFrame.width,
                 height: screenFrame.height - headerScreenHeight
             )
@@ -519,11 +523,9 @@ final class CanvasViewportView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         // 背景由 CanvasBackground 子视图负责绘制
-        // 磁吸辅助线由 MagneticSnapGuideView 子视图负责绘制
-        // 此处只绘制临时连线、绘制矩形、框选矩形
+        // 磁吸辅助线、框选矩形、绘制预览矩形由 MagneticSnapGuideView（最顶层）负责绘制
+        // 此处只绘制临时连线
         drawTemporaryConnection()
-        drawDrawingRect()
-        drawSelectionRect()
     }
 }
 

@@ -6,7 +6,7 @@ enum CanvasNodeConstants {
     static let headerHeight: CGFloat = 32
     static let minNodeWidth: CGFloat = 160
     static let minNodeHeight: CGFloat = 80
-    static let resizeHandleSize: CGFloat = 8
+    static let resizeHandleSize: CGFloat = 12
     static let cornerRadius: CGFloat = 10
     static let selectionOutset: CGFloat = 8
 }
@@ -28,9 +28,37 @@ extension EnvironmentValues {
 /// NSHostingView 子类，作为所有节点的 SwiftUI 容器。
 /// hitTest 默认返回 self（不穿透内部 SwiftUI 视图到 AppKit 层），
 /// 天然实现 Maestri 的 SwiftUIGestureBlocker 效果。
+/// 所有鼠标/滚轮事件透传给父视图 CanvasViewportView 统一处理。
 final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
-    // 不重写 hitTest：默认行为已满足需求
-    // 不重写 mouseDown：由父视图 CanvasViewportView 统一处理
+
+
+    override func mouseDown(with event: NSEvent) {
+        nextResponder?.mouseDown(with: event)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        nextResponder?.mouseUp(with: event)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        nextResponder?.mouseDragged(with: event)
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        nextResponder?.rightMouseDown(with: event)
+    }
+
+    override func rightMouseUp(with event: NSEvent) {
+        nextResponder?.rightMouseUp(with: event)
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        nextResponder?.mouseMoved(with: event)
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        nextResponder?.scrollWheel(with: event)
+    }
 }
 
 // MARK: - CanvasNodesSwiftUIView
@@ -54,20 +82,23 @@ struct CanvasNodesSwiftUIView: View {
         GeometryReader { _ in
             ZStack {
                 ForEach(nodes.sorted(by: { $0.zIndex < $1.zIndex })) { node in
+                    let posX = (node.frame.midX - canvasOrigin.x) * zoom
+                    let posY = (node.frame.midY - canvasOrigin.y) * zoom
                     nodeView(for: node)
-                        .frame(
-                            width: node.frame.width * zoom,
-                            height: node.frame.height * zoom
-                        )
-                        .position(
-                            x: (node.frame.midX - canvasOrigin.x) * zoom,
-                            y: (node.frame.midY - canvasOrigin.y) * zoom
-                        )
+                        // 以原始画布尺寸渲染，内容不感知 zoom
+                        .frame(width: node.frame.width, height: node.frame.height)
+                        // scaleEffect 从中心缩放到屏幕尺寸，与 position center 语义匹配
+                        .scaleEffect(zoom)
+                        // position 与 hitTestCanvas/canvasRectToScreen 坐标系完全一致
+                        .position(x: posX, y: posY)
                         .allowsHitTesting(false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        // 忽略 safe area，使 GeometryReader 尺寸与 NSHostingView frame 完全一致
+        // 否则 safe area insets 导致 SwiftUI .position() 坐标与 AppKit hitTest 坐标系不对齐
+        .ignoresSafeArea()
         .environment(\.dropTargetNodeId, dropTargetNodeId)
     }
 

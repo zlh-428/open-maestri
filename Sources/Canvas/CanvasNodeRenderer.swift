@@ -42,6 +42,9 @@ final class CanvasNodeRenderer {
             workspace: nil
         )
         let hostingView = CanvasNodesView(rootView: rootView)
+        // 禁止 NSHostingView 向 SwiftUI 传播 safe area insets，
+        // 确保 GeometryReader 尺寸与 NSHostingView frame 完全一致（修复 hitTest 坐标偏移）
+        hostingView.safeAreaRegions = []
         hostingView.frame = canvas.bounds
         hostingView.autoresizingMask = [.width, .height]
         canvas.addSubview(hostingView)

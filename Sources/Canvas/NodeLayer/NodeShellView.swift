@@ -32,19 +32,18 @@ struct NodeShellView<Content: View>: View {
                 }
 
             VStack(spacing: 0) {
-                // Header
+                // Header（固定 32pt 高，与 CanvasNodeConstants.headerHeight 对齐）
                 NodeHeaderSwiftUIView(
                     title: title,
                     icon: headerIcon,
                     color: headerColor,
-                    isLocked: isLocked,
-                    zoom: zoom
+                    isLocked: isLocked
                 )
-                .frame(height: CanvasNodeConstants.headerHeight / zoom)
+                .frame(height: CanvasNodeConstants.headerHeight)
 
                 Divider().opacity(0.5)
 
-                // 内容区
+                // 内容区（以节点原始画布尺寸填满，内容不受 zoom 影响）
                 content()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -92,27 +91,26 @@ struct NodeHeaderSwiftUIView: View {
     let icon: String?
     let color: Color?
     let isLocked: Bool
-    let zoom: CGFloat
 
     var body: some View {
         HStack(spacing: 6) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 11 / zoom))
+                    .font(.system(size: 11))
                     .foregroundStyle(color ?? .primary)
             }
             Text(title)
-                .font(.system(size: 12 / zoom, weight: .medium))
+                .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer()
             if isLocked {
                 Image(systemName: "lock.fill")
-                    .font(.system(size: 10 / zoom))
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 8 / zoom)
+        .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(color?.opacity(0.15) ?? Color.clear)
     }

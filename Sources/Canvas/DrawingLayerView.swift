@@ -3,6 +3,8 @@ import AppKit
 /// 手绘路径渲染层（节点下方），用于将 DrawingContent 渲染为画布上的笔画。
 /// 笔画坐标为节点内部坐标，需结合节点 frame 转换到画布屏幕坐标。
 final class DrawingLayerView: NSView {
+    override var isFlipped: Bool { true }
+
     var canvasOrigin: CGPoint = .zero { didSet { needsDisplay = true } }
     var zoom: CGFloat = 1.0 { didSet { needsDisplay = true } }
 

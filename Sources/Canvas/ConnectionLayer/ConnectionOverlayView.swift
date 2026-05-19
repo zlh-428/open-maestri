@@ -6,6 +6,7 @@ import AppKit
 /// - 颜色状态编码：灰色（空闲）→ 绿色 glow（通信中）→ 红色（断开）（UX-DR5）
 /// - 支持 hover 高亮和右键删除连线
 final class ConnectionOverlayView: NSView {
+    override var isFlipped: Bool { true }
 
     // MARK: - 数据源
 

@@ -57,7 +57,9 @@ extension CanvasViewportView {
 
         for node in sortedNodes {
             let screenFrame = canvasRectToScreen(node.frame)
-            guard screenFrame.contains(loc) else { continue }
+            let contains = screenFrame.contains(loc)
+
+            guard contains else { continue }
 
             let localPt = CGPoint(
                 x: loc.x - screenFrame.minX,
@@ -68,7 +70,9 @@ extension CanvasViewportView {
                 return .nodeResize(node.id, edge)
             }
 
-            if localPt.y <= CanvasNodeConstants.headerHeight {
+            // header 在节点顶部（y 向下：minY 是顶边，localPt.y 小 = 顶部）
+            let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
+            if localPt.y <= scaledHeaderHeight {
                 return .nodeHeader(node.id)
             }
 
@@ -78,12 +82,17 @@ extension CanvasViewportView {
     }
 
     private func geometricResizeEdge(at localPt: CGPoint, in size: CGSize) -> ResizeEdge? {
+        // 热区使用固定屏幕像素，不受 zoom 影响（localPt 和 size 已是屏幕坐标）
         let h = CanvasNodeConstants.resizeHandleSize
         let w = size.width
         let ht = size.height
 
+        // 确保节点尺寸足够大，不至于整个节点都变成 resize 热区
+        guard w > h * 3 && ht > h * 3 else { return nil }
+
         let onLeft   = localPt.x <= h
         let onRight  = localPt.x >= w - h
+        // y 向下：top = 小 y 端（顶边），bottom = 大 y 端（底边）
         let onTop    = localPt.y <= h
         let onBottom = localPt.y >= ht - h
 
@@ -194,8 +203,14 @@ extension CanvasViewportView {
         case .nodeContent(let id, _):
             guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
-            let startFrame = nodeCanvasFrames[id] ?? .zero
-            interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+            // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
+            // 不进入 mayDragNode 状态，保持 idle
+            // 发送激活通知（聚焦终端等）
+            NotificationCenter.default.post(
+                name: .canvasNodeActivated,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
 
         case .nodeResize(let id, let edge):
             guard !isNodeLocked(id) else { return }
@@ -362,13 +377,27 @@ extension CanvasViewportView {
             applyResizeOnCanvas(id: id, edge: edge, dx: dx, dy: dy, startFrame: startFrame)
 
         // --- 框选 ---
-        case .marquee:
+        case .marquee(let start):
             marqueeCurrentPoint = loc
+            let rect = CGRect(
+                x: min(start.x, loc.x),
+                y: min(start.y, loc.y),
+                width: abs(loc.x - start.x),
+                height: abs(loc.y - start.y)
+            )
+            snapGuideView?.selectionRect = rect
             needsDisplay = true
 
         // --- 节点绘制模式 ---
-        case .drawing:
+        case .drawing(let start):
             drawingCurrentPoint = loc
+            let rect = CGRect(
+                x: min(start.x, loc.x),
+                y: min(start.y, loc.y),
+                width: abs(loc.x - start.x),
+                height: abs(loc.y - start.y)
+            )
+            snapGuideView?.drawingRect = rect
             needsDisplay = true
 
         // --- idle（连线工具跟踪）---
@@ -395,7 +424,7 @@ extension CanvasViewportView {
         var h = startFrame.height
 
         // startFrame 是屏幕坐标（缩放后），dx/dy 亦为屏幕坐标
-        // isFlipped = false：y=0 在底部，dy>0 向上
+        // isFlipped = true：y=0 在顶部，dy>0 向下
         switch edge {
         case .right:
             w = max(w + dx, minW)
@@ -404,41 +433,48 @@ extension CanvasViewportView {
             x = startFrame.maxX - newW
             w = newW
         case .bottom:
-            let top = y + h
-            let newH = max(h - dy, minH)
-            y = top - newH
-            h = newH
-        case .top:
             h = max(h + dy, minH)
+        case .top:
+            let bottom = y + h
+            let newH = max(h - dy, minH)
+            y = bottom - newH
+            h = newH
         case .bottomLeft:
             let newW = max(w - dx, minW)
             x = startFrame.maxX - newW
             w = newW
-            let top = y + h
-            let newH = max(h - dy, minH)
-            y = top - newH
-            h = newH
+            h = max(h + dy, minH)
         case .bottomRight:
             w = max(w + dx, minW)
-            let top = y + h
-            let newH = max(h - dy, minH)
-            y = top - newH
-            h = newH
+            h = max(h + dy, minH)
         case .topLeft:
             let newW = max(w - dx, minW)
             x = startFrame.maxX - newW
             w = newW
-            h = max(h + dy, minH)
+            let bottom = y + h
+            let newH = max(h - dy, minH)
+            y = bottom - newH
+            h = newH
         case .topRight:
             w = max(w + dx, minW)
-            h = max(h + dy, minH)
+            let bottom = y + h
+            let newH = max(h - dy, minH)
+            y = bottom - newH
+            h = newH
         }
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         let canvasOriginPt = screenToCanvas(CGPoint(x: x, y: y))
-        nodeCanvasFrames[id] = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
-                                      width: w / zoom, height: h / zoom)
+        let newCanvasFrame = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
+                                    width: w / zoom, height: h / zoom)
+        nodeCanvasFrames[id] = newCanvasFrame
+        // 同步更新 currentNodes，避免 layout() 重建 SwiftUI 视图时使用旧 frame 导致“弹回”
+        currentNodes = currentNodes.map { node in
+            guard node.id == id else { return node }
+            return CanvasNode(id: node.id, frame: newCanvasFrame, content: node.content,
+                              zIndex: node.zIndex, isLocked: node.isLocked)
+        }
         CATransaction.commit()
         needsLayout = true
     }
@@ -503,6 +539,7 @@ extension CanvasViewportView {
                 }
             }
             marqueeCurrentPoint = nil
+            snapGuideView?.selectionRect = nil
             needsDisplay = true
 
         case .drawing(let start):
@@ -531,6 +568,7 @@ extension CanvasViewportView {
                 onNodeDrawn?(drawingNodeType, canvasRect)
             }
             drawingCurrentPoint = nil
+            snapGuideView?.drawingRect = nil
             needsDisplay = true
 
         case .panCanvas:

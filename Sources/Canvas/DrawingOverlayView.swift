@@ -2,6 +2,8 @@ import AppKit
 
 /// 手绘选中交互层（连接线上方），为选中的 drawing 节点绘制选中边框。
 final class DrawingOverlayView: NSView {
+    override var isFlipped: Bool { true }
+
     var selectedDrawingIds: Set<UUID> = [] { didSet { needsDisplay = true } }
     var canvasOrigin: CGPoint = .zero { didSet { needsDisplay = true } }
     var zoom: CGFloat = 1.0 { didSet { needsDisplay = true } }

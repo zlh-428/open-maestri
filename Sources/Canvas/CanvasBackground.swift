@@ -3,6 +3,8 @@ import AppKit
 /// 画布背景层（点阵/纯色/透明），替代 CanvasViewportView.drawLineGrid。
 /// 随 canvasOrigin/zoom/backgroundMode 变化重绘。
 final class CanvasBackground: NSView {
+    override var isFlipped: Bool { true }
+
     var canvasOrigin: CGPoint = .zero { didSet { needsDisplay = true } }
     var zoom: CGFloat = 1.0 { didSet { needsDisplay = true } }
     var backgroundMode: String = "dotGrid" { didSet { needsDisplay = true } }

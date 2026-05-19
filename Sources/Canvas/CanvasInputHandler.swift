@@ -357,10 +357,10 @@ extension CanvasViewportView {
                 y: mouseCanvas.y - mouseScreen.y / zoom
             )
         } else {
-            // 触摸板两指平移：手指方向 = 画布移动方向（自然滚动）
+            // 触摸板两指平移：自然滚动（手指方向 = 内容移动方向）
             canvasOrigin = CGPoint(
                 x: canvasOrigin.x - event.scrollingDeltaX / zoom,
-                y: canvasOrigin.y + event.scrollingDeltaY / zoom
+                y: canvasOrigin.y - event.scrollingDeltaY / zoom
             )
         }
         needsLayout = true
