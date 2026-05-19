@@ -511,10 +511,11 @@ final class CanvasViewportView: NSView {
         // 更新 SwiftUI 节点树的 canvasOrigin/zoom，触发节点重新定位
         if let hostingView = nodesHostingView {
             let current = hostingView.rootView
-            // 仅当 origin/zoom 变化时才更新（避免完全无变化时的多余赋值）
-            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != sortedNodesByZIndex {
+            let visibleNodes = viewportCulledNodes()
+            // 仅当 origin/zoom/可见节点变化时才更新（避免完全无变化时的多余赋值）
+            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != visibleNodes {
                 hostingView.rootView = CanvasNodesSwiftUIView(
-                    nodes: sortedNodesByZIndex,
+                    nodes: visibleNodes,
                     canvasOrigin: canvasOrigin,
                     zoom: zoom,
                     selectedNodeIds: current.selectedNodeIds,
@@ -528,6 +529,24 @@ final class CanvasViewportView: NSView {
                     onLockToggle: current.onLockToggle
                 )
             }
+        }
+    }
+
+    // MARK: - 视口裁剪
+
+    /// 视口裁剪边距（画布坐标单位），超出视口此距离以外的节点不渲染
+    /// 使用较大边距确保节点进入视口前已经准备好，避免闪烁
+    private static let viewportCullMargin: CGFloat = 200
+
+    /// 计算当前视口可见的节点列表（按 zIndex 升序）
+    /// 逻辑：将视口屏幕 bounds 转为画布坐标，加上边距后与节点 frame 做 intersects 判断
+    func viewportCulledNodes() -> [CanvasNode] {
+        let viewportCanvas = screenRectToCanvas(bounds).insetBy(
+            dx: -Self.viewportCullMargin,
+            dy: -Self.viewportCullMargin
+        )
+        return sortedNodesByZIndex.filter { node in
+            viewportCanvas.intersects(node.frame)
         }
     }
 

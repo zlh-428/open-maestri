@@ -199,8 +199,11 @@ final class CanvasNodeRenderer {
         }
         canvas.currentNodes = nodes
 
+        // 视口裁剪：仅将可见节点传入 SwiftUI 渲染层
+        let visibleNodes = canvas.viewportCulledNodes()
+
         nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-            nodes: canvas.sortedNodesByZIndex,
+            nodes: visibleNodes,
             canvasOrigin: canvas.canvasOrigin,
             zoom: canvas.zoom,
             selectedNodeIds: canvas.selectedNodeIds,
@@ -352,7 +355,7 @@ final class CanvasNodeRenderer {
                   current.selectedNodeIds != ids else { return }
             let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
             self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-                nodes: canvas.sortedNodesByZIndex,
+                nodes: canvas.viewportCulledNodes(),
                 canvasOrigin: canvas.canvasOrigin,
                 zoom: canvas.zoom,
                 selectedNodeIds: ids,
@@ -379,7 +382,7 @@ final class CanvasNodeRenderer {
             guard let current = self.nodesHostingView?.rootView,
                   current.dropTargetNodeId != dropTargetId else { return }
             self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-                nodes: canvas.sortedNodesByZIndex,
+                nodes: canvas.viewportCulledNodes(),
                 canvasOrigin: canvas.canvasOrigin,
                 zoom: canvas.zoom,
                 selectedNodeIds: current.selectedNodeIds,
@@ -398,70 +401,97 @@ final class CanvasNodeRenderer {
 
     // MARK: - 连线同步
 
+    /// 缓存每条连线的画布坐标 rope 点（key: connection UUID）
+    /// 仅当连接两端节点的 frame 变化时才重新计算 catenary
+    private var cachedCanvasRopePoints: [UUID: CachedRope] = [:]
+
+    /// 缓存结构：存储计算 rope 所用的源 frame 和结果
+    private struct CachedRope {
+        let frameA: CGRect
+        let frameB: CGRect
+        let canvasPoints: [CGPoint]  // 画布坐标系下的 21 个控制点
+    }
+
     func syncConnections(workspace: WorkspaceManager) {
         guard let overlay = overlayView, let canvas else { return }
 
         var renderables: [RenderableConnection] = []
+        var activeConnectionIds: Set<UUID> = []
 
         for conn in workspace.connections {
             guard let frameA = nodeFrame(id: conn.terminalIdA, in: workspace),
                   let frameB = nodeFrame(id: conn.terminalIdB, in: workspace) else { continue }
-            let points = computeRopeScreenPoints(frameA: frameA, frameB: frameB, canvas: canvas)
+            activeConnectionIds.insert(conn.id)
+            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
             let status = ConnectionManager.shared.connections.values
                 .first { $0.nodeIdA == conn.terminalIdA && $0.nodeIdB == conn.terminalIdB }?.status ?? .idle
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: points, status: status))
+            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: status))
         }
 
         for conn in workspace.noteConnections {
             guard let frameA = nodeFrame(id: conn.terminalId, in: workspace),
                   let frameB = nodeFrame(id: conn.noteNodeId, in: workspace) else { continue }
-            let points = computeRopeScreenPoints(frameA: frameA, frameB: frameB, canvas: canvas)
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: points, status: .idle))
+            activeConnectionIds.insert(conn.id)
+            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
+            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
         }
 
         for conn in workspace.portalConnections {
             guard let frameA = nodeFrame(id: conn.terminalId, in: workspace),
                   let frameB = nodeFrame(id: conn.portalNodeId, in: workspace) else { continue }
-            let points = computeRopeScreenPoints(frameA: frameA, frameB: frameB, canvas: canvas)
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: points, status: .idle))
+            activeConnectionIds.insert(conn.id)
+            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
+            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
         }
 
         // Note↔Note 连接（Note Chaining）
         for conn in workspace.noteToNoteConnections {
             guard let frameA = nodeFrame(id: conn.noteNodeIdA, in: workspace),
                   let frameB = nodeFrame(id: conn.noteNodeIdB, in: workspace) else { continue }
-            let points = computeRopeScreenPoints(frameA: frameA, frameB: frameB, canvas: canvas)
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: points, status: .idle))
+            activeConnectionIds.insert(conn.id)
+            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
+            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
         }
 
         // Portal↔Portal 连接（共享 session）
         for conn in workspace.portalToPortalConnections {
             guard let frameA = nodeFrame(id: conn.portalIdA, in: workspace),
                   let frameB = nodeFrame(id: conn.portalIdB, in: workspace) else { continue }
-            let points = computeRopeScreenPoints(frameA: frameA, frameB: frameB, canvas: canvas)
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: points, status: .idle))
+            activeConnectionIds.insert(conn.id)
+            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
+            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
         }
 
+        // 清理已删除连线的缓存
+        cachedCanvasRopePoints = cachedCanvasRopePoints.filter { activeConnectionIds.contains($0.key) }
+
         overlay.connections = renderables
+    }
+
+    /// 获取缓存的画布坐标 rope 点；若源 frame 未变则直接返回缓存，否则重新计算
+    private func cachedCanvasRope(id: UUID, frameA: CGRect, frameB: CGRect) -> [CGPoint] {
+        if let cached = cachedCanvasRopePoints[id],
+           cached.frameA == frameA && cached.frameB == frameB {
+            return cached.canvasPoints
+        }
+        let canvasPoints = computeRopeCanvasPoints(frameA: frameA, frameB: frameB)
+        cachedCanvasRopePoints[id] = CachedRope(frameA: frameA, frameB: frameB, canvasPoints: canvasPoints)
+        return canvasPoints
     }
 
     private func nodeFrame(id: UUID, in workspace: WorkspaceManager) -> CGRect? {
         workspace.nodes.first { $0.id == id }?.frame
     }
 
-    private func computeRopeScreenPoints(frameA: CGRect, frameB: CGRect, canvas: CanvasViewportView) -> [CGPoint] {
-        // 节点 frame origin 是画布坐标，宽高是画布原始尺寸（不含 zoom）
-        // 屏幕中点 = canvasToScreen(origin) + 宽高/2 * zoom
-        let screenOriginA = canvas.canvasToScreen(frameA.origin)
-        let screenOriginB = canvas.canvasToScreen(frameB.origin)
-        let startScreen = CGPoint(
-            x: screenOriginA.x + frameA.width * canvas.zoom / 2,
-            y: screenOriginA.y + frameA.height * canvas.zoom / 2
-        )
-        let endScreen = CGPoint(
-            x: screenOriginB.x + frameB.width * canvas.zoom / 2,
-            y: screenOriginB.y + frameB.height * canvas.zoom / 2
-        )
-        return ropeSimulation.compute(from: startScreen, to: endScreen)
+    /// 在画布坐标系中计算 catenary rope 点（与 viewport 无关）
+    private func computeRopeCanvasPoints(frameA: CGRect, frameB: CGRect) -> [CGPoint] {
+        let startCanvas = CGPoint(x: frameA.midX, y: frameA.midY)
+        let endCanvas = CGPoint(x: frameB.midX, y: frameB.midY)
+        return ropeSimulation.compute(from: startCanvas, to: endCanvas)
     }
 }

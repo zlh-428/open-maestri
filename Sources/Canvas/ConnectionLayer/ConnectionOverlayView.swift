@@ -11,8 +11,37 @@ final class ConnectionOverlayView: NSView {
     // MARK: - 数据源
 
     /// 当前需要绘制的连接列表（由画布在节点移动/连接变化时更新）
+    /// 仅当连线数据实际变化时才触发重绘（避免 viewport pan/zoom 时的冗余重绘）
     var connections: [RenderableConnection] = [] {
-        didSet { needsDisplay = true }
+        didSet {
+            guard connectionsDidChange(old: oldValue, new: connections) else { return }
+            needsDisplay = true
+        }
+    }
+
+    /// 快速判断连线数据是否有实际变化
+    /// 比较策略：数量 → 各连线 id + 首尾中点（覆盖 95% 场景，避免逐点全量比较）
+    private func connectionsDidChange(old: [RenderableConnection], new: [RenderableConnection]) -> Bool {
+        guard old.count == new.count else { return true }
+        for i in old.indices {
+            let o = old[i], n = new[i]
+            if o.id != n.id || o.status != n.status { return true }
+            // 比较首点、尾点、中点三个采样位置
+            guard o.screenPoints.count == n.screenPoints.count,
+                  !o.screenPoints.isEmpty else { return o.screenPoints.count != n.screenPoints.count }
+            let midIdx = o.screenPoints.count / 2
+            if !pointsEqual(o.screenPoints[0], n.screenPoints[0]) ||
+               !pointsEqual(o.screenPoints[midIdx], n.screenPoints[midIdx]) ||
+               !pointsEqual(o.screenPoints[o.screenPoints.count - 1], n.screenPoints[n.screenPoints.count - 1]) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// 浮点坐标比较（容差 0.5 像素，避免亚像素抖动触发重绘）
+    private func pointsEqual(_ a: CGPoint, _ b: CGPoint) -> Bool {
+        abs(a.x - b.x) < 0.5 && abs(a.y - b.y) < 0.5
     }
 
     /// 当前 hover 高亮的连线 ID
