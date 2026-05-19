@@ -120,6 +120,14 @@ final class CanvasViewportView: NSView {
     var onContextMenuRename: ((UUID) -> Void)?
     /// 右键菜单：锁定/解锁节点回调（由 CanvasNodeRenderer 设置）
     var onContextMenuLockToggle: ((UUID) -> Void)?
+    /// 右键菜单：编辑终端（弹出 EditTerminalSheet）
+    var onContextMenuEditTerminal: ((UUID) -> Void)?
+    /// 右键菜单：开始连接
+    var onContextMenuConnect: ((UUID) -> Void)?
+    /// 右键菜单：分配角色（Terminal 专属）
+    var onContextMenuAssignRole: ((UUID) -> Void)?
+    /// 右键菜单：切换 Maestro 模式（Terminal 专属）
+    var onContextMenuToggleMaestro: ((UUID) -> Void)?
 
     /// 节点 zIndex 变化回调（节点ID → 新 zIndex），由 WorkspaceManager 持久化
     var onNodeZIndexChanged: ((UUID, Int) -> Void)?
@@ -589,6 +597,12 @@ final class CanvasViewportView: NSView {
 extension CanvasViewportView {
 
     /// 右键菜单：在 AppKit 层处理，避免 SwiftUI allowsHitTesting(false) 阻断问题
+    /// 根据节点类型动态构建菜单项（对标 Maestri 产品行为）：
+    /// - Terminal: Duplicate → Edit Terminal → Assign Role / Enable Maestro → Connect → Delete
+    /// - Note: Duplicate → Rename → Connect → Delete
+    /// - Portal: Duplicate → Connect → Delete
+    /// - FileTree: Duplicate → Lock → Delete（使用节点内部工具栏，菜单精简）
+    /// - Text/Drawing: Duplicate → Lock → Delete
     override func menu(for event: NSEvent) -> NSMenu? {
         let loc = convert(event.locationInWindow, from: nil)
         let hit = hitTestCanvas(at: loc)
@@ -602,49 +616,80 @@ extension CanvasViewportView {
         }
 
         guard let id = nodeId else { return super.menu(for: event) }
+        guard let node = currentNodes.first(where: { $0.id == id }) else { return super.menu(for: event) }
 
-        let node = currentNodes.first { $0.id == id }
         let menu = NSMenu()
 
-        let renameItem = NSMenuItem(
-            title: NSLocalizedString("Rename", comment: "Context menu: rename node"),
-            action: #selector(contextMenuRename(_:)),
-            keyEquivalent: ""
-        )
-        renameItem.representedObject = id
-        menu.addItem(renameItem)
+        switch node.content {
+        case .terminal(let tc):
+            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem("Edit Terminal", action: #selector(contextMenuEditTerminal(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(menuItem("Assign Role", action: #selector(contextMenuAssignRole(_:)), id: id))
+            let maestroTitle = tc.isManager ? "Disable Maestro" : "Enable Maestro"
+            menu.addItem(menuItem(maestroTitle, action: #selector(contextMenuToggleMaestro(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
 
-        let duplicateItem = NSMenuItem(
-            title: NSLocalizedString("Duplicate", comment: "Context menu: duplicate node"),
-            action: #selector(contextMenuDuplicate(_:)),
-            keyEquivalent: ""
-        )
-        duplicateItem.representedObject = id
-        menu.addItem(duplicateItem)
+        case .stickyNote:
+            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
 
-        let lockTitle = (node?.isLocked == true)
-            ? NSLocalizedString("Unlock", comment: "Context menu: unlock node")
-            : NSLocalizedString("Lock", comment: "Context menu: lock node")
-        let lockItem = NSMenuItem(
-            title: lockTitle,
-            action: #selector(contextMenuLockToggle(_:)),
-            keyEquivalent: ""
-        )
-        lockItem.representedObject = id
-        menu.addItem(lockItem)
+        case .portal:
+            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
 
-        menu.addItem(NSMenuItem.separator())
+        case .fileTree:
+            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
+            let lockTitle = node.isLocked ? "Unlock" : "Lock"
+            menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
 
-        let closeItem = NSMenuItem(
-            title: NSLocalizedString("Close", comment: "Context menu: close node"),
-            action: #selector(contextMenuClose(_:)),
-            keyEquivalent: ""
-        )
-        closeItem.representedObject = id
-        menu.addItem(closeItem)
+        case .text, .drawing:
+            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
+            let lockTitle = node.isLocked ? "Unlock" : "Lock"
+            menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id))
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+        }
 
         return menu
     }
+
+    // MARK: - Menu Item Helpers
+
+    private func menuItem(_ title: String, action: Selector, id: UUID) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.representedObject = id
+        item.target = self
+        return item
+    }
+
+    private func destructiveItem(_ title: String, action: Selector, id: UUID) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+        item.representedObject = id
+        item.target = self
+        // 危险操作红色标记（macOS 标准做法：设置 attributedTitle）
+        item.attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [.foregroundColor: NSColor.systemRed]
+        )
+        return item
+    }
+
+    // MARK: - Context Menu Actions
 
     @objc private func contextMenuRename(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
@@ -664,6 +709,26 @@ extension CanvasViewportView {
     @objc private func contextMenuClose(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
         onContextMenuClose?(id)
+    }
+
+    @objc private func contextMenuEditTerminal(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuEditTerminal?(id)
+    }
+
+    @objc private func contextMenuConnect(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuConnect?(id)
+    }
+
+    @objc private func contextMenuAssignRole(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuAssignRole?(id)
+    }
+
+    @objc private func contextMenuToggleMaestro(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuToggleMaestro?(id)
     }
 }
 

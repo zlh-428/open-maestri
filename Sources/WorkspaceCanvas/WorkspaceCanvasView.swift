@@ -15,6 +15,8 @@ struct WorkspaceCanvasView: View {
     @State private var selectedNodeIds: Set<UUID> = []
     @State private var selectedNodeScreenFrame: CGRect? = nil
     @State private var showMinimap = false
+    @State private var showAssignRoleSheet = false
+    @State private var assignRoleNodeId: UUID? = nil
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -231,6 +233,33 @@ struct WorkspaceCanvasView: View {
                let tc = notif.userInfo?["terminalContent"] as? TerminalContent {
                 terminalToEdit = (nodeId: nodeId, content: tc)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .contextMenuConnect)) { notif in
+            if let nodeId = notif.userInfo?["nodeId"] as? UUID {
+                selectedNodeIds = [nodeId]
+                isConnecting = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .contextMenuAssignRole)) { notif in
+            if let nodeId = notif.userInfo?["nodeId"] as? UUID {
+                assignRoleNodeId = nodeId
+                showAssignRoleSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .contextMenuToggleMaestro)) { notif in
+            if let nodeId = notif.userInfo?["nodeId"] as? UUID {
+                toggleMaestroMode(nodeId: nodeId)
+            }
+        }
+        .sheet(isPresented: $showAssignRoleSheet) {
+            AssignRoleSheet(
+                roles: appState.preferences.rolePresets,
+                onAssign: { role in
+                    applyRole(role, toNodeId: assignRoleNodeId)
+                    showAssignRoleSheet = false
+                },
+                onDismiss: { showAssignRoleSheet = false }
+            )
         }
         .sheet(item: Binding(
             get: { terminalToEdit.map { EditTerminalItem(id: $0.nodeId, content: $0.content) } },
@@ -504,6 +533,28 @@ struct WorkspaceCanvasView: View {
     private func startConnectionFromSelected() {
         guard !selectedNodeIds.isEmpty else { return }
         isConnecting = true
+    }
+
+    /// 切换终端节点的 Maestro 模式
+    private func toggleMaestroMode(nodeId: UUID?) {
+        guard let nodeId,
+              let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .terminal(var tc) = workspace.nodes[idx].content else { return }
+        tc.isManager = !tc.isManager
+        workspace.nodes[idx].content = .terminal(tc)
+        Task { try? await workspace.save() }
+    }
+
+    /// 为终端节点分配角色
+    private func applyRole(_ role: RolePreset, toNodeId nodeId: UUID?) {
+        guard let nodeId,
+              let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .terminal(var tc) = workspace.nodes[idx].content else { return }
+        tc.assignedRoleId = role.id
+        tc.color = role.color
+        tc.icon = role.icon
+        workspace.nodes[idx].content = .terminal(tc)
+        Task { try? await workspace.save() }
     }
 
     /// 获取当前选中节点的内容类型（单选时）

@@ -109,21 +109,8 @@ struct FileTreeNodeSwiftUIView: View {
                     .allowsHitTesting(false)
             }
         }
-        .contextMenu {
-            if let onRename {
-                Button("Rename") { onRename(nodeId, content.name) }
-            }
-            if let onDuplicate {
-                Button("Duplicate") { onDuplicate(nodeId) }
-            }
-            if let onLockToggle {
-                Button(isLocked ? "Unlock" : "Lock") { onLockToggle(nodeId, !isLocked) }
-            }
-            Divider()
-            if let onClose {
-                Button(role: .destructive) { onClose(nodeId) } label: { Text("Close") }
-            }
-        }
+        // 右键菜单由 AppKit 层 CanvasViewportView.menu(for:) 统一处理
+        // （SwiftUI .contextMenu 因 allowsHitTesting(false) 永远不会触发）
     }
 }
 

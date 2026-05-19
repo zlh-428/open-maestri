@@ -92,6 +92,41 @@ final class CanvasNodeRenderer {
             let newLocked = !ws.nodes[idx].isLocked
             self?.handleLockToggle(id: id, locked: newLocked)
         }
+        // 右键菜单：编辑终端（发送通知，附带 TerminalContent 数据）
+        canvas.onContextMenuEditTerminal = { [weak self] id in
+            guard let ws = self?.currentWorkspace,
+                  let node = ws.nodes.first(where: { $0.id == id }),
+                  case .terminal(let tc) = node.content else { return }
+            NotificationCenter.default.post(
+                name: .editTerminalRequested,
+                object: nil,
+                userInfo: ["nodeId": id, "terminalContent": tc]
+            )
+        }
+        // 右键菜单：开始连接
+        canvas.onContextMenuConnect = { id in
+            NotificationCenter.default.post(
+                name: .contextMenuConnect,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
+        }
+        // 右键菜单：分配角色（Terminal 专属）
+        canvas.onContextMenuAssignRole = { id in
+            NotificationCenter.default.post(
+                name: .contextMenuAssignRole,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
+        }
+        // 右键菜单：切换 Maestro 模式（Terminal 专属）
+        canvas.onContextMenuToggleMaestro = { id in
+            NotificationCenter.default.post(
+                name: .contextMenuToggleMaestro,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
+        }
         // 节点层级变更：同步到 workspace 持久化
         canvas.onNodeZIndexChanged = { [weak self] nodeId, newZIndex in
             guard let ws = self?.currentWorkspace,

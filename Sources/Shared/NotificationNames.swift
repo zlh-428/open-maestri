@@ -21,6 +21,12 @@ extension Notification.Name {
     static let maestroRecruited        = Notification.Name("OpenMaestri.maestroRecruited")
     /// 编辑终端请求：userInfo 含 nodeId/terminalContent
     static let editTerminalRequested   = Notification.Name("OpenMaestri.editTerminalRequested")
+    /// 右键菜单：开始连接（userInfo 含 "nodeId" UUID）
+    static let contextMenuConnect      = Notification.Name("OpenMaestri.contextMenuConnect")
+    /// 右键菜单：分配角色（userInfo 含 "nodeId" UUID）
+    static let contextMenuAssignRole   = Notification.Name("OpenMaestri.contextMenuAssignRole")
+    /// 右键菜单：切换 Maestro 模式（userInfo 含 "nodeId" UUID）
+    static let contextMenuToggleMaestro = Notification.Name("OpenMaestri.contextMenuToggleMaestro")
     /// Portal WebView 重建通知（shareSession 后更新视图）
     static let portalWebViewReplaced   = Notification.Name("OpenMaestri.portalWebViewReplaced")
     /// FileTree 根目录变更通知：userInfo 含 nodeId/newPath

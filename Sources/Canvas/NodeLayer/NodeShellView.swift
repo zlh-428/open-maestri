@@ -99,21 +99,8 @@ struct NodeShellView<Content: View, Accessory: View>: View {
                     .allowsHitTesting(false)
             }
         }
-        .contextMenu {
-            if let onRename {
-                Button("Rename") { onRename(title) }
-            }
-            if let onDuplicate {
-                Button("Duplicate") { onDuplicate() }
-            }
-            if let onLockToggle {
-                Button(isLocked ? "Unlock" : "Lock") { onLockToggle(!isLocked) }
-            }
-            Divider()
-            if let onClose {
-                Button(role: .destructive) { onClose() } label: { Text("Close") }
-            }
-        }
+        // 右键菜单由 AppKit 层 CanvasViewportView.menu(for:) 统一处理
+        // （SwiftUI .contextMenu 因 allowsHitTesting(false) 永远不会触发）
     }
 }
 
