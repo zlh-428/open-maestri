@@ -90,20 +90,12 @@ final class InterAgentServerTests: XCTestCase {
         XCTAssertFalse(result.contains("Line 5"))
     }
 
-    // MARK: - SkillInjector 脚本生成质量
+    // MARK: - SkillInjector（简化版，CLI 二进制通过 PATH 注入）
 
-    func testSkillScriptIsNonEmpty() {
-        let injector = SkillInjector.shared
-        let script = injector.buildSkillScript(terminalId: UUID(), host: "127.0.0.1:9999")
-        XCTAssertFalse(script.isEmpty)
-        XCTAssertGreaterThan(script.count, 100, "Script should be substantial")
-    }
-
-    func testSkillScriptHostInjected() {
-        let injector = SkillInjector.shared
-        let host = "127.0.0.1:54321"
-        let script = injector.buildSkillScript(terminalId: UUID(), host: host)
-        XCTAssertTrue(script.contains(host), "Script must embed the actual host")
+    func testSkillInjectorIsSingleton() {
+        let a = SkillInjector.shared
+        let b = SkillInjector.shared
+        XCTAssertTrue(a === b, "SkillInjector should be a singleton")
     }
 
     // MARK: - 数据格式兼容性（NFR14）
