@@ -16,7 +16,13 @@ let package = Package(
                 .product(name: "Sparkle", package: "Sparkle"),
             ],
             path: "Sources",
+            exclude: ["CLI"],
             resources: [.process("Resources")]
+        ),
+        .executableTarget(
+            name: "omaestri",
+            dependencies: [],
+            path: "Sources/CLI"
         ),
         .testTarget(
             name: "OpenMaestriTests",
