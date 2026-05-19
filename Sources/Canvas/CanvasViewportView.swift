@@ -88,6 +88,15 @@ final class CanvasViewportView: NSView {
     /// 节点内容类型查询（由 CanvasNodeRenderer 在创建节点后注册）
     var nodeContentTypes: [UUID: String] = [:]  // nodeId → "terminal"|"stickyNote"|"portal"|"fileTree"
 
+    /// 节点 SwiftUI 容器（由 CanvasNodeRenderer 创建后注册，供 hitTestCanvas 使用）
+    weak var nodesHostingView: CanvasNodesView?
+
+    /// 当前画布节点列表（由 CanvasNodeRenderer.sync() 同步，供 hitTestCanvas 使用）
+    var currentNodes: [CanvasNode] = []
+
+    /// option+拖拽复制节点回调
+    var onDuplicateNode: ((UUID) -> Void)?
+
     // MARK: - 初始化
 
     override init(frame: NSRect) {
@@ -256,18 +265,6 @@ final class CanvasViewportView: NSView {
         }
     }
 
-    /// 在视图树中递归做 hitTest，point 为相对于 root 的本地坐标
-    private func deepHitTest(in root: NSView, at point: CGPoint) -> NSView? {
-        guard root.bounds.contains(point), !root.isHidden, root.alphaValue > 0 else { return nil }
-        for sub in root.subviews.reversed() {
-            let subLocal = root.convert(point, to: sub)
-            if let hit = deepHitTest(in: sub, at: subLocal) {
-                return hit
-            }
-        }
-        return root
-    }
-
     /// 从视图（或其子视图）反查所属节点 ID（O(1) 直查 + O(n) 祖先降级）
     private func nodeIdForHitView(_ hitView: NSView?) -> UUID? {
         nodeId(for: hitView)
@@ -381,39 +378,15 @@ final class CanvasViewportView: NSView {
         view.setBoundsSize(canvasFrame.size)
     }
 
-    override func hitTest(_ point: CGPoint) -> NSView? {
-        for view in subviews.reversed() {
-            guard nodeViews.values.contains(where: { $0 === view }) else {
-                if let hit = view.hitTest(convert(point, to: view)) {
-                    return hit
-                }
-                continue
-            }
-            // frame 已是缩放后的屏幕尺寸，直接做 contains 检测
-            guard view.frame.contains(point) else { continue }
-            // 将屏幕坐标映射回节点 bounds 坐标系（bounds 是画布原始尺寸）
-            let localX = (point.x - view.frame.minX) / zoom
-            let localY = (point.y - view.frame.minY) / zoom
-            return deepHitTest(in: view, at: CGPoint(x: localX, y: localY))
-        }
-        return super.hitTest(point)
-    }
 
     // MARK: - 选中视觉更新
 
     private func updateSelectionVisuals() {
-        for (id, view) in nodeViews {
-            let selected = selectedNodeIds.contains(id)
-            if let tv = view as? TerminalNodeView {
-                tv.isSelected = selected
-            }
-            if let baseNode = view as? BaseNodeView {
-                baseNode.isNodeSelected = selected
-                if selected && selectedNodeIds.count == 1 {
-                    baseNode.onFocusRequested?()
-                }
-            }
-        }
+        NotificationCenter.default.post(
+            name: .canvasSelectionChanged,
+            object: nil,
+            userInfo: ["selectedIds": selectedNodeIds]
+        )
     }
 
     private func reportSelectionChange() {

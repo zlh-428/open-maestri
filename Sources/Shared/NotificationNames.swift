@@ -29,4 +29,8 @@ extension Notification.Name {
     static let terminalBecameIdle      = Notification.Name("OpenMaestri.terminalBecameIdle")
     /// 新工作区创建完成：userInfo 含 "workspaceId" UUID
     static let workspaceCreated        = Notification.Name("OpenMaestri.workspaceCreated")
+    /// 画布节点激活（焦点传递给终端）：userInfo 含 "nodeId" UUID
+    static let canvasNodeActivated     = Notification.Name("OpenMaestri.canvasNodeActivated")
+    /// 画布选中节点变化：userInfo 含 "selectedIds" Set<UUID>
+    static let canvasSelectionChanged  = Notification.Name("OpenMaestri.canvasSelectionChanged")
 }

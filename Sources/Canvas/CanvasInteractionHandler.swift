@@ -51,44 +51,57 @@ extension CanvasViewportView {
 
     /// 将画布坐标 point 映射到语义化命中区域
     /// 优先级：resize 热区 > header 区域 > 内容区 > 空白
+    /// 纯几何计算，不依赖 BaseNodeView 或子视图 hitTest（避免无限递归）
     func hitTestCanvas(at loc: CGPoint) -> CanvasHitTestResult {
-        // 按 subviews 逆序遍历（最顶层的 nodeView 优先）
-        for view in subviews.reversed() {
-            guard let id = viewToNodeId[ObjectIdentifier(view)],
-                  view.frame.contains(loc),
-                  let base = view as? BaseNodeView else { continue }
+        let sortedNodes = currentNodes.sorted { $0.zIndex > $1.zIndex }
 
-            // 将画布坐标转换为节点 bounds 坐标
-            // view.frame 是缩放后屏幕坐标，bounds 是原始画布尺寸
-            let localX = (loc.x - view.frame.minX) / zoom
-            let localY = (loc.y - view.frame.minY) / zoom
-            let localPoint = CGPoint(x: localX, y: localY)
+        for node in sortedNodes {
+            let screenFrame = canvasRectToScreen(node.frame)
+            guard screenFrame.contains(loc) else { continue }
 
-            // 1. resize 热区优先
-            if let edge = base.resizeEdge(at: localPoint) {
-                return .nodeResize(id, edge)
+            let localPt = CGPoint(
+                x: loc.x - screenFrame.minX,
+                y: loc.y - screenFrame.minY
+            )
+
+            if let edge = geometricResizeEdge(at: localPt, in: screenFrame.size) {
+                return .nodeResize(node.id, edge)
             }
 
-            // 2. header 区域
-            let headerH = BaseNodeView.headerHeight
-            if localY >= base.bounds.height - headerH {
-                return .nodeHeader(id)
+            if localPt.y <= CanvasNodeConstants.headerHeight {
+                return .nodeHeader(node.id)
             }
 
-            // 3. 内容区：做 deep hitTest 找最深子视图
-            // NSScroller 豁免：不拦截，让滚动条自然处理
-            let contentLocal = base.contentView.convert(CGPoint(x: localX, y: localY), from: base)
-            if let deepHit = base.contentView.hitTest(contentLocal) {
-                if deepHit is NSScroller {
-                    return .canvas
-                }
-                return .nodeContent(id, deepHit)
-            }
-
-            return .nodeContent(id, base.contentView)
+            return .nodeContent(node.id, nodesHostingView ?? self)
         }
-
         return .canvas
+    }
+
+    private func geometricResizeEdge(at localPt: CGPoint, in size: CGSize) -> BaseNodeView.ResizeEdge? {
+        let h = CanvasNodeConstants.resizeHandleSize
+        let w = size.width
+        let ht = size.height
+
+        let onLeft   = localPt.x <= h
+        let onRight  = localPt.x >= w - h
+        let onTop    = localPt.y <= h
+        let onBottom = localPt.y >= ht - h
+
+        if onTop    && onLeft  { return .topLeft }
+        if onTop    && onRight { return .topRight }
+        if onBottom && onLeft  { return .bottomLeft }
+        if onBottom && onRight { return .bottomRight }
+        if onLeft              { return .left }
+        if onRight             { return .right }
+        if onTop               { return .top }
+        if onBottom            { return .bottom }
+        return nil
+    }
+
+    // MARK: - 节点锁定查询
+
+    private func isNodeLocked(_ id: UUID) -> Bool {
+        currentNodes.first(where: { $0.id == id })?.isLocked ?? false
     }
 
     // MARK: - 选中逻辑
@@ -173,25 +186,20 @@ extension CanvasViewportView {
             marqueeCurrentPoint = nil
 
         case .nodeHeader(let id):
-            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+            guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
-            base.onActivated?()
             let startFrame = nodeCanvasFrames[id] ?? .zero
             interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
 
-        case .nodeContent(let id, let deepHit):
-            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+        case .nodeContent(let id, _):
+            guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
-            base.onActivated?()
-            // 立即将 mouseDown 透传给内容区目标（Terminal 获焦等）
-            deepHit.mouseDown(with: event)
             let startFrame = nodeCanvasFrames[id] ?? .zero
-            interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: deepHit)
+            interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
 
         case .nodeResize(let id, let edge):
-            guard let base = nodeViews[id] as? BaseNodeView, !base.isLocked else { return }
+            guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
-            base.onActivated?()
             let canvasFrame = nodeCanvasFrames[id] ?? .zero
             let startFrame = canvasRectToScreen(canvasFrame)
             interaction = .resizingNode(id, edge: edge, startFrame: startFrame, startMouse: loc)
@@ -226,10 +234,9 @@ extension CanvasViewportView {
             guard NSEvent.pressedMouseButtons & 1 != 0 else { return }
 
             // Option+拖动 → 触发节点复制而非移动
-            if event.modifierFlags.contains(.option),
-               let base = nodeViews[id] as? BaseNodeView {
+            if event.modifierFlags.contains(.option) {
                 interaction = .idle
-                base.onDuplicate?()
+                onDuplicateNode?(id)
                 return
             }
 
@@ -351,10 +358,10 @@ extension CanvasViewportView {
 
         // --- Resize ---
         case .resizingNode(let id, let edge, let startFrame, let startMouse):
-            guard let view = nodeViews[id] as? BaseNodeView else { return }
+            guard nodeCanvasFrames[id] != nil else { return }
             let dx = loc.x - startMouse.x
             let dy = loc.y - startMouse.y
-            applyResizeOnCanvas(id: id, view: view, edge: edge, dx: dx, dy: dy, startFrame: startFrame)
+            applyResizeOnCanvas(id: id, edge: edge, dx: dx, dy: dy, startFrame: startFrame)
 
         // --- 框选 ---
         case .marquee:
@@ -377,12 +384,12 @@ extension CanvasViewportView {
 
     // MARK: - Resize 辅助
 
-    private func applyResizeOnCanvas(id: UUID, view: BaseNodeView,
+    private func applyResizeOnCanvas(id: UUID,
                                       edge: BaseNodeView.ResizeEdge,
                                       dx: CGFloat, dy: CGFloat,
                                       startFrame: CGRect) {
-        let minW = BaseNodeView.minNodeWidth * zoom
-        let minH = BaseNodeView.minNodeHeight * zoom
+        let minW = CanvasNodeConstants.minNodeWidth * zoom
+        let minH = CanvasNodeConstants.minNodeHeight * zoom
 
         var x = startFrame.origin.x
         var y = startFrame.origin.y
@@ -429,17 +436,13 @@ extension CanvasViewportView {
             h = max(h + dy, minH)
         }
 
-        let newScreenFrame = CGRect(x: x, y: y, width: w, height: h)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        view.frame = newScreenFrame
-        view.setBoundsSize(CGSize(width: w / zoom, height: h / zoom))
-        let canvasOriginPt = screenToCanvas(newScreenFrame.origin)
+        let canvasOriginPt = screenToCanvas(CGPoint(x: x, y: y))
         nodeCanvasFrames[id] = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
-                                       width: w / zoom, height: h / zoom)
+                                      width: w / zoom, height: h / zoom)
         CATransaction.commit()
-
-        if view.isNodeSelected { view.needsLayout = true }
+        needsLayout = true
     }
 
     // MARK: - mouseUp
@@ -453,12 +456,13 @@ extension CanvasViewportView {
 
         switch interaction {
 
-        case .mayDragNode(let id, _, _, let contentTarget):
-            // 没有发生拖动 = 点击
-            if let target = contentTarget {
-                // mouseDown 已透传，补发 mouseUp 完成点击序列
-                target.mouseUp(with: event)
-            }
+        case .mayDragNode(let id, _, _, _):
+            // 没有发生拖动 = 点击，发送节点激活通知
+            NotificationCenter.default.post(
+                name: .canvasNodeActivated,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
             // 单击已在多选集合中的节点 → 收窄为单选
             if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
                 selectedNodeIds = [id]
