@@ -28,9 +28,8 @@ struct WorkspaceSidebarView: View {
             deleteConfirmButtons
         }
         .onChange(of: selectedId) { _, newId in
-            appState.activeWorkspaceId = newId
+            appState.selectWorkspace(id: newId)
             if let id = newId {
-                appState.clearUnread(workspaceId: id)
                 updateRecentWorkspaces(id: id)
             }
         }

@@ -126,7 +126,7 @@ struct CreateWorkspaceSheet: View {
             await MainActor.run {
                 capturedAppState.manifest = finalManifest
                 capturedAppState.workspaces.append(ws)
-                capturedAppState.activeWorkspaceId = entry.id
+                capturedAppState.selectWorkspace(id: entry.id)
                 NotificationCenter.default.post(
                     name: .workspaceCreated,
                     object: nil,

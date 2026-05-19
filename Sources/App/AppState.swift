@@ -48,6 +48,15 @@ final class AppState {
         workspaces.first(where: { $0.id == workspaceId })?.unreadActivityCount = 0
     }
 
+    /// 激活指定工作区：更新 activeWorkspaceId、清零未读计数，并通知 InterAgentServer 切换 Unix socket
+    func selectWorkspace(id: UUID?) {
+        activeWorkspaceId = id
+        if let id {
+            clearUnread(workspaceId: id)
+            InterAgentServer.shared.switchWorkspace(to: id)
+        }
+    }
+
     // MARK: - 启动加载（NFR1：冷启动 < 1.5s）
 
     func loadOnLaunch() async {
@@ -81,6 +90,10 @@ final class AppState {
             await MainActor.run {
                 workspaces = loadedWorkspaces
                 loadErrors = errors
+                // 启动时若有活跃工作区，初始化 Unix socket
+                if let activeId = activeWorkspaceId {
+                    InterAgentServer.shared.switchWorkspace(to: activeId)
+                }
             }
 
             // 标记本次为未完成关闭

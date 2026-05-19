@@ -82,7 +82,7 @@ struct ContentView: View {
         } else {
             selectedWorkspaceId = entries.first?.id
         }
-        appState.activeWorkspaceId = selectedWorkspaceId
+        appState.selectWorkspace(id: selectedWorkspaceId)
     }
 }
 
