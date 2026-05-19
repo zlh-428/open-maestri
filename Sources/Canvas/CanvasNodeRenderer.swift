@@ -21,6 +21,9 @@ final class CanvasNodeRenderer {
     // 连线层
     private(set) var overlayView: ConnectionOverlayView?
 
+    /// 复用的悬链线计算器（避免每条连线每帧都 alloc 新实例）
+    private let ropeSimulation = RopeSimulation()
+
     init(canvas: CanvasViewportView) {
         self.canvas = canvas
         setupNodesHostingView(canvas: canvas)
@@ -190,8 +193,14 @@ final class CanvasNodeRenderer {
 
         let lockedIds = Set(nodes.filter { $0.isLocked }.map { $0.id })
 
+        // 先更新 currentNodes（触发排序缓存更新），再用排序后的数组构建 SwiftUI 视图
+        for node in nodes {
+            canvas.nodeCanvasFrames[node.id] = node.frame
+        }
+        canvas.currentNodes = nodes
+
         nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-            nodes: nodes,
+            nodes: canvas.sortedNodesByZIndex,
             canvasOrigin: canvas.canvasOrigin,
             zoom: canvas.zoom,
             selectedNodeIds: canvas.selectedNodeIds,
@@ -218,11 +227,6 @@ final class CanvasNodeRenderer {
                 self?.handleLockToggle(id: id, locked: locked)
             }
         )
-
-        for node in nodes {
-            canvas.nodeCanvasFrames[node.id] = node.frame
-        }
-        canvas.currentNodes = nodes
 
         if let overlay = overlayView {
             canvas.addSubview(overlay)
@@ -343,23 +347,23 @@ final class CanvasNodeRenderer {
         ) { [weak self] notif in
             guard let self,
                   let canvas = self.canvas,
-                  let ws = self.currentWorkspace,
                   let ids = notif.userInfo?["selectedIds"] as? Set<UUID> else { return }
-            let lockedIds = Set(ws.nodes.filter { $0.isLocked }.map { $0.id })
-            let current = self.nodesHostingView?.rootView
+            guard let current = self.nodesHostingView?.rootView,
+                  current.selectedNodeIds != ids else { return }
+            let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
             self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-                nodes: ws.nodes,
+                nodes: canvas.sortedNodesByZIndex,
                 canvasOrigin: canvas.canvasOrigin,
                 zoom: canvas.zoom,
                 selectedNodeIds: ids,
                 lockedNodeIds: lockedIds,
-                workspace: ws,
-                dropTargetNodeId: current?.dropTargetNodeId,
-                onActivated: current?.onActivated,
-                onClose: current?.onClose,
-                onRename: current?.onRename,
-                onDuplicate: current?.onDuplicate,
-                onLockToggle: current?.onLockToggle
+                workspace: current.workspace,
+                dropTargetNodeId: current.dropTargetNodeId,
+                onActivated: current.onActivated,
+                onClose: current.onClose,
+                onRename: current.onRename,
+                onDuplicate: current.onDuplicate,
+                onLockToggle: current.onLockToggle
             )
         }
         notificationObservers.append(obs)
@@ -370,24 +374,23 @@ final class CanvasNodeRenderer {
             forName: .canvasDropTargetChanged, object: nil, queue: .main
         ) { [weak self] notif in
             guard let self,
-                  let canvas = self.canvas,
-                  let ws = self.currentWorkspace else { return }
+                  let canvas = self.canvas else { return }
             let dropTargetId = notif.userInfo?["dropTargetNodeId"] as? UUID
-            let current = self.nodesHostingView?.rootView
-            let lockedIds = Set(ws.nodes.filter { $0.isLocked }.map { $0.id })
+            guard let current = self.nodesHostingView?.rootView,
+                  current.dropTargetNodeId != dropTargetId else { return }
             self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-                nodes: ws.nodes,
+                nodes: canvas.sortedNodesByZIndex,
                 canvasOrigin: canvas.canvasOrigin,
                 zoom: canvas.zoom,
-                selectedNodeIds: canvas.selectedNodeIds,
-                lockedNodeIds: lockedIds,
-                workspace: ws,
+                selectedNodeIds: current.selectedNodeIds,
+                lockedNodeIds: current.lockedNodeIds,
+                workspace: current.workspace,
                 dropTargetNodeId: dropTargetId,
-                onActivated: current?.onActivated,
-                onClose: current?.onClose,
-                onRename: current?.onRename,
-                onDuplicate: current?.onDuplicate,
-                onLockToggle: current?.onLockToggle
+                onActivated: current.onActivated,
+                onClose: current.onClose,
+                onRename: current.onRename,
+                onDuplicate: current.onDuplicate,
+                onLockToggle: current.onLockToggle
             )
         }
         notificationObservers.append(obs)
@@ -459,7 +462,6 @@ final class CanvasNodeRenderer {
             x: screenOriginB.x + frameB.width * canvas.zoom / 2,
             y: screenOriginB.y + frameB.height * canvas.zoom / 2
         )
-        let rope = RopeSimulation()
-        return rope.compute(from: startScreen, to: endScreen)
+        return ropeSimulation.compute(from: startScreen, to: endScreen)
     }
 }

@@ -185,9 +185,11 @@ final class InterAgentServer {
     }
 
     func stop() {
+        // 先取消 listener 阻止新连接进入
         listener?.cancel()
         listener = nil
         stopUnixSocket()
+        port = 0
         logger.debug("InterAgentServer stopped")
     }
 

@@ -109,7 +109,67 @@ final class CanvasViewportView: NSView {
     weak var nodesHostingView: CanvasNodesView?
 
     /// 当前画布节点列表（由 CanvasNodeRenderer.sync() 同步，供 hitTestCanvas 使用）
-    var currentNodes: [CanvasNode] = []
+    /// 注意：赋值时自动触发排序缓存更新。高频帧内 frame 更新请使用 updateNodeFrameInPlace。
+    var currentNodes: [CanvasNode] = [] {
+        didSet {
+            guard !_skipSortOnDidSet else { return }
+            invalidateSortedNodesCache()
+        }
+    }
+    /// 内部标志：为 true 时 currentNodes.didSet 跳过排序（仅 frame 变化时使用）
+    private var _skipSortOnDidSet = false
+
+    /// 按 zIndex 升序预排序的节点缓存（供 SwiftUI 渲染 + hitTest 使用，避免每帧 O(n log n)）
+    private(set) var sortedNodesByZIndex: [CanvasNode] = []
+    /// 按 zIndex 降序预排序的节点缓存（供 hitTest 从前到后命中检测使用）
+    private(set) var sortedNodesByZIndexDesc: [CanvasNode] = []
+
+    private func invalidateSortedNodesCache() {
+        sortedNodesByZIndex = currentNodes.sorted { $0.zIndex < $1.zIndex }
+        sortedNodesByZIndexDesc = sortedNodesByZIndex.reversed()
+    }
+
+    /// 仅更新指定节点的 frame（不触发全量 sort，因为 zIndex 未变）
+    /// 用于拖动/resize 等高频场景，避免每帧 O(n log n) + O(n) 数组拷贝
+    func updateNodeFrameInPlace(id: UUID, frame: CGRect) {
+        _skipSortOnDidSet = true
+        for i in currentNodes.indices where currentNodes[i].id == id {
+            currentNodes[i].frame = frame
+            break
+        }
+        _skipSortOnDidSet = false
+        // 同步更新排序缓存中对应条目的 frame（zIndex 不变所以位置不变）
+        for i in sortedNodesByZIndex.indices where sortedNodesByZIndex[i].id == id {
+            sortedNodesByZIndex[i].frame = frame
+            break
+        }
+        for i in sortedNodesByZIndexDesc.indices where sortedNodesByZIndexDesc[i].id == id {
+            sortedNodesByZIndexDesc[i].frame = frame
+            break
+        }
+    }
+
+    /// 批量更新多个节点的 frame（不触发全量 sort）
+    func updateNodeFramesInPlace(frames: [UUID: CGRect]) {
+        _skipSortOnDidSet = true
+        for i in currentNodes.indices {
+            if let newFrame = frames[currentNodes[i].id] {
+                currentNodes[i].frame = newFrame
+            }
+        }
+        _skipSortOnDidSet = false
+        // 同步更新排序缓存
+        for i in sortedNodesByZIndex.indices {
+            if let newFrame = frames[sortedNodesByZIndex[i].id] {
+                sortedNodesByZIndex[i].frame = newFrame
+            }
+        }
+        for i in sortedNodesByZIndexDesc.indices {
+            if let newFrame = frames[sortedNodesByZIndexDesc[i].id] {
+                sortedNodesByZIndexDesc[i].frame = newFrame
+            }
+        }
+    }
 
     /// option+拖拽复制节点回调
     var onDuplicateNode: ((UUID) -> Void)?
@@ -451,20 +511,23 @@ final class CanvasViewportView: NSView {
         // 更新 SwiftUI 节点树的 canvasOrigin/zoom，触发节点重新定位
         if let hostingView = nodesHostingView {
             let current = hostingView.rootView
-            let lockedIds = Set(currentNodes.filter { $0.isLocked }.map { $0.id })
-            hostingView.rootView = CanvasNodesSwiftUIView(
-                nodes: currentNodes,
-                canvasOrigin: canvasOrigin,
-                zoom: zoom,
-                selectedNodeIds: selectedNodeIds,
-                lockedNodeIds: lockedIds,
-                workspace: current.workspace,
-                onActivated: current.onActivated,
-                onClose: current.onClose,
-                onRename: current.onRename,
-                onDuplicate: current.onDuplicate,
-                onLockToggle: current.onLockToggle
-            )
+            // 仅当 origin/zoom 变化时才更新（避免完全无变化时的多余赋值）
+            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != sortedNodesByZIndex {
+                hostingView.rootView = CanvasNodesSwiftUIView(
+                    nodes: sortedNodesByZIndex,
+                    canvasOrigin: canvasOrigin,
+                    zoom: zoom,
+                    selectedNodeIds: current.selectedNodeIds,
+                    lockedNodeIds: current.lockedNodeIds,
+                    workspace: current.workspace,
+                    dropTargetNodeId: current.dropTargetNodeId,
+                    onActivated: current.onActivated,
+                    onClose: current.onClose,
+                    onRename: current.onRename,
+                    onDuplicate: current.onDuplicate,
+                    onLockToggle: current.onLockToggle
+                )
+            }
         }
     }
 

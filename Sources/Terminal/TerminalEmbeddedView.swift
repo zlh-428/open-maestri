@@ -105,4 +105,14 @@ final class TerminalProviderRegistry {
         guard let view = providers[terminalId]?.terminalView else { return }
         view.removeFromSuperview()
     }
+
+    /// 退出时终止所有 PTY 进程，避免僵尸进程（必须在主线程调用）
+    @MainActor
+    func terminateAll() {
+        lock.lock(); defer { lock.unlock() }
+        for (_, provider) in providers {
+            provider.stop()
+        }
+        providers.removeAll()
+    }
 }

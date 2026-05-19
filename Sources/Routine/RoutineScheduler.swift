@@ -119,6 +119,12 @@ final class RoutineScheduler {
         timers.removeValue(forKey: id)
     }
 
+    /// 停止所有 Routine 定时器（应用退出时调用，避免 Timer 回调阻塞主线程）
+    func stopAllTimers() {
+        for (_, timer) in timers { timer.invalidate() }
+        timers.removeAll()
+    }
+
     // MARK: - 执行（链式：等待 Agent 空闲后发下一条）
 
     private func executeRoutine(_ routine: Routine) async {

@@ -65,6 +65,7 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
 /// 所有节点在 ZStack 中以 .frame + .position 布局。
 /// 全部设 allowsHitTesting(false)，交互由 AppKit 层统一负责。
 struct CanvasNodesSwiftUIView: View {
+    /// 节点列表（调用方负责按 zIndex 升序排好，避免 body 中反复排序）
     let nodes: [CanvasNode]
     let canvasOrigin: CGPoint
     let zoom: CGFloat
@@ -81,7 +82,7 @@ struct CanvasNodesSwiftUIView: View {
     var body: some View {
         GeometryReader { _ in
             ZStack {
-                ForEach(nodes.sorted(by: { $0.zIndex < $1.zIndex })) { node in
+                ForEach(nodes) { node in
                     let posX = (node.frame.midX - canvasOrigin.x) * zoom
                     let posY = (node.frame.midY - canvasOrigin.y) * zoom
                     nodeView(for: node)

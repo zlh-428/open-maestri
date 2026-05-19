@@ -22,7 +22,7 @@ final class CLIRouter {
         }
     }
 
-    /// 异步路由（semaphore 等待 @MainActor 完成）
+    /// 异步路由（semaphore 等待 @MainActor 完成，带超时防止退出时死锁）
     func routeAsync(args: [String], terminalId: UUID?) -> String {
         guard let command = args.first else { return "error: empty command" }
         let semaphore = DispatchSemaphore(value: 0)
@@ -44,7 +44,12 @@ final class CLIRouter {
             }
             semaphore.signal()
         }
-        semaphore.wait()
+        // 超时 30s 防止退出时 @MainActor 不可达导致永久挂起
+        let waitResult = semaphore.wait(timeout: .now() + 30.0)
+        if waitResult == .timedOut {
+            logger.warning("CLIRouter.routeAsync timed out for command: \(command)")
+            return "error: command timed out"
+        }
         return result
     }
 

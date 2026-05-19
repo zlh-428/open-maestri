@@ -14,6 +14,8 @@ struct OpenMaestriApp: App {
                 .environment(appState)
                 .environment(\.locale, l10n.locale)
                 .task {
+                    // 将 appState 绑定到 AppDelegate，供退出时访问
+                    appDelegate.appState = appState
                     await appState.loadOnLaunch()
                     // 启动后同步语言设置到 LocalizationManager
                     LocalizationManager.shared.sync(from: appState.preferences.language)
@@ -33,8 +35,9 @@ struct OpenMaestriApp: App {
                     )
                 }
                 .onDisappear {
+                    // 注意：主要清理逻辑已移至 AppDelegate.applicationShouldTerminate
+                    // 此处仅作为窗口关闭的备份清理（非退出场景时触发）
                     appState.stopAutosave()
-                    appState.forceSave(cleanShutdown: true)
                     BackupManager.shared.stopBackups()
                 }
                 .sheet(isPresented: $showRoutines) {

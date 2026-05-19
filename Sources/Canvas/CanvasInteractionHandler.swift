@@ -55,9 +55,7 @@ extension CanvasViewportView {
     /// 优先级：resize 热区 > header 区域 > 内容区 > 空白
     /// 纯几何计算，不依赖 BaseNodeView 或子视图 hitTest（避免无限递归）
     func hitTestCanvas(at loc: CGPoint) -> CanvasHitTestResult {
-        let sortedNodes = currentNodes.sorted { $0.zIndex > $1.zIndex }
-
-        for node in sortedNodes {
+        for node in sortedNodesByZIndexDesc {
             let screenFrame = canvasRectToScreen(node.frame)
             let contains = screenFrame.contains(loc)
 
@@ -355,10 +353,7 @@ extension CanvasViewportView {
             }
 
             nodeCanvasFrames[id] = newFrame
-            currentNodes = currentNodes.map { node in
-                guard node.id == id else { return node }
-                var updated = node; updated.frame = newFrame; return updated
-            }
+            updateNodeFrameInPlace(id: id, frame: newFrame)
             needsLayout = true
 
         // --- 批量拖动 ---
@@ -383,15 +378,14 @@ extension CanvasViewportView {
             }
             lastSnapActive = snapActive
 
+            var updatedFrames: [UUID: CGRect] = [:]
             for (sid, sFrame) in startFrames {
                 let newOrigin = CGPoint(x: sFrame.origin.x + finalDX, y: sFrame.origin.y + finalDY)
                 let newFrame = CGRect(origin: newOrigin, size: sFrame.size)
                 nodeCanvasFrames[sid] = newFrame
+                updatedFrames[sid] = newFrame
             }
-            currentNodes = currentNodes.map { node in
-                guard let newFrame = nodeCanvasFrames[node.id] else { return node }
-                var n = node; n.frame = newFrame; return n
-            }
+            updateNodeFramesInPlace(frames: updatedFrames)
             needsLayout = true
 
         // --- Resize ---
@@ -498,12 +492,8 @@ extension CanvasViewportView {
         let newCanvasFrame = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
                                     width: w / zoom, height: h / zoom)
         nodeCanvasFrames[id] = newCanvasFrame
-        // 同步更新 currentNodes，避免 layout() 重建 SwiftUI 视图时使用旧 frame 导致“弹回”
-        currentNodes = currentNodes.map { node in
-            guard node.id == id else { return node }
-            return CanvasNode(id: node.id, frame: newCanvasFrame, content: node.content,
-                              zIndex: node.zIndex, isLocked: node.isLocked)
-        }
+        // 同步更新 currentNodes，避免 layout() 重建 SwiftUI 视图时使用旧 frame 导致"弹回"
+        updateNodeFrameInPlace(id: id, frame: newCanvasFrame)
         CATransaction.commit()
         needsLayout = true
     }

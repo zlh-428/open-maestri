@@ -37,29 +37,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logger.debug("Application did finish launching")
     }
 
-    func applicationWillTerminate(_ notification: Notification) {
-        logger.debug("Application will terminate — forcing save")
-        guard let appState else { return }
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        logger.debug("Application should terminate — starting graceful shutdown")
+        guard let appState else { return .terminateNow }
 
-        // 停止 autosave timer 避免与同步保存冲突
+        // 1. 立刻停止所有可能阻塞主线程的子系统
         appState.stopAutosave()
+        InterAgentServer.shared.stop()
+        RoutineScheduler.shared.stopAllTimers()
 
-        // 在主线程先把所有 @Observable 属性快照为纯值类型，
-        // 再交给后台线程做 I/O，避免跨线程访问 @Observable 对象导致死锁
+        // 2. 在主线程快照所有 @Observable 状态为纯值类型（O(n) 拷贝，无 I/O）
         let payloads: [(id: UUID, doc: WorkspaceDocument)] = appState.workspaces.map { ws in
-            let payload = ws.snapshotPayload()
-            return (ws.id, WorkspaceDocument(payload: payload))
+            (ws.id, WorkspaceDocument(payload: ws.snapshotPayload()))
         }
         let stateData: AppStateData = {
             var s = AppStateData()
             s.activeWorkspaceId = appState.activeWorkspaceId
             s.hasCompletedOnboarding = appState.hasCompletedOnboarding
             s.cleanShutdown = true
+            s.recentWorkspaceIds = appState.recentWorkspaceIds
             return s
         }()
         let manifest = appState.manifest
 
-        let semaphore = DispatchSemaphore(value: 0)
+        // 3. 后台线程做 I/O，完成后回调 reply
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let pm = PersistenceManager.shared
             for item in payloads {
@@ -70,9 +71,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             catch { self?.logger.error("Failed to save manifest on terminate: \(error)") }
             do { try pm.saveAppState(stateData) }
             catch { self?.logger.error("Failed to save app state on terminate: \(error)") }
-            semaphore.signal()
+            self?.logger.debug("Graceful shutdown save completed")
+            // 通知 AppKit 可以安全退出了
+            DispatchQueue.main.async {
+                sender.reply(toApplicationShouldTerminate: true)
+            }
         }
-        _ = semaphore.wait(timeout: .now() + 3.0)
+
+        // 告诉 AppKit "稍后回复"，不阻塞主线程
+        return .terminateLater
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // 所有清理已在 applicationShouldTerminate 完成
+        // 此处仅做最终资源释放（PTY 进程等）
+        logger.debug("Application will terminate — final cleanup")
+        TerminalProviderRegistry.shared.terminateAll()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
