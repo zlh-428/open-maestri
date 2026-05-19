@@ -49,6 +49,12 @@ final class CanvasNodeRenderer {
             }
             self.saveWorkspace()
         }
+        // Resize 结束：持久化新 frame（替换旧的 onFrameChanged 机制）
+        canvas.onNodeResizeEnded = { [weak self] nodeId, canvasFrame in
+            guard let self else { return }
+            self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: canvasFrame)
+            self.saveWorkspace()
+        }
     }
 
     private func saveWorkspace() {
@@ -209,30 +215,6 @@ final class CanvasNodeRenderer {
             view = makeTextView(node: node, tc: tc)
         case .drawing(let dc):
             view = makeDrawingView(node: node, dc: dc)
-        }
-
-        // Resize 回写：BaseNodeView.onFrameChanged → workspace.updateNodeFrame
-        // 移动拖动由 canvas 层（onNodeDragEnded）统一处理，不走此回调
-        if let baseView = view as? BaseNodeView {
-            let nodeId = node.id
-            let weakWorkspace = workspace
-            let weakCanvas = canvas
-
-            baseView.onFrameChanged = { [weak weakCanvas] screenFrame in
-                guard let cv = weakCanvas else { return }
-                // screenFrame 是缩放后的屏幕尺寸，需转回画布坐标
-                let canvasOrigin = cv.screenToCanvas(screenFrame.origin)
-                let canvasFrame = CGRect(
-                    x: canvasOrigin.x,
-                    y: canvasOrigin.y,
-                    width: screenFrame.width / cv.zoom,
-                    height: screenFrame.height / cv.zoom
-                )
-                Task { @MainActor in
-                    weakWorkspace.updateNodeFrame(id: nodeId, frame: canvasFrame)
-                    cv.nodeCanvasFrames[nodeId] = canvasFrame
-                }
-            }
         }
 
         canvas.addNodeView(view, id: node.id, canvasFrame: node.frame)
@@ -651,31 +633,6 @@ final class CanvasNodeRenderer {
                ws.nodes[idx].zIndex < maxZ {
                 ws.nodes[idx].zIndex = maxZ + 1
             }
-        }
-
-        // 点击节点时通知画布更新选中状态
-        nodeView.onNodeClicked = { [weak self, weak nodeView] event in
-            guard let canvas = self?.canvas else { return }
-            let nodeId = node.id
-            if event.modifierFlags.contains(.command) {
-                // ⌘+点击：切换选中（多选）
-                if canvas.selectedNodeIds.contains(nodeId) {
-                    canvas.selectedNodeIds.remove(nodeId)
-                } else {
-                    canvas.selectedNodeIds.insert(nodeId)
-                }
-            } else {
-                // 普通点击：如果节点已在选中集合中（批量选中），保持选中状态（支持批量拖动）；
-                // 如果节点不在选中集合中，执行单选
-                if !canvas.selectedNodeIds.contains(nodeId) {
-                    canvas.selectedNodeIds = [nodeId]
-                }
-            }
-        }
-
-        // Option+拖拽复制节点
-        nodeView.onOptionDragDuplicate = { [weak self] in
-            self?.duplicateNode(id: node.id)
         }
 
         // 右键菜单"复制节点"
