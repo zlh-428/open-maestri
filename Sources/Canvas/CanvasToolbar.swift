@@ -94,15 +94,20 @@ struct CanvasToolbar: View {
                     toggleDrawingTool("drawing")
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+            )
 
             Spacer()
         }
-        .padding(.top, 10)
         .sheet(isPresented: $showTerminalSheet) {
             NewTerminalSheet(
                 initialPresets: appState.preferences.agentPresets.filter { $0.isActive },
@@ -248,12 +253,12 @@ private struct FloatingToolButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(isActive ? Color.accentColor : Color.primary.opacity(0.7))
-                .frame(width: 34, height: 30)
+                .font(.system(size: 15, weight: .regular))
+                .foregroundStyle(isActive ? Color.accentColor : Color(white: 0.2))
+                .frame(width: 32, height: 28)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(isActive ? Color.accentColor.opacity(0.12) : Color.clear)
+                        .fill(isActive ? Color.accentColor.opacity(0.1) : (isHovered ? Color.black.opacity(0.06) : Color.clear))
                 )
         }
         .buttonStyle(.plain)
@@ -300,6 +305,7 @@ private struct FloatingToolButton: View {
             }
         }
         .animation(.easeInOut(duration: 0.15), value: showTooltip)
+        .animation(.easeInOut(duration: 0.1), value: isHovered)
     }
 }
 

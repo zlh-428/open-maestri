@@ -15,17 +15,17 @@ struct NodeContextToolbar: View {
             contextButton(icon: "arrow.triangle.2.circlepath", tooltip: "tooltip.refresh".localized, action: onRefresh)
             contextButton(icon: "trash", tooltip: "tooltip.node.delete".localized, action: onDelete)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background {
-            Capsule()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
                 .fill(.white)
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
-                )
-        }
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+        )
     }
 
     @ViewBuilder
@@ -47,17 +47,17 @@ struct FileTreeContextToolbar: View {
             contextButton(icon: "folder.badge.gearshape", tooltip: "tooltip.node.change_root".localized, action: onChangeRoot)
             contextButton(icon: "trash", tooltip: "tooltip.node.delete".localized, action: onDelete)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .background {
-            Capsule()
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
                 .fill(.white)
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
-                )
-        }
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+        )
     }
 
     @ViewBuilder
