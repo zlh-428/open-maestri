@@ -23,7 +23,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 2. 写入 omaestri skill 到用户全局 ~/.claude/skills/（幂等，应用启动时执行一次）
         SkillInjector.shared.installSkillsIfNeeded()
 
-        // 2. Sparkle 自动更新（Debug 构建跳过自动检查，避免签名/appcast 缺失报错）
+        // 3. 配置主窗口样式（透明 title bar，让画布充满窗口）
+        DispatchQueue.main.async {
+            WindowStateObserver.shared.configureMainWindow()
+        }
+
+        // 4. Sparkle 自动更新（Debug 构建跳过自动检查，避免签名/appcast 缺失报错）
         #if DEBUG
         updaterController = SPUStandardUpdaterController(
             startingUpdater: false,

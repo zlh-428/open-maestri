@@ -18,48 +18,66 @@ struct WorkspaceCanvasView: View {
     @State private var showAssignRoleSheet = false
     @State private var assignRoleNodeId: UUID? = nil
 
+
     var body: some View {
         ZStack(alignment: .top) {
             canvasBody
 
-            // 顶部工具栏区域：一级工具栏 + 选中时的二级操作栏
-            VStack(spacing: 6) {
-                // 一级浮动工具栏
-                CanvasToolbar(workspace: workspace, isConnecting: $isConnecting, activeDrawingTool: $activeDrawingTool)
+            // 顶部浮动工具栏区域
+            toolbarOverlay
+        }
+    }
 
-                // 二级操作工具栏（选中节点时显示，固定在一级工具栏正下方）
-                // 仅当选中的节点确实存在于 workspace 中时才显示
-                if !selectedNodeIds.isEmpty && selectedNodeIds.contains(where: { id in
-                    workspace.nodes.contains { $0.id == id }
-                }) {
-                    if selectedNodeContentType == "fileTree" {
-                        FileTreeContextToolbar(
-                            onRevealInFinder: { revealFileTreeInFinder() },
-                            onChangeRoot: { changeFileTreeRoot() },
-                            onDelete: { deleteSelectedNodes() }
-                        )
-                        .fixedSize()
-                        .padding(.bottom, 36) // 为 tooltip 气泡预留空间
-                        .contentShape(Rectangle())
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
-                    } else {
-                        NodeContextToolbar(
-                            onEdit: { editSelectedNode() },
-                            onConnect: { startConnectionFromSelected() },
-                            onRefresh: { /* 预留刷新操作 */ },
-                            onDelete: { deleteSelectedNodes() }
-                        )
-                        .fixedSize()
-                        .padding(.bottom, 36) // 为 tooltip 气泡预留空间
-                        .contentShape(Rectangle())
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                        .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
-                    }
+    /// 当前是否全屏
+    private var isFullScreen: Bool { WindowStateObserver.shared.isFullScreen }
+
+    /// 顶部工具栏覆盖层
+    @ViewBuilder
+    private var toolbarOverlay: some View {
+        VStack(spacing: 0) {
+            // 浮动工具栏（距窗口顶部 8px）
+            CanvasToolbar(workspace: workspace, isConnecting: $isConnecting, activeDrawingTool: $activeDrawingTool)
+                .padding(.top, 8)
+
+            // 二级操作工具栏（选中节点时显示）
+            // 与一级工具栏间距加大
+            Spacer().frame(height: 12)
+
+            // 仅当选中的节点确实存在于 workspace 中时才显示
+            if !selectedNodeIds.isEmpty && selectedNodeIds.contains(where: { id in
+                workspace.nodes.contains { $0.id == id }
+            }) {
+                if selectedNodeContentType == "fileTree" {
+                    FileTreeContextToolbar(
+                        onRevealInFinder: { revealFileTreeInFinder() },
+                        onChangeRoot: { changeFileTreeRoot() },
+                        onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else {
+                    NodeContextToolbar(
+                        onEdit: { editSelectedNode() },
+                        onConnect: { startConnectionFromSelected() },
+                        onRefresh: { /* 预留刷新操作 */ },
+                        onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
                 }
             }
-            .zIndex(100)
         }
+        .frame(maxWidth: .infinity)
+        // 非全屏模式：忽略顶部安全区域，让工具栏延伸到标题栏区域
+        // 全屏模式：不忽略安全区域，工具栏在 NavigationSplitView toolbar 下方正常显示
+        .modifier(ConditionalIgnoreSafeAreaTop(ignore: !isFullScreen))
+        .zIndex(100)
     }
 
     @ViewBuilder
@@ -892,5 +910,21 @@ private struct AutosaveModifier: ViewModifier {
 private extension View {
     func autosave(workspace: WorkspaceManager) -> some View {
         modifier(AutosaveModifier(workspace: workspace))
+    }
+}
+
+// MARK: - Conditional Safe Area
+
+/// 根据条件决定是否忽略顶部安全区域。
+/// 非全屏时忽略（工具栏延伸到标题栏）；全屏时不忽略（工具栏在可视区域内正常显示）。
+private struct ConditionalIgnoreSafeAreaTop: ViewModifier {
+    let ignore: Bool
+
+    func body(content: Content) -> some View {
+        if ignore {
+            content.ignoresSafeArea(.container, edges: .top)
+        } else {
+            content
+        }
     }
 }

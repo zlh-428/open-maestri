@@ -33,6 +33,8 @@ struct OpenMaestriApp: App {
                         workspaces: appState.manifest.workspaces,
                         nodes: wsNodes
                     )
+                    // 配置窗口样式
+                    WindowStateObserver.shared.configureMainWindow()
                 }
                 .onDisappear {
                     // 注意：主要清理逻辑已移至 AppDelegate.applicationShouldTerminate
@@ -46,6 +48,7 @@ struct OpenMaestriApp: App {
                         .environment(\.locale, l10n.locale)
                 }
         }
+        .windowStyle(.hiddenTitleBar)
         .commands {
             // MARK: File 菜单
             CommandGroup(after: .newItem) {

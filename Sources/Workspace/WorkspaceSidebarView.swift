@@ -18,7 +18,7 @@ struct WorkspaceSidebarView: View {
 
     private var workspaceList: some View {
         workspaceListCore
-        .navigationTitle("open-maestri")
+        .navigationTitle("")
         .toolbar { addWorkspaceToolbarItem }
         .confirmationDialog(
             "确认删除工作区 \"\(workspaceToDelete?.name ?? "")\"？",

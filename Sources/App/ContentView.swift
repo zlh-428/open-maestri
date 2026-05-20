@@ -4,6 +4,7 @@ struct ContentView: View {
     @Environment(AppState.self) private var appState
     @State private var showCreateWorkspace = false
     @State private var selectedWorkspaceId: UUID?
+    private var isFullScreen: Bool { WindowStateObserver.shared.isFullScreen }
 
     var body: some View {
         if !appState.hasCompletedOnboarding {
@@ -86,4 +87,3 @@ struct ContentView: View {
         appState.selectWorkspace(id: selectedWorkspaceId)
     }
 }
-
