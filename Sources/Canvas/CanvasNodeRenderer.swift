@@ -118,8 +118,10 @@ final class CanvasNodeRenderer {
                 userInfo: ["nodeId": id, "terminalContent": tc]
             )
         }
-        // 右键菜单：开始连接
-        canvas.onContextMenuConnect = { id in
+        // 右键菜单：开始连接（直接在 NSView 层设置起点，避免 SwiftUI 往返延迟）
+        canvas.onContextMenuConnect = { [weak canvas] id in
+            canvas?.selectedNodeIds = [id]
+            canvas?.connectingFromNodeId = id
             NotificationCenter.default.post(
                 name: .contextMenuConnect,
                 object: nil,

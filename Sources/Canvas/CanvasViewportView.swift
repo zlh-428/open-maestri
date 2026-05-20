@@ -90,6 +90,11 @@ final class CanvasViewportView: NSView {
 
     /// 外部激活连线模式（由 CanvasViewportRepresentable 在 isConnecting=true 时调用）
     func activateConnectionMode() {
+        // 如果尚未设置连线起点但有选中节点，自动将首个选中节点设为起点
+        // （L 键入口已提前设置 connectingFromNodeId，此处不覆盖）
+        if connectingFromNodeId == nil, let firstSelected = selectedNodeIds.first {
+            connectingFromNodeId = firstSelected
+        }
         connectionDragPoint = nil
         needsDisplay = true
         for ta in trackingAreas { removeTrackingArea(ta) }
