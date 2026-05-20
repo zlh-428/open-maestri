@@ -34,6 +34,10 @@ final class CanvasNodeRenderer {
         setupSelectionObserver()
         setupDropTargetObserver()
         setupPhysicsCallbacks()
+        // 画布 pan/zoom 变化时直接刷新连线屏幕坐标（绕过 SwiftUI 时序问题）
+        canvas.onViewportPanned = { [weak self] in
+            self?.rerenderConnections()
+        }
     }
 
     private func setupNodesHostingView(canvas: CanvasViewportView) {
@@ -444,6 +448,12 @@ final class CanvasNodeRenderer {
             renderables.append(RenderableConnection(id: meta.id, screenPoints: screenPoints, status: status))
         }
         overlay.connections = renderables
+    }
+
+    /// 轻量级重渲染：仅将已有的物理控制点重新转换为屏幕坐标
+    /// 用于 viewport pan/zoom 变化时（节点画布坐标不变，只有屏幕映射变了）
+    func rerenderConnections() {
+        renderConnectionsFromPhysics(ropeSimulation.allPoints())
     }
 
     /// 同步连接列表 + 更新物理端点

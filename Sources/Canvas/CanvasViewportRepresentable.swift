@@ -100,9 +100,9 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
             renderer.syncConnections(workspace: ws)
             context.coordinator.lastNodeCount = currentHash
             context.coordinator.lastViewportKey = viewportKey
-        } else if (originChanged || zoomChanged) && viewportKey != context.coordinator.lastViewportKey {
-            // zoom/pan 变化：只重算连线屏幕坐标（节点 frame 已由 layout() 处理）
-            renderer.syncConnections(workspace: ws)
+        } else if originChanged || zoomChanged {
+            // viewport pan/zoom 变化：轻量级重渲染（只重算屏幕坐标映射，不重算锚点）
+            renderer.rerenderConnections()
             context.coordinator.lastViewportKey = viewportKey
         }
     }

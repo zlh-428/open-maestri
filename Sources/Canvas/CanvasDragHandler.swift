@@ -131,9 +131,14 @@ extension CanvasViewportView {
 
     func drawTemporaryConnection() {
         guard let fromId = connectingFromNodeId,
-              let fromCanvasFrame = nodeCanvasFrames[fromId],
-              let toPoint = connectionDragPoint else { return }
+              let fromCanvasFrame = nodeCanvasFrames[fromId] else { return }
         let fromScreenFrame = canvasRectToScreen(fromCanvasFrame)
+
+        // 如果鼠标还没移动（刚进入连线模式），显示四个边缘的连接点指示器
+        guard let toPoint = connectionDragPoint else {
+            drawEdgeConnectors(on: fromScreenFrame)
+            return
+        }
         // 计算从节点边缘出发的锚点（向鼠标方向与边框的交点）
         let fromCenter = CGPoint(x: fromScreenFrame.midX, y: fromScreenFrame.midY)
         let fromPoint = Self.edgeAnchorScreen(of: fromScreenFrame, center: fromCenter, toward: toPoint)
@@ -154,10 +159,61 @@ extension CanvasViewportView {
         NSColor.systemBlue.withAlphaComponent(0.8).setStroke()
         path.stroke()
 
-        // 起点节点高亮
-        NSColor.systemBlue.withAlphaComponent(0.3).setFill()
-        let dot = NSBezierPath(ovalIn: fromScreenFrame.insetBy(dx: -3, dy: -3))
-        dot.fill()
+        // 起点连接点指示器（在节点边缘出发点画小圆圈）
+        let connectorRadius: CGFloat = 5.0
+        let connectorRect = CGRect(
+            x: fromPoint.x - connectorRadius,
+            y: fromPoint.y - connectorRadius,
+            width: connectorRadius * 2,
+            height: connectorRadius * 2
+        )
+        NSColor.systemBlue.setFill()
+        NSBezierPath(ovalIn: connectorRect).fill()
+        NSColor.white.setFill()
+        let innerRadius: CGFloat = 2.5
+        let innerRect = CGRect(
+            x: fromPoint.x - innerRadius,
+            y: fromPoint.y - innerRadius,
+            width: innerRadius * 2,
+            height: innerRadius * 2
+        )
+        NSBezierPath(ovalIn: innerRect).fill()
+
+        // 源节点边框高亮（淡蓝色）
+        let borderPath = NSBezierPath(roundedRect: fromScreenFrame, xRadius: 6, yRadius: 6)
+        borderPath.lineWidth = 1.5
+        NSColor.systemBlue.withAlphaComponent(0.4).setStroke()
+        borderPath.stroke()
+    }
+
+    // MARK: - 连接点指示器
+
+    /// 在节点四个边缘中点绘制连接点圆圈（连线模式激活但鼠标未移动时）
+    private func drawEdgeConnectors(on frame: CGRect) {
+        let midPoints = [
+            CGPoint(x: frame.midX, y: frame.minY),  // 上
+            CGPoint(x: frame.midX, y: frame.maxY),  // 下
+            CGPoint(x: frame.minX, y: frame.midY),  // 左
+            CGPoint(x: frame.maxX, y: frame.midY),  // 右
+        ]
+        let radius: CGFloat = 5.0
+        let innerRadius: CGFloat = 2.5
+
+        // 节点边框高亮
+        let borderPath = NSBezierPath(roundedRect: frame, xRadius: 6, yRadius: 6)
+        borderPath.lineWidth = 1.5
+        NSColor.systemBlue.withAlphaComponent(0.4).setStroke()
+        borderPath.stroke()
+
+        // 四个连接点
+        for pt in midPoints {
+            let outerRect = CGRect(x: pt.x - radius, y: pt.y - radius, width: radius * 2, height: radius * 2)
+            NSColor.systemBlue.setFill()
+            NSBezierPath(ovalIn: outerRect).fill()
+            let innerRect = CGRect(x: pt.x - innerRadius, y: pt.y - innerRadius, width: innerRadius * 2, height: innerRadius * 2)
+            NSColor.white.setFill()
+            NSBezierPath(ovalIn: innerRect).fill()
+        }
     }
 
     // MARK: - 边缘锚点计算（屏幕坐标）

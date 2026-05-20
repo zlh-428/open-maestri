@@ -177,6 +177,7 @@ extension CanvasViewportView {
         needsLayout = true
         needsDisplay = true
         notifyViewportChanged()
+        onViewportPanned?()
     }
 
     private func jumpToTerminal(number: Int) {
@@ -277,6 +278,7 @@ extension CanvasViewportView {
         let newOriginY = canvasFrame.midY - (bounds.height / 2) / zoom
         canvasOrigin = CGPoint(x: newOriginX, y: newOriginY)
         notifyViewportChanged()
+        onViewportPanned?()
     }
 
     /// 平滑动画跳转到指定画布 frame（duration=0.35s easeInOut）
@@ -321,6 +323,7 @@ extension CanvasViewportView {
                 y: from.y + (to.y - from.y) * eased
             )
             self.notifyViewportChanged()
+            self.onViewportPanned?()
             if progress >= 1.0 {
                 t.invalidate()
                 self.animationTimer = nil
@@ -366,6 +369,8 @@ extension CanvasViewportView {
         needsLayout = true
         needsDisplay = true
         notifyViewportChanged()
+        // 立即重渲染连线（不等 SwiftUI updateNSView 回路）
+        onViewportPanned?()
     }
 
     override func magnify(with event: NSEvent) {
@@ -381,5 +386,7 @@ extension CanvasViewportView {
         needsLayout = true
         needsDisplay = true
         notifyViewportChanged()
+        // 立即重渲染连线（不等 SwiftUI updateNSView 回路）
+        onViewportPanned?()
     }
 }

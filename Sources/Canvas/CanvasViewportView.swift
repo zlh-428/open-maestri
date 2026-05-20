@@ -62,6 +62,8 @@ final class CanvasViewportView: NSView {
     // MARK: - 回调
 
     var onViewportChanged: ((CGPoint, CGFloat) -> Void)?
+    /// 画布平移/缩放后立即回调（用于连线层实时重渲染，不经过 SwiftUI 回路）
+    var onViewportPanned: (() -> Void)?
     var onDeleteSelectedNodes: (() -> Void)?
     var onFocusSelectedNode: (() -> Void)?
     var onNodeJumpNumbersRequested: ((Bool) -> Void)? // true=显示, false=隐藏

@@ -68,13 +68,10 @@ struct RopePathRenderer {
         guard !points.isEmpty else { return }
         let path = bezierPath(from: points)
 
-        // 通信中或高亮时绘制 glow 底层
-        if status == .communicating || isHighlighted {
+        // 通信中绘制绿色 glow 底层（hover 时不绘制 glow）
+        if status == .communicating && !isHighlighted {
             let glowPath = bezierPath(from: points)
-            let glowColor = isHighlighted
-                ? NSColor.systemBlue.withAlphaComponent(0.25)
-                : NSColor.systemGreen.withAlphaComponent(0.3)
-            glowColor.setStroke()
+            NSColor.systemGreen.withAlphaComponent(0.3).setStroke()
             glowPath.lineWidth = lineWidth(for: status) + 4
             glowPath.lineCapStyle = .round
             glowPath.lineJoinStyle = .round
@@ -88,7 +85,11 @@ struct RopePathRenderer {
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
 
-        if !isHighlighted && isDashed(for: status) {
+        if isHighlighted {
+            // hover 时使用蓝色虚线
+            let pattern: [CGFloat] = [6, 4]
+            path.setLineDash(pattern, count: 2, phase: 0)
+        } else if isDashed(for: status) {
             let pattern: [CGFloat] = [6, 4]
             path.setLineDash(pattern, count: 2, phase: 0)
         }
