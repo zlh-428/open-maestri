@@ -33,6 +33,7 @@ final class CanvasNodeRenderer {
         setupActivationObserver()
         setupSelectionObserver()
         setupDropTargetObserver()
+        setupPhysicsCallbacks()
     }
 
     private func setupNodesHostingView(canvas: CanvasViewportView) {
@@ -56,6 +57,13 @@ final class CanvasNodeRenderer {
     }
 
     private func setupNodeDragCallback(canvas: CanvasViewportView) {
+        // 拖动中帧级回调：实时更新物理引擎端点
+        canvas.onNodeFramesDuringDrag = { [weak self] draggedIds in
+            guard let self, let ws = self.currentWorkspace else { return }
+            // 只更新涉及被拖动节点的连接绳索端点
+            self.updatePhysicsAnchorsForNodes(draggedIds, workspace: ws)
+        }
+
         canvas.onNodeDragEnded = { [weak self] nodeId, canvasFrame in
             guard let self else { return }
             self.currentWorkspace?.updateNodeFrame(id: nodeId, frame: canvasFrame)
@@ -399,99 +407,224 @@ final class CanvasNodeRenderer {
         notificationObservers.append(obs)
     }
 
-    // MARK: - 连线同步
+    // MARK: - 连线物理同步
 
-    /// 缓存每条连线的画布坐标 rope 点（key: connection UUID）
-    /// 仅当连接两端节点的 frame 变化时才重新计算 catenary
-    private var cachedCanvasRopePoints: [UUID: CachedRope] = [:]
-
-    /// 缓存结构：存储计算 rope 所用的源 frame 和结果
-    private struct CachedRope {
-        let frameA: CGRect
-        let frameB: CGRect
-        let canvasPoints: [CGPoint]  // 画布坐标系下的 21 个控制点
+    /// 连接元数据（用于渲染时查找 status）
+    private struct ConnectionMeta {
+        let id: UUID
+        let nodeIdA: UUID
+        let nodeIdB: UUID
     }
 
-    func syncConnections(workspace: WorkspaceManager) {
+    /// 当前活跃的连接元数据列表（在 syncConnections 中构建）
+    private var activeConnections: [ConnectionMeta] = []
+
+    /// 连接状态缓存（避免每条连线每帧 O(n) 查找）
+    /// 在 syncConnections 中构建，在物理回调中使用
+    private var connectionStatusCache: [UUID: ConnectionStatus] = [:]
+
+    /// 初始化物理模拟回调（在 setupOverlay 后调用一次）
+    private func setupPhysicsCallbacks() {
+        ropeSimulation.onTick = { [weak self] allPoints in
+            self?.renderConnectionsFromPhysics(allPoints)
+        }
+        ropeSimulation.onSleep = { [weak self] allPoints in
+            self?.renderConnectionsFromPhysics(allPoints)
+        }
+    }
+
+    /// 共享的物理回调渲染方法：将画布坐标控制点转为屏幕坐标并推送给 overlay
+    private func renderConnectionsFromPhysics(_ allPoints: [UUID: [CGPoint]]) {
         guard let overlay = overlayView, let canvas else { return }
-
         var renderables: [RenderableConnection] = []
-        var activeConnectionIds: Set<UUID> = []
-
-        for conn in workspace.connections {
-            guard let frameA = nodeFrame(id: conn.terminalIdA, in: workspace),
-                  let frameB = nodeFrame(id: conn.terminalIdB, in: workspace) else { continue }
-            activeConnectionIds.insert(conn.id)
-            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
+        for meta in activeConnections {
+            guard let canvasPoints = allPoints[meta.id] else { continue }
             let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
-            let status = ConnectionManager.shared.connections.values
-                .first { $0.nodeIdA == conn.terminalIdA && $0.nodeIdB == conn.terminalIdB }?.status ?? .idle
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: status))
+            let status = connectionStatusCache[meta.id] ?? .idle
+            renderables.append(RenderableConnection(id: meta.id, screenPoints: screenPoints, status: status))
         }
-
-        for conn in workspace.noteConnections {
-            guard let frameA = nodeFrame(id: conn.terminalId, in: workspace),
-                  let frameB = nodeFrame(id: conn.noteNodeId, in: workspace) else { continue }
-            activeConnectionIds.insert(conn.id)
-            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
-            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
-        }
-
-        for conn in workspace.portalConnections {
-            guard let frameA = nodeFrame(id: conn.terminalId, in: workspace),
-                  let frameB = nodeFrame(id: conn.portalNodeId, in: workspace) else { continue }
-            activeConnectionIds.insert(conn.id)
-            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
-            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
-        }
-
-        // Note↔Note 连接（Note Chaining）
-        for conn in workspace.noteToNoteConnections {
-            guard let frameA = nodeFrame(id: conn.noteNodeIdA, in: workspace),
-                  let frameB = nodeFrame(id: conn.noteNodeIdB, in: workspace) else { continue }
-            activeConnectionIds.insert(conn.id)
-            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
-            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
-        }
-
-        // Portal↔Portal 连接（共享 session）
-        for conn in workspace.portalToPortalConnections {
-            guard let frameA = nodeFrame(id: conn.portalIdA, in: workspace),
-                  let frameB = nodeFrame(id: conn.portalIdB, in: workspace) else { continue }
-            activeConnectionIds.insert(conn.id)
-            let canvasPoints = cachedCanvasRope(id: conn.id, frameA: frameA, frameB: frameB)
-            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
-            renderables.append(RenderableConnection(id: conn.id, screenPoints: screenPoints, status: .idle))
-        }
-
-        // 清理已删除连线的缓存
-        cachedCanvasRopePoints = cachedCanvasRopePoints.filter { activeConnectionIds.contains($0.key) }
-
         overlay.connections = renderables
     }
 
-    /// 获取缓存的画布坐标 rope 点；若源 frame 未变则直接返回缓存，否则重新计算
-    private func cachedCanvasRope(id: UUID, frameA: CGRect, frameB: CGRect) -> [CGPoint] {
-        if let cached = cachedCanvasRopePoints[id],
-           cached.frameA == frameA && cached.frameB == frameB {
-            return cached.canvasPoints
+    /// 同步连接列表 + 更新物理端点
+    /// 调用时机：节点/连接数量变化、zoom/pan 变化、节点拖动中
+    func syncConnections(workspace: WorkspaceManager) {
+        guard let overlay = overlayView, let canvas else { return }
+
+        var metas: [ConnectionMeta] = []
+        var activeIds: Set<UUID> = []
+        var anchorUpdates: [(id: UUID, anchorA: CGPoint, anchorB: CGPoint)] = []
+
+        // 收集所有连接的端点（计算边缘锚点，而非中心点）
+        for conn in workspace.connections {
+            guard let frameA = liveNodeFrame(id: conn.terminalIdA, in: workspace),
+                  let frameB = liveNodeFrame(id: conn.terminalIdB, in: workspace) else { continue }
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            activeIds.insert(conn.id)
+            metas.append(ConnectionMeta(id: conn.id, nodeIdA: conn.terminalIdA, nodeIdB: conn.terminalIdB))
+            anchorUpdates.append((id: conn.id, anchorA: anchorA, anchorB: anchorB))
         }
-        let canvasPoints = computeRopeCanvasPoints(frameA: frameA, frameB: frameB)
-        cachedCanvasRopePoints[id] = CachedRope(frameA: frameA, frameB: frameB, canvasPoints: canvasPoints)
-        return canvasPoints
+
+        for conn in workspace.noteConnections {
+            guard let frameA = liveNodeFrame(id: conn.terminalId, in: workspace),
+                  let frameB = liveNodeFrame(id: conn.noteNodeId, in: workspace) else { continue }
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            activeIds.insert(conn.id)
+            metas.append(ConnectionMeta(id: conn.id, nodeIdA: conn.terminalId, nodeIdB: conn.noteNodeId))
+            anchorUpdates.append((id: conn.id, anchorA: anchorA, anchorB: anchorB))
+        }
+
+        for conn in workspace.portalConnections {
+            guard let frameA = liveNodeFrame(id: conn.terminalId, in: workspace),
+                  let frameB = liveNodeFrame(id: conn.portalNodeId, in: workspace) else { continue }
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            activeIds.insert(conn.id)
+            metas.append(ConnectionMeta(id: conn.id, nodeIdA: conn.terminalId, nodeIdB: conn.portalNodeId))
+            anchorUpdates.append((id: conn.id, anchorA: anchorA, anchorB: anchorB))
+        }
+
+        for conn in workspace.noteToNoteConnections {
+            guard let frameA = liveNodeFrame(id: conn.noteNodeIdA, in: workspace),
+                  let frameB = liveNodeFrame(id: conn.noteNodeIdB, in: workspace) else { continue }
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            activeIds.insert(conn.id)
+            metas.append(ConnectionMeta(id: conn.id, nodeIdA: conn.noteNodeIdA, nodeIdB: conn.noteNodeIdB))
+            anchorUpdates.append((id: conn.id, anchorA: anchorA, anchorB: anchorB))
+        }
+
+        for conn in workspace.portalToPortalConnections {
+            guard let frameA = liveNodeFrame(id: conn.portalIdA, in: workspace),
+                  let frameB = liveNodeFrame(id: conn.portalIdB, in: workspace) else { continue }
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            activeIds.insert(conn.id)
+            metas.append(ConnectionMeta(id: conn.id, nodeIdA: conn.portalIdA, nodeIdB: conn.portalIdB))
+            anchorUpdates.append((id: conn.id, anchorA: anchorA, anchorB: anchorB))
+        }
+
+        // 更新活跃连接元数据
+        activeConnections = metas
+
+        // 清理已删除的绳索
+        let existingIds = Set(ropeSimulation.ropes.keys)
+        for deadId in existingIds.subtracting(activeIds) {
+            ropeSimulation.removeRope(id: deadId)
+        }
+
+        // 添加新绳索 / 更新已有绳索的端点
+        for update in anchorUpdates {
+            if ropeSimulation.ropes[update.id] != nil {
+                ropeSimulation.updateAnchors(id: update.id, anchorA: update.anchorA, anchorB: update.anchorB)
+            } else {
+                ropeSimulation.addRope(id: update.id, anchorA: update.anchorA, anchorB: update.anchorB)
+            }
+        }
+
+        // 构建连接状态缓存（O(n) 一次，后续物理回调 O(1) 查询）
+        rebuildConnectionStatusCache()
+
+        // 立即渲染当前帧（确保连线可见，不论物理是否在运行）
+        var renderables: [RenderableConnection] = []
+        for meta in metas {
+            guard let canvasPoints = ropeSimulation.points(for: meta.id) else { continue }
+            let screenPoints = canvasPoints.map { canvas.canvasToScreen($0) }
+            let status = connectionStatusCache[meta.id] ?? .idle
+            renderables.append(RenderableConnection(id: meta.id, screenPoints: screenPoints, status: status))
+        }
+        overlay.connections = renderables
     }
 
-    private func nodeFrame(id: UUID, in workspace: WorkspaceManager) -> CGRect? {
-        workspace.nodes.first { $0.id == id }?.frame
+    /// 获取节点的实时 frame（优先使用 canvas 中的拖拽实时值，否则从 workspace 取）
+    private func liveNodeFrame(id: UUID, in workspace: WorkspaceManager) -> CGRect? {
+        // 拖动期间 canvas.nodeCanvasFrames 持有最新 frame
+        if let liveFrame = canvas?.nodeCanvasFrames[id] {
+            return liveFrame
+        }
+        return workspace.nodes.first { $0.id == id }?.frame
     }
 
-    /// 在画布坐标系中计算 catenary rope 点（与 viewport 无关）
-    private func computeRopeCanvasPoints(frameA: CGRect, frameB: CGRect) -> [CGPoint] {
-        let startCanvas = CGPoint(x: frameA.midX, y: frameA.midY)
-        let endCanvas = CGPoint(x: frameB.midX, y: frameB.midY)
-        return ropeSimulation.compute(from: startCanvas, to: endCanvas)
+    // MARK: - 边缘锚点计算
+
+    /// 计算连接线锚点：从节点 frame 的中心出发，向目标中心方向与边框的交点
+    /// 这样连线从节点边缘出发而非中心，与 Maestri 行为一致
+    private func edgeAnchor(of frame: CGRect, toward target: CGPoint) -> CGPoint {
+        let center = CGPoint(x: frame.midX, y: frame.midY)
+        let dx = target.x - center.x
+        let dy = target.y - center.y
+
+        // 两节点重叠或完全重合时退化为中心
+        guard abs(dx) > 0.001 || abs(dy) > 0.001 else { return center }
+
+        let halfW = frame.width / 2.0
+        let halfH = frame.height / 2.0
+
+        // 通过比例判断射线先碰到左右边还是上下边
+        // t 表示从 center 到 target 方向上，到达边框的参数值
+        var t: CGFloat = .greatestFiniteMagnitude
+
+        if abs(dx) > 0.001 {
+            let tx = halfW / abs(dx)
+            if tx < t { t = tx }
+        }
+        if abs(dy) > 0.001 {
+            let ty = halfH / abs(dy)
+            if ty < t { t = ty }
+        }
+
+        return CGPoint(x: center.x + dx * t, y: center.y + dy * t)
+    }
+
+    /// 重建连接状态缓存（从 ConnectionManager 的活跃连接中构建 [connectionId: status] 字典）
+    private func rebuildConnectionStatusCache() {
+        var cache: [UUID: ConnectionStatus] = [:]
+        for meta in activeConnections {
+            // 通过 connectionId 直接查找（O(1) 字典查找）
+            if let active = ConnectionManager.shared.connections[meta.id] {
+                cache[meta.id] = active.status
+            } else {
+                // 降级：按节点对匹配（兼容 connectionId 不一致的情况）
+                let matched = ConnectionManager.shared.connections.values
+                    .first { $0.nodeIdA == meta.nodeIdA && $0.nodeIdB == meta.nodeIdB }
+                cache[meta.id] = matched?.status ?? .idle
+            }
+        }
+        connectionStatusCache = cache
+    }
+
+    /// 拖动中增量更新：只更新涉及被拖动节点的绳索端点（高效路径，不重建整个连接列表）
+    private func updatePhysicsAnchorsForNodes(_ movedNodeIds: Set<UUID>, workspace: WorkspaceManager) {
+        var updates: [(id: UUID, anchorA: CGPoint, anchorB: CGPoint)] = []
+
+        for meta in activeConnections {
+            // 只处理涉及被拖动节点的连接
+            guard movedNodeIds.contains(meta.nodeIdA) || movedNodeIds.contains(meta.nodeIdB) else { continue }
+            guard let frameA = liveNodeFrame(id: meta.nodeIdA, in: workspace),
+                  let frameB = liveNodeFrame(id: meta.nodeIdB, in: workspace) else { continue }
+            let centerA = CGPoint(x: frameA.midX, y: frameA.midY)
+            let centerB = CGPoint(x: frameB.midX, y: frameB.midY)
+            let anchorA = edgeAnchor(of: frameA, toward: centerB)
+            let anchorB = edgeAnchor(of: frameB, toward: centerA)
+            updates.append((id: meta.id, anchorA: anchorA, anchorB: anchorB))
+        }
+
+        if !updates.isEmpty {
+            ropeSimulation.updateAnchors(updates: updates)
+            // 立即渲染一帧（确保拖动时连线位置实时更新，不需要等待物理 tick 触发）
+            renderConnectionsFromPhysics(ropeSimulation.allPoints())
+        }
     }
 }

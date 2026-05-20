@@ -355,6 +355,8 @@ extension CanvasViewportView {
             nodeCanvasFrames[id] = newFrame
             updateNodeFrameInPlace(id: id, frame: newFrame)
             needsLayout = true
+            // 通知连线物理引擎：端点已移动
+            onNodeFramesDuringDrag?([id])
 
         // --- 批量拖动 ---
         case .batchDragging(let startFrames, let primaryId, let startMouse):
@@ -387,6 +389,8 @@ extension CanvasViewportView {
             }
             updateNodeFramesInPlace(frames: updatedFrames)
             needsLayout = true
+            // 通知连线物理引擎：多个端点已移动
+            onNodeFramesDuringDrag?(Set(startFrames.keys))
 
         // --- Resize ---
         case .resizingNode(let id, let edge, let startFrame, let startMouse):
@@ -496,6 +500,8 @@ extension CanvasViewportView {
         updateNodeFrameInPlace(id: id, frame: newCanvasFrame)
         CATransaction.commit()
         needsLayout = true
+        // 通知连线物理引擎：resize 也改变了节点中心
+        onNodeFramesDuringDrag?([id])
     }
 
     // MARK: - mouseUp

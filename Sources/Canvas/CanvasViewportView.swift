@@ -171,6 +171,10 @@ final class CanvasViewportView: NSView {
         }
     }
 
+    /// 节点拖动中帧级回调（连线物理引擎用此更新端点）
+    /// 参数：被拖动节点的 ID 集合
+    var onNodeFramesDuringDrag: ((Set<UUID>) -> Void)?
+
     /// option+拖拽复制节点回调
     var onDuplicateNode: ((UUID) -> Void)?
 

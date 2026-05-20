@@ -121,6 +121,30 @@ final class ConnectionManager {
         return conn
     }
 
+    /// 建立 Note↔Note 连接（Note Chaining）
+    func connectNoteToNote(noteNodeIdA: UUID, noteNodeIdB: UUID, ropePoints: [[Double]] = []) -> NoteToNoteConnection {
+        let conn = NoteToNoteConnection(
+            noteNodeIdA: noteNodeIdA, noteNodeIdB: noteNodeIdB,
+            ropePoints: ropePoints.isEmpty ? buildDefaultRopePoints() : ropePoints
+        )
+        let active = ActiveConnection(id: conn.id, nodeIdA: noteNodeIdA, nodeIdB: noteNodeIdB, type: .noteToNote)
+        connections[conn.id] = active
+        logger.info("Note↔Note connection: \(noteNodeIdA.uuidString.prefix(8)) ↔ \(noteNodeIdB.uuidString.prefix(8))")
+        return conn
+    }
+
+    /// 建立 Portal↔Portal 连接（共享 session）
+    func connectPortalToPortal(portalIdA: UUID, portalIdB: UUID, ropePoints: [[Double]] = []) -> PortalToPortalConnection {
+        let conn = PortalToPortalConnection(
+            portalIdA: portalIdA, portalIdB: portalIdB,
+            ropePoints: ropePoints.isEmpty ? buildDefaultRopePoints() : ropePoints
+        )
+        let active = ActiveConnection(id: conn.id, nodeIdA: portalIdA, nodeIdB: portalIdB, type: .portalToPortal)
+        connections[conn.id] = active
+        logger.info("Portal↔Portal connection: \(portalIdA.uuidString.prefix(8)) ↔ \(portalIdB.uuidString.prefix(8))")
+        return conn
+    }
+
     // MARK: - 断开连接
 
     func disconnect(id: UUID) {

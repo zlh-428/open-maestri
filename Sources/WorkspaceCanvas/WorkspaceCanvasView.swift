@@ -106,10 +106,10 @@ struct WorkspaceCanvasView: View {
                         let conn = cm.connectTerminalToPortal(terminalId: termId, portalNodeId: portId)
                         workspace.addPortalConnection(conn)
                     case ("stickyNote", "stickyNote"):
-                        let conn = NoteToNoteConnection(noteNodeIdA: idA, noteNodeIdB: idB)
+                        let conn = cm.connectNoteToNote(noteNodeIdA: idA, noteNodeIdB: idB)
                         workspace.noteToNoteConnections.append(conn)
                     case ("portal", "portal"):
-                        let conn = PortalToPortalConnection(portalIdA: idA, portalIdB: idB)
+                        let conn = cm.connectPortalToPortal(portalIdA: idA, portalIdB: idB)
                         workspace.addPortalToPortalConnection(conn)
                         PortalWebViewStore.shared.shareSession(portalIdA: idA, portalIdB: idB)
                     default:

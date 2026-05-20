@@ -90,6 +90,7 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
 
         let nodeCount = ws.nodes.count
         let connCount = ws.connections.count + ws.noteConnections.count + ws.portalConnections.count
+            + ws.portalToPortalConnections.count + ws.noteToNoteConnections.count
         let currentHash = nodeCount * 1000 + connCount
         let viewportKey = "\(canvasOrigin.x.rounded())_\(canvasOrigin.y.rounded())_\(zoom)"
 

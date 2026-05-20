@@ -127,17 +127,28 @@ extension CanvasViewportView {
         path.fill()
     }
 
-    // MARK: - 临时连线绘制（连线工具拖动时）
+    // MARK: - 临时连线绘制（连线工具拖动时，使用物理下垂曲线）
 
     func drawTemporaryConnection() {
         guard let fromId = connectingFromNodeId,
               let fromCanvasFrame = nodeCanvasFrames[fromId],
               let toPoint = connectionDragPoint else { return }
         let fromScreenFrame = canvasRectToScreen(fromCanvasFrame)
-        let fromPoint = CGPoint(x: fromScreenFrame.midX, y: fromScreenFrame.midY)
+        // 计算从节点边缘出发的锚点（向鼠标方向与边框的交点）
+        let fromCenter = CGPoint(x: fromScreenFrame.midX, y: fromScreenFrame.midY)
+        let fromPoint = Self.edgeAnchorScreen(of: fromScreenFrame, center: fromCenter, toward: toPoint)
+
+        // 使用静态悬链线计算（带自然下垂效果）
+        let catenaryPoints = RopeSimulation.computeStaticCatenary(from: fromPoint, to: toPoint)
+
+        guard catenaryPoints.count >= 2 else { return }
+
+        // 使用折线绘制（21 个控制点足够密集，视觉上近似平滑曲线）
         let path = NSBezierPath()
-        path.move(to: fromPoint)
-        path.line(to: toPoint)
+        path.move(to: catenaryPoints[0])
+        for i in 1..<catenaryPoints.count {
+            path.line(to: catenaryPoints[i])
+        }
         path.lineWidth = 2
         path.setLineDash([6, 4], count: 2, phase: 0)
         NSColor.systemBlue.withAlphaComponent(0.8).setStroke()
@@ -147,6 +158,31 @@ extension CanvasViewportView {
         NSColor.systemBlue.withAlphaComponent(0.3).setFill()
         let dot = NSBezierPath(ovalIn: fromScreenFrame.insetBy(dx: -3, dy: -3))
         dot.fill()
+    }
+
+    // MARK: - 边缘锚点计算（屏幕坐标）
+
+    /// 计算从节点边框出发的锚点（屏幕坐标版本）
+    /// 从 frame 中心向 target 方向做射线，返回与边框的交点
+    static func edgeAnchorScreen(of frame: CGRect, center: CGPoint, toward target: CGPoint) -> CGPoint {
+        let dx = target.x - center.x
+        let dy = target.y - center.y
+        guard abs(dx) > 0.001 || abs(dy) > 0.001 else { return center }
+
+        let halfW = frame.width / 2.0
+        let halfH = frame.height / 2.0
+        var t: CGFloat = .greatestFiniteMagnitude
+
+        if abs(dx) > 0.001 {
+            let tx = halfW / abs(dx)
+            if tx < t { t = tx }
+        }
+        if abs(dy) > 0.001 {
+            let ty = halfH / abs(dy)
+            if ty < t { t = ty }
+        }
+
+        return CGPoint(x: center.x + dx * t, y: center.y + dy * t)
     }
 
     // MARK: - Finder 文件拖入（创建 Note 节点）
