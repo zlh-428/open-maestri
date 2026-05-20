@@ -96,6 +96,8 @@ final class TerminalSession {
     let roleName: String?
     /// Agent 实际分配的名称（来自 OMAESTRI_AGENT_NAME 环境变量，由 MaestroHandlers.recruit 注入）
     var agentName: String?
+    /// 终端当前工作目录（由 PTY OSC 7 回调实时更新）
+    private(set) var currentDirectory: String?
     private(set) var isRunning: Bool = false
     private(set) var isIdle: Bool = true
 
@@ -169,6 +171,17 @@ final class TerminalSession {
             name: .terminalBecameIdle,
             object: nil,
             userInfo: ["terminalId": id]
+        )
+    }
+
+    /// 更新当前工作目录（由 SwiftTermProvider.hostCurrentDirectoryUpdate 调用）
+    func updateCurrentDirectory(_ directory: String?) {
+        guard let dir = directory, !dir.isEmpty, dir != currentDirectory else { return }
+        currentDirectory = dir
+        NotificationCenter.default.post(
+            name: .terminalDirectoryChanged,
+            object: nil,
+            userInfo: ["terminalId": id, "directory": dir]
         )
     }
 

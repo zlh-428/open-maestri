@@ -47,4 +47,6 @@ extension Notification.Name {
     static let terminalAttentionChanged  = Notification.Name("OpenMaestri.terminalAttentionChanged")
     /// 终端主题/字体变更（立即应用到所有已打开终端）
     static let terminalAppearanceChanged = Notification.Name("OpenMaestri.terminalAppearanceChanged")
+    /// 终端当前工作目录变化：userInfo 含 "terminalId" UUID, "directory" String
+    static let terminalDirectoryChanged  = Notification.Name("OpenMaestri.terminalDirectoryChanged")
 }

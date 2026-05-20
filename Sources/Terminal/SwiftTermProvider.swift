@@ -304,7 +304,12 @@ extension SwiftTermProvider: LocalProcessTerminalViewDelegate {
         }
     }
 
-    nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        let tid = terminalId
+        Task { @MainActor in
+            TerminalManager.shared.terminals[tid]?.updateCurrentDirectory(directory)
+        }
+    }
 
     nonisolated func processTerminated(source: TerminalView, exitCode: Int32?) {
         Task { @MainActor in

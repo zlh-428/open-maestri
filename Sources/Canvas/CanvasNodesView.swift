@@ -4,6 +4,7 @@ import SwiftUI
 // MARK: - 节点画布常量（替代 BaseNodeView 中的静态常量）
 enum CanvasNodeConstants {
     static let headerHeight: CGFloat = 32
+    static let footerHeight: CGFloat = 26
     static let minNodeWidth: CGFloat = 160
     static let minNodeHeight: CGFloat = 80
     static let resizeHandleSize: CGFloat = 12

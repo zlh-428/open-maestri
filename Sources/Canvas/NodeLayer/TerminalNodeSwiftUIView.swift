@@ -15,6 +15,7 @@ struct TerminalNodeSwiftUIView: View {
     var onLockToggle: ((UUID, Bool) -> Void)?
 
     @State private var needsAttention: Bool = false
+    @State private var currentDirectory: String = ""
 
     var body: some View {
         NodeShellView(
@@ -26,6 +27,11 @@ struct TerminalNodeSwiftUIView: View {
             headerIcon: content.icon,
             headerColor: Color(hex: content.color),
             headerAccessory: { headerAccessoryContent },
+            footer: {
+                if !currentDirectory.isEmpty {
+                    TerminalFooterView(directory: currentDirectory)
+                }
+            },
             onClose: { onClose?(nodeId) },
             onRename: { onRename?(nodeId, $0) },
             onDuplicate: { onDuplicate?(nodeId) },
@@ -49,12 +55,25 @@ struct TerminalNodeSwiftUIView: View {
         }
         .onAppear {
             needsAttention = AttentionNotifier.shared.needsAttention(terminalId: content.id)
+            // 初始化当前目录：优先从 session 读取，否则使用配置的 workingDirectory
+            if let session = TerminalManager.shared.terminals[content.id],
+               let dir = session.currentDirectory {
+                currentDirectory = dir
+            } else if !content.workingDirectory.isEmpty {
+                currentDirectory = content.workingDirectory
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .terminalAttentionChanged)) { notification in
             guard let terminalId = notification.userInfo?["terminalId"] as? UUID,
                   terminalId == content.id,
                   let attention = notification.userInfo?["needsAttention"] as? Bool else { return }
             needsAttention = attention
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .terminalDirectoryChanged)) { notification in
+            guard let terminalId = notification.userInfo?["terminalId"] as? UUID,
+                  terminalId == content.id,
+                  let directory = notification.userInfo?["directory"] as? String else { return }
+            currentDirectory = directory
         }
         .onChange(of: isSelected) { _, selected in
             if selected {

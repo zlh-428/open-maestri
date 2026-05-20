@@ -709,7 +709,7 @@ extension CanvasViewportView {
 
         let nodeId: UUID?
         switch hit {
-        case .nodeHeader(let id), .nodeContent(let id, _), .nodeResize(let id, _):
+        case .nodeHeader(let id), .nodeFooter(let id), .nodeContent(let id, _), .nodeResize(let id, _):
             nodeId = id
         case .canvas:
             nodeId = nil

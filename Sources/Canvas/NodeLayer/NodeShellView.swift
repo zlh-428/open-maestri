@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// 所有节点的通用外壳，替代 BaseNodeView（NSView 子类）。
-/// 提供：背景/阴影/圆角、Header 栏、选中蓝色虚线边框、右键菜单。
-struct NodeShellView<Content: View, Accessory: View>: View {
+/// 提供：背景/阴影/圆角、Header 栏、可选 Footer 栏、选中蓝色虚线边框、右键菜单。
+struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
     let nodeId: UUID
     let title: String
     let isSelected: Bool
@@ -11,6 +11,7 @@ struct NodeShellView<Content: View, Accessory: View>: View {
     let headerIcon: String?
     let headerColor: Color?
     let headerAccessory: Accessory
+    let footer: Footer
     var onClose: (() -> Void)?
     var onRename: ((String) -> Void)?
     var onDuplicate: (() -> Void)?
@@ -26,6 +27,7 @@ struct NodeShellView<Content: View, Accessory: View>: View {
         headerIcon: String?,
         headerColor: Color?,
         @ViewBuilder headerAccessory: () -> Accessory = { EmptyView() },
+        @ViewBuilder footer: () -> Footer = { EmptyView() },
         onClose: (() -> Void)? = nil,
         onRename: ((String) -> Void)? = nil,
         onDuplicate: (() -> Void)? = nil,
@@ -40,6 +42,7 @@ struct NodeShellView<Content: View, Accessory: View>: View {
         self.headerIcon = headerIcon
         self.headerColor = headerColor
         self.headerAccessory = headerAccessory()
+        self.footer = footer()
         self.onClose = onClose
         self.onRename = onRename
         self.onDuplicate = onDuplicate
@@ -50,6 +53,8 @@ struct NodeShellView<Content: View, Accessory: View>: View {
     @Environment(\.dropTargetNodeId) private var dropTargetNodeId
 
     private var isDropTarget: Bool { dropTargetNodeId == nodeId }
+
+    private var hasFooter: Bool { !(Footer.self == EmptyView.self) }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -78,6 +83,14 @@ struct NodeShellView<Content: View, Accessory: View>: View {
                 // 内容区（以节点原始画布尺寸填满，内容不受 zoom 影响）
                 content()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Footer（可选，仅当提供了非 EmptyView 时显示）
+                if hasFooter {
+                    Divider().opacity(0.3)
+                    footer
+                        .frame(height: CanvasNodeConstants.footerHeight)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .clipShape(RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius))
 
@@ -147,6 +160,37 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(color?.opacity(0.15) ?? Color.clear)
+        .background(Color(white: 0.97))
+    }
+}
+
+/// 终端节点 Footer 栏（显示当前工作目录）
+struct TerminalFooterView: View {
+    let directory: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "folder.fill")
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+            Text(abbreviatedPath)
+                .font(.system(size: 10, weight: .regular, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(white: 0.97))
+    }
+
+    /// 将绝对路径缩写为 ~/... 形式
+    private var abbreviatedPath: String {
+        let home = NSHomeDirectory()
+        if directory.hasPrefix(home) {
+            return "~" + directory.dropFirst(home.count)
+        }
+        return directory
     }
 }

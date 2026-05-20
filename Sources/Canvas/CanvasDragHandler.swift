@@ -290,7 +290,7 @@ extension CanvasViewportView {
     func nodeId(at screenPoint: CGPoint) -> UUID? {
         let hit = hitTestCanvas(at: screenPoint)
         switch hit {
-        case .nodeHeader(let id), .nodeContent(let id, _), .nodeResize(let id, _):
+        case .nodeHeader(let id), .nodeFooter(let id), .nodeContent(let id, _), .nodeResize(let id, _):
             return id
         case .canvas:
             return nil

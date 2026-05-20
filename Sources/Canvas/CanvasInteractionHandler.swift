@@ -6,6 +6,7 @@ import AppKit
 enum CanvasHitTestResult {
     case canvas
     case nodeHeader(UUID)
+    case nodeFooter(UUID)
     case nodeContent(UUID, NSView)
     case nodeResize(UUID, ResizeEdge)
 }
@@ -74,6 +75,14 @@ extension CanvasViewportView {
             let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
             if localPt.y <= scaledHeaderHeight {
                 return .nodeHeader(node.id)
+            }
+
+            // footer 在节点底部（仅终端节点有 footer）
+            if case .terminal = node.content {
+                let scaledFooterHeight = CanvasNodeConstants.footerHeight * zoom
+                if localPt.y >= screenFrame.height - scaledFooterHeight {
+                    return .nodeFooter(node.id)
+                }
             }
 
             return .nodeContent(node.id, nodesHostingView ?? self)
@@ -150,6 +159,8 @@ extension CanvasViewportView {
             let hit = hitTestCanvas(at: loc)
             if case .nodeHeader(let id) = hit {
                 handleConnectionClick(nodeId: id)
+            } else if case .nodeFooter(let id) = hit {
+                handleConnectionClick(nodeId: id)
             } else if case .nodeContent(let id, _) = hit {
                 handleConnectionClick(nodeId: id)
             } else {
@@ -162,6 +173,9 @@ extension CanvasViewportView {
         if connectingFromNodeId != nil {
             let hit = hitTestCanvas(at: loc)
             if case .nodeHeader(let id) = hit {
+                handleConnectionClick(nodeId: id)
+                return
+            } else if case .nodeFooter(let id) = hit {
                 handleConnectionClick(nodeId: id)
                 return
             } else if case .nodeContent(let id, _) = hit {
@@ -196,7 +210,7 @@ extension CanvasViewportView {
             interaction = .marquee(start: loc)
             marqueeCurrentPoint = nil
 
-        case .nodeHeader(let id):
+        case .nodeHeader(let id), .nodeFooter(let id):
             guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
             let startFrame = nodeCanvasFrames[id] ?? .zero
@@ -626,7 +640,7 @@ extension CanvasViewportView {
         switch hitTestCanvas(at: loc) {
         case .nodeResize(_, let edge):
             edge.cursor.set()
-        case .nodeHeader, .nodeContent, .canvas:
+        case .nodeHeader, .nodeFooter, .nodeContent, .canvas:
             NSCursor.arrow.set()
         }
     }
