@@ -25,6 +25,14 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
     var onFilesDroppedOnNode: (([String], UUID) -> Void)?
     /// 可用角色预设（用于 TerminalNodeView 右键菜单 Assign Role 子菜单）
     var rolePresets: [RolePreset] = []
+    /// Agent 预设列表（供画布空白区域右键菜单 Terminal 子菜单使用）
+    var agentPresets: [AgentPreset] = []
+    /// 画布空白区域右键菜单：创建节点（nodeType, canvasPoint）
+    var onCanvasContextCreateNode: ((String, CGPoint) -> Void)?
+    /// 画布空白区域右键菜单：创建终端（presetIndex, canvasPoint）
+    var onCanvasContextCreateTerminal: ((Int, CGPoint) -> Void)?
+    /// 画布空白区域右键菜单：粘贴（canvasPoint）
+    var onCanvasContextPaste: ((CGPoint) -> Void)?
 
     final class Coordinator {
         var renderer: CanvasNodeRenderer?
@@ -47,6 +55,10 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         view.onSelectionChanged = onSelectionChanged
         view.onFilesDropped = onFilesDropped
         view.onFilesDroppedOnNode = onFilesDroppedOnNode
+        view.agentPresets = agentPresets
+        view.onCanvasContextCreateNode = onCanvasContextCreateNode
+        view.onCanvasContextCreateTerminal = onCanvasContextCreateTerminal
+        view.onCanvasContextPaste = onCanvasContextPaste
 
         let renderer = CanvasNodeRenderer(canvas: view)
         context.coordinator.renderer = renderer
@@ -82,6 +94,10 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         nsView.onNodeDrawn = onNodeDrawn
         nsView.onFilesDropped = onFilesDropped
         nsView.onFilesDroppedOnNode = onFilesDroppedOnNode
+        nsView.agentPresets = agentPresets
+        nsView.onCanvasContextCreateNode = onCanvasContextCreateNode
+        nsView.onCanvasContextCreateTerminal = onCanvasContextCreateTerminal
+        nsView.onCanvasContextPaste = onCanvasContextPaste
 
         guard let ws = workspace, let renderer = context.coordinator.renderer else { return }
 

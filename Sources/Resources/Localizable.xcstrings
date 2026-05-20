@@ -1657,6 +1657,54 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
       }
     },
+    "canvas.context.add" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加" } }
+      }
+    },
+    "canvas.context.add.terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端" } }
+      }
+    },
+    "canvas.context.add.note" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Note" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "便签" } }
+      }
+    },
+    "canvas.context.add.attachment" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Attachment" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "附件" } }
+      }
+    },
+    "canvas.context.add.filetree" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File Tree" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件树" } }
+      }
+    },
+    "canvas.context.add.portal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Portal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "门户" } }
+      }
+    },
+    "canvas.context.add.text" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Text" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文本" } }
+      }
+    },
+    "canvas.context.paste" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Paste" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "粘贴" } }
+      }
+    },
     "canvas.context.duplicate" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate" } },

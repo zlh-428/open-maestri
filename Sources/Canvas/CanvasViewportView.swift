@@ -195,6 +195,18 @@ final class CanvasViewportView: NSView {
     /// 右键菜单：切换 Maestro 模式（Terminal 专属）
     var onContextMenuToggleMaestro: ((UUID) -> Void)?
 
+    // MARK: - 画布空白区域右键菜单回调
+
+    /// 右键菜单：在画布指定位置创建指定类型节点（nodeType, canvasPoint）
+    /// nodeType: "terminal", "stickyNote", "portal", "fileTree", "text", "linkedFile"
+    var onCanvasContextCreateNode: ((String, CGPoint) -> Void)?
+    /// 右键菜单：在画布指定位置创建终端节点（presetIndex, canvasPoint）
+    var onCanvasContextCreateTerminal: ((Int, CGPoint) -> Void)?
+    /// 右键菜单：粘贴（画布坐标）
+    var onCanvasContextPaste: ((CGPoint) -> Void)?
+    /// Agent 预设列表（供画布右键菜单 Terminal 子菜单使用）
+    var agentPresets: [AgentPreset] = []
+
     /// 节点 zIndex 变化回调（节点ID → 新 zIndex），由 WorkspaceManager 持久化
     var onNodeZIndexChanged: ((UUID, Int) -> Void)?
 
@@ -703,7 +715,9 @@ extension CanvasViewportView {
             nodeId = nil
         }
 
-        guard let id = nodeId else { return super.menu(for: event) }
+        guard let id = nodeId else {
+            return buildCanvasBlankMenu(at: loc)
+        }
         guard let node = currentNodes.first(where: { $0.id == id }) else { return super.menu(for: event) }
 
         let menu = NSMenu()
@@ -754,6 +768,142 @@ extension CanvasViewportView {
         }
 
         return menu
+    }
+
+    // MARK: - Canvas Blank Area Context Menu
+
+    /// 构建画布空白区域右键菜单（添加 → 终端/便签/附件/文件树/门户/文本 + 粘贴）
+    private func buildCanvasBlankMenu(at screenPoint: CGPoint) -> NSMenu {
+        let canvasPoint = screenToCanvas(screenPoint)
+        let menu = NSMenu()
+
+        // 「添加」子菜单
+        let addItem = NSMenuItem(title: "canvas.context.add".localized, action: nil, keyEquivalent: "")
+        addItem.image = NSImage(systemSymbolName: "plus.square", accessibilityDescription: nil)
+        let addSubmenu = NSMenu()
+
+        // 终端子菜单（含 Agent 预设列表）
+        let terminalItem = NSMenuItem(title: "canvas.context.add.terminal".localized, action: nil, keyEquivalent: "")
+        terminalItem.image = NSImage(systemSymbolName: "terminal", accessibilityDescription: nil)
+        let terminalSubmenu = NSMenu()
+
+        for (index, preset) in agentPresets.enumerated() where preset.isActive {
+            let presetItem = NSMenuItem(title: preset.name, action: #selector(contextMenuCreateTerminalPreset(_:)), keyEquivalent: "")
+            presetItem.target = self
+            presetItem.tag = index
+            presetItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+            if let iconName = presetIconName(for: preset) {
+                presetItem.image = NSImage(systemSymbolName: iconName, accessibilityDescription: nil)
+            }
+            terminalSubmenu.addItem(presetItem)
+        }
+        terminalItem.submenu = terminalSubmenu
+        addSubmenu.addItem(terminalItem)
+
+        // 便签
+        let noteItem = NSMenuItem(title: "canvas.context.add.note".localized, action: #selector(contextMenuCreateNote(_:)), keyEquivalent: "")
+        noteItem.target = self
+        noteItem.image = NSImage(systemSymbolName: "doc.richtext", accessibilityDescription: nil)
+        noteItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        addSubmenu.addItem(noteItem)
+
+        // 附件（LinkedFile）
+        let attachmentItem = NSMenuItem(title: "canvas.context.add.attachment".localized, action: #selector(contextMenuCreateAttachment(_:)), keyEquivalent: "")
+        attachmentItem.target = self
+        attachmentItem.image = NSImage(systemSymbolName: "paperclip", accessibilityDescription: nil)
+        attachmentItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        addSubmenu.addItem(attachmentItem)
+
+        // 文件树
+        let fileTreeItem = NSMenuItem(title: "canvas.context.add.filetree".localized, action: #selector(contextMenuCreateFileTree(_:)), keyEquivalent: "")
+        fileTreeItem.target = self
+        fileTreeItem.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        fileTreeItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        addSubmenu.addItem(fileTreeItem)
+
+        // 门户
+        let portalItem = NSMenuItem(title: "canvas.context.add.portal".localized, action: #selector(contextMenuCreatePortal(_:)), keyEquivalent: "")
+        portalItem.target = self
+        portalItem.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        portalItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        addSubmenu.addItem(portalItem)
+
+        // 文本
+        let textItem = NSMenuItem(title: "canvas.context.add.text".localized, action: #selector(contextMenuCreateText(_:)), keyEquivalent: "")
+        textItem.target = self
+        textItem.image = NSImage(systemSymbolName: "textformat", accessibilityDescription: nil)
+        textItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        addSubmenu.addItem(textItem)
+
+        addItem.submenu = addSubmenu
+        menu.addItem(addItem)
+
+        // 粘贴
+        let pasteItem = NSMenuItem(title: "canvas.context.paste".localized, action: #selector(contextMenuPaste(_:)), keyEquivalent: "")
+        pasteItem.target = self
+        pasteItem.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+        pasteItem.representedObject = NSValue(point: NSPoint(x: canvasPoint.x, y: canvasPoint.y))
+        // 仅在剪贴板有内容时可用
+        pasteItem.isEnabled = NSPasteboard.general.string(forType: .string) != nil
+        menu.addItem(pasteItem)
+
+        return menu
+    }
+
+    /// 根据 AgentPreset 获取 SF Symbol 图标名
+    private func presetIconName(for preset: AgentPreset) -> String? {
+        switch preset.agentType {
+        case "claude_code": return "seal"
+        case "codex": return "brain"
+        case "gemini_cli": return "sparkle"
+        case "open_code": return "rectangle.portrait"
+        case "generic_shell": return "terminal"
+        default: return preset.icon.isEmpty ? nil : preset.icon
+        }
+    }
+
+    // MARK: - Canvas Blank Area Context Menu Actions
+
+    @objc private func contextMenuCreateTerminalPreset(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateTerminal?(sender.tag, canvasPoint)
+    }
+
+    @objc private func contextMenuCreateNote(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateNode?("stickyNote", canvasPoint)
+    }
+
+    @objc private func contextMenuCreateAttachment(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateNode?("linkedFile", canvasPoint)
+    }
+
+    @objc private func contextMenuCreateFileTree(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateNode?("fileTree", canvasPoint)
+    }
+
+    @objc private func contextMenuCreatePortal(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateNode?("portal", canvasPoint)
+    }
+
+    @objc private func contextMenuCreateText(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextCreateNode?("text", canvasPoint)
+    }
+
+    @objc private func contextMenuPaste(_ sender: NSMenuItem) {
+        guard let point = (sender.representedObject as? NSValue)?.pointValue else { return }
+        let canvasPoint = CGPoint(x: point.x, y: point.y)
+        onCanvasContextPaste?(canvasPoint)
     }
 
     // MARK: - Menu Item Helpers

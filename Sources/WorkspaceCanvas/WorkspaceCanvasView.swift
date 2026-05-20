@@ -131,7 +131,17 @@ struct WorkspaceCanvasView: View {
                 onFilesDroppedOnNode: { paths, nodeId in
                     handleFilesDroppedOnNode(paths: paths, nodeId: nodeId)
                 },
-                rolePresets: appState.preferences.rolePresets
+                rolePresets: appState.preferences.rolePresets,
+                agentPresets: appState.preferences.agentPresets.filter { $0.isActive },
+                onCanvasContextCreateNode: { nodeType, canvasPoint in
+                    handleCanvasContextCreateNode(nodeType: nodeType, at: canvasPoint)
+                },
+                onCanvasContextCreateTerminal: { presetIndex, canvasPoint in
+                    handleCanvasContextCreateTerminal(presetIndex: presetIndex, at: canvasPoint)
+                },
+                onCanvasContextPaste: { canvasPoint in
+                    handleCanvasContextPaste(at: canvasPoint)
+                }
             )
             .ignoresSafeArea()
 
@@ -411,6 +421,113 @@ struct WorkspaceCanvasView: View {
         )
         workspace.addNode(node)
         Task { try? await workspace.save() }
+    }
+
+    // MARK: - Canvas Blank Area Context Menu Handlers
+
+    /// 画布空白区域右键菜单：创建指定类型节点
+    private func handleCanvasContextCreateNode(nodeType: String, at canvasPoint: CGPoint) {
+        let size = defaultNodeSize(for: nodeType)
+        let frame = CGRect(
+            x: canvasPoint.x - size.width / 2,
+            y: canvasPoint.y - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        switch nodeType {
+        case "stickyNote":
+            createNoteAtFrame(frame)
+        case "fileTree":
+            createFileTreeAtFrame(frame)
+        case "portal":
+            // Portal 需要弹 sheet 输入 URL
+            showPortalDrawnFrame = frame
+            showPortalSheetForDrawing = true
+        case "text":
+            createTextAtFrame(frame)
+        case "linkedFile":
+            // 链接文件：弹出文件选择面板
+            createLinkedFileAtFrame(frame)
+        default:
+            break
+        }
+    }
+
+    /// 画布空白区域右键菜单：根据预设索引创建终端节点
+    private func handleCanvasContextCreateTerminal(presetIndex: Int, at canvasPoint: CGPoint) {
+        let activePresets = appState.preferences.agentPresets.filter { $0.isActive }
+        guard presetIndex >= 0, presetIndex < activePresets.count else { return }
+        let preset = activePresets[presetIndex]
+        let size = defaultNodeSize(for: "terminal")
+        let frame = CGRect(
+            x: canvasPoint.x - size.width / 2,
+            y: canvasPoint.y - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        createTerminalAtFrame(frame, preset: preset, role: nil, isManager: false)
+    }
+
+    /// 画布空白区域右键菜单：粘贴
+    private func handleCanvasContextPaste(at canvasPoint: CGPoint) {
+        guard let text = NSPasteboard.general.string(forType: .string) else { return }
+        // 粘贴文本内容为 Note 节点
+        let name = "Pasted-\(UUID().uuidString.prefix(6))"
+        let fileName = "\(name).md"
+        var nc = StickyNoteContent(name: name)
+        nc.fileName = fileName
+        let size = defaultNodeSize(for: "stickyNote")
+        let frame = CGRect(
+            x: canvasPoint.x - size.width / 2,
+            y: canvasPoint.y - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        let node = CanvasNode(frame: frame, content: .stickyNote(nc))
+        let filePath = PersistenceManager.shared.notesDirURL(workspaceId: workspace.id)
+            .appendingPathComponent(fileName).path
+        try? FileManager.default.createDirectory(
+            atPath: PersistenceManager.shared.notesDirURL(workspaceId: workspace.id).path,
+            withIntermediateDirectories: true
+        )
+        try? text.write(toFile: filePath, atomically: true, encoding: .utf8)
+        NoteRegistry.shared.register(name: name, filePath: filePath, nodeId: node.id)
+        workspace.addNode(node)
+        Task { try? await workspace.save() }
+    }
+
+    /// 链接文件：弹出文件选择器并在指定位置创建节点
+    private func createLinkedFileAtFrame(_ frame: CGRect) {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Task { @MainActor in
+                let name = url.lastPathComponent
+                var nc = StickyNoteContent(name: name)
+                nc.fileName = url.lastPathComponent
+                nc.storageMode = .custom(path: url.path)
+                let node = CanvasNode(frame: frame, content: .stickyNote(nc))
+                NoteRegistry.shared.register(name: name, filePath: url.path, nodeId: node.id)
+                workspace.addNode(node)
+                Task { try? await workspace.save() }
+            }
+        }
+    }
+
+    /// 节点类型对应的默认尺寸（复用 CanvasViewportView 的定义）
+    private func defaultNodeSize(for nodeType: String) -> CGSize {
+        switch nodeType {
+        case "terminal": return CGSize(width: 600, height: 400)
+        case "stickyNote": return CGSize(width: 300, height: 240)
+        case "portal": return CGSize(width: 500, height: 380)
+        case "fileTree": return CGSize(width: 360, height: 480)
+        case "text": return CGSize(width: 200, height: 60)
+        case "linkedFile": return CGSize(width: 300, height: 240)
+        default: return CGSize(width: 400, height: 300)
+        }
     }
 
     /// 处理从 Finder 拖入的 .md/.markdown/.txt 文件，创建 Note 节点（storageMode = .custom）
