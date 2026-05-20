@@ -74,8 +74,6 @@ struct TerminalSettingsView: View {
     }
 
     private func allProviders() -> [SwiftTermProvider] {
-        TerminalManager.shared.terminals.keys.compactMap {
-            TerminalProviderRegistry.shared.provider(for: $0)
-        }
+        TerminalProviderRegistry.shared.allProviders()
     }
 }

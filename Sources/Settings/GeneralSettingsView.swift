@@ -101,10 +101,8 @@ struct GeneralSettingsView: View {
 
     private func applyMetalToAll(enabled: Bool) {
         Task { @MainActor in
-            for id in TerminalManager.shared.terminals.keys {
-                if let provider = TerminalProviderRegistry.shared.provider(for: id) {
-                    provider.applyMetalRenderer(enabled: enabled)
-                }
+            for provider in TerminalProviderRegistry.shared.allProviders() {
+                provider.applyMetalRenderer(enabled: enabled)
             }
         }
     }

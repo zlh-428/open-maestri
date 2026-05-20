@@ -16,6 +16,9 @@ struct TerminalEmbeddedView: NSViewRepresentable {
         if let existing = TerminalProviderRegistry.shared.provider(for: terminalId),
            let existingView = existing.terminalView {
             existing.terminalView?.removeFromSuperview()
+            // 重新 attach 时同步最新主题和字体（preferences 可能在离开期间已变更）
+            existing.applyCurrentTheme(to: existingView)
+            existing.applyCurrentFont(to: existingView)
             return existingView
         }
 
@@ -97,6 +100,11 @@ final class TerminalProviderRegistry {
     func provider(for terminalId: UUID) -> SwiftTermProvider? {
         lock.lock(); defer { lock.unlock() }
         return providers[terminalId]
+    }
+
+    func allProviders() -> [SwiftTermProvider] {
+        lock.lock(); defer { lock.unlock() }
+        return Array(providers.values)
     }
 
     /// 将已缓存的 terminalView 从当前父视图移除（供 Canvas 层重新 attach 前调用）
