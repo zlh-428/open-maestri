@@ -115,7 +115,7 @@ final class ConnectionOverlayView: NSView {
         highlightedConnectionId = connId
 
         let menu = NSMenu()
-        let deleteTitle = String(localized: "connection.delete")
+        let deleteTitle = "connection.delete".localized
         let deleteItem = NSMenuItem(title: deleteTitle, action: #selector(deleteHighlightedConnection), keyEquivalent: "")
         let attrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemRed]
         deleteItem.attributedTitle = NSAttributedString(string: deleteTitle, attributes: attrs)

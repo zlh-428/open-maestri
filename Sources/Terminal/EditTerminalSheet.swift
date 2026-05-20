@@ -49,9 +49,9 @@ struct EditTerminalSheet: View {
                     .focused($focusedField, equals: .name)
                 TextField("terminal.launch_command", text: $command)
                     .focused($focusedField, equals: .command)
-                    .help(String(localized: "terminal.edit.command_help"))
+                    .help("terminal.edit.command_help".localized)
                 Toggle("terminal.maestro_mode", isOn: $isManager)
-                    .help(String(localized: "terminal.edit.maestro_help"))
+                    .help("terminal.edit.maestro_help".localized)
             }.formStyle(.grouped).padding()
         }
         .frame(width: 380, height: 240)

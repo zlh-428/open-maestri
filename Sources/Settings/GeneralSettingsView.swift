@@ -28,7 +28,7 @@ struct GeneralSettingsView: View {
                 }
                 Toggle("general.metal_renderer",
                        isOn: $state.preferences.metalRendererEnabled)
-                    .help(String(localized: "general.metal_renderer.help"))
+                    .help("general.metal_renderer.help".localized)
                     .onChange(of: state.preferences.metalRendererEnabled) { _, enabled in
                         applyMetalToAll(enabled: enabled)
                     }
@@ -40,7 +40,7 @@ struct GeneralSettingsView: View {
                     Text("VS Code").tag("vscode")
                     Text("Xcode").tag("xcode")
                 }
-                .help(String(localized: "general.preferred_ide.help"))
+                .help("general.preferred_ide.help".localized)
 
                 Toggle("general.ssh_enabled", isOn: $state.preferences.sshEnabled)
                 if appState.preferences.sshEnabled {
@@ -56,10 +56,10 @@ struct GeneralSettingsView: View {
                         TextField("", value: $state.preferences.sshTunnelPort, format: .number)
                             .frame(width: 70)
                     }
-                    .help(String(localized: "general.ssh_tunnel.help"))
+                    .help("general.ssh_tunnel.help".localized)
                     TextField("general.ssh_script_path", text: $state.preferences.sshScriptPath)
                         .textFieldStyle(.roundedBorder)
-                        .help(String(localized: "general.ssh_script_path.help"))
+                        .help("general.ssh_script_path.help".localized)
                     Toggle("general.ssh_add_to_path", isOn: $state.preferences.sshAddToPath)
                     Button("button.connect") {
                         connectSSH()
@@ -95,6 +95,7 @@ struct GeneralSettingsView: View {
         }
         .sheet(isPresented: $showBackups) {
             BackupListView(backups: backupList)
+                .environment(\.locale, LocalizationManager.shared.locale)
         }
     }
 
@@ -182,7 +183,7 @@ struct BackupListView: View {
                         Spacer()
                         Button("button.restore") {
                             if let count = try? BackupManager.shared.restoreFromBackup(url: backup) {
-                                restoreResult = "\(String(localized: "general.backup_list.restored")) \(count)"
+                                restoreResult = "\("general.backup_list.restored".localized) \(count)"
                             }
                         }
                         .buttonStyle(.bordered)

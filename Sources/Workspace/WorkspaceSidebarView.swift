@@ -46,6 +46,7 @@ struct WorkspaceSidebarView: View {
                 EditWorkspaceSheet(entry: entry) { updated in
                     applyEdit(updated)
                 }
+                .environment(\.locale, LocalizationManager.shared.locale)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .nextWorkspace)) { _ in
@@ -117,7 +118,7 @@ struct WorkspaceSidebarView: View {
                 workspaceRowItem(entry: entry, inGroup: nil)
             }
         }
-        .searchable(text: $searchText, placement: .sidebar, prompt: String(localized: "workspace.search"))
+        .searchable(text: $searchText, placement: .sidebar, prompt: "workspace.search".localized)
     }
 
     @ViewBuilder
@@ -151,7 +152,7 @@ struct WorkspaceSidebarView: View {
             } label: {
                 Image(systemName: "plus")
             }
-            .help(String(localized: "workspace.new_or_group"))
+            .help("workspace.new_or_group".localized)
         }
     }
 

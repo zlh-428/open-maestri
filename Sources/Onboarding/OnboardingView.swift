@@ -12,23 +12,23 @@ struct OnboardingView: View {
             case 0:
                 OnboardingStep(
                     icon: "terminal.fill",
-                    title: String(localized: "onboarding.step1.title"),
-                    subtitle: String(localized: "onboarding.step1.subtitle"),
-                    buttonLabel: String(localized: "button.start")
+                    title: "onboarding.step1.title".localized,
+                    subtitle: "onboarding.step1.subtitle".localized,
+                    buttonLabel: "button.start".localized
                 ) { step = 1 }
             case 1:
                 OnboardingStep(
                     icon: "cpu",
-                    title: String(localized: "onboarding.step2.title"),
-                    subtitle: String(localized: "onboarding.step2.subtitle"),
-                    buttonLabel: String(localized: "button.continue")
+                    title: "onboarding.step2.title".localized,
+                    subtitle: "onboarding.step2.subtitle".localized,
+                    buttonLabel: "button.continue".localized
                 ) { step = 2 }
             default:
                 OnboardingStep(
                     icon: "link",
-                    title: String(localized: "onboarding.step3.title"),
-                    subtitle: String(localized: "onboarding.step3.subtitle"),
-                    buttonLabel: String(localized: "button.get_started")
+                    title: "onboarding.step3.title".localized,
+                    subtitle: "onboarding.step3.subtitle".localized,
+                    buttonLabel: "button.get_started".localized
                 ) { hasCompleted = true }
             }
             Spacer()

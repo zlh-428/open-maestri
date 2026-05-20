@@ -70,7 +70,7 @@ struct LandingView: View {
     private func loadDiff() {
         Task.detached(priority: .userInitiated) {
             let result = (try? runGit(["diff", "--stat", floor.branchName], in: workingDirectory)) ?? ""
-            let noDiff = String(localized: "git.no_diff")
+            let noDiff = "git.no_diff".localized
             await MainActor.run { diffText = result.isEmpty ? noDiff : result }
         }
     }

@@ -44,6 +44,7 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 600)
         .sheet(isPresented: $showCreateWorkspace) {
             CreateWorkspaceSheet()
+                .environment(\.locale, LocalizationManager.shared.locale)
         }
         .onAppear {
             selectedWorkspaceId = appState.activeWorkspaceId

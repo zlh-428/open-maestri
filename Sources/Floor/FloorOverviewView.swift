@@ -76,6 +76,7 @@ struct FloorOverviewView: View {
             CreateFloorSheet(workingDirectory: workspace.workingDirectory) { name, branch in
                 createFloor(name: name, branchName: branch)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showLanding) {
             if let floor = landingFloor {
@@ -86,6 +87,7 @@ struct FloorOverviewView: View {
                 } onCancel: {
                     showLanding = false
                 }
+                .environment(\.locale, LocalizationManager.shared.locale)
             }
         }
         .sheet(isPresented: $showHooksSheet) {
@@ -98,6 +100,7 @@ struct FloorOverviewView: View {
                         Task { try? await workspace.save() }
                     }
                 ), floorName: floor.name)
+                .environment(\.locale, LocalizationManager.shared.locale)
             }
         }
     }
@@ -194,7 +197,7 @@ struct FloorRowView: View {
                     Image(systemName: "bolt.fill")
                 }
                 .buttonStyle(.plain)
-                .help(String(localized: "tooltip.config_hooks"))
+                .help("tooltip.config_hooks".localized)
             }
         }
         .padding(.horizontal, 12)
@@ -232,7 +235,7 @@ struct HooksConfigSheet: View {
                 VStack(spacing: 16) {
                     HooksPhaseSection(
                         title: "Setup",
-                        subtitle: String(localized: "floor.hook.post_create"),
+                        subtitle: "floor.hook.post_create".localized,
                         systemImage: "play.circle",
                         commands: $hooks.setup
                     )
@@ -244,7 +247,7 @@ struct HooksConfigSheet: View {
 
                     HooksPhaseSection(
                         title: "Run",
-                        subtitle: String(localized: "floor.hook.manual"),
+                        subtitle: "floor.hook.manual".localized,
                         systemImage: "bolt.circle",
                         commands: $hooks.run
                     )
@@ -253,7 +256,7 @@ struct HooksConfigSheet: View {
 
                     HooksPhaseSection(
                         title: "Teardown",
-                        subtitle: String(localized: "floor.hook.teardown"),
+                        subtitle: "floor.hook.teardown".localized,
                         systemImage: "stop.circle",
                         commands: $hooks.teardown
                     )

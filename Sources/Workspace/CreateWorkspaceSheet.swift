@@ -82,7 +82,7 @@ struct CreateWorkspaceSheet: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = String(localized: "panel.select_workspace_dir")
+        panel.message = "panel.select_workspace_dir".localized
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             workingDirectory = url.path

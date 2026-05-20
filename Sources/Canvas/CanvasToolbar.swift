@@ -24,7 +24,7 @@ struct CanvasToolbar: View {
                 // 1. 选择工具（鼠标指针）
                 FloatingToolButton(
                     icon: "cursorarrow",
-                    tooltip: String(localized: "canvas.toolbar.select"),
+                    tooltip: "canvas.toolbar.select".localized,
                     isActive: activeDrawingTool == nil && !isConnecting
                 ) {
                     activeDrawingTool = nil
@@ -34,7 +34,7 @@ struct CanvasToolbar: View {
                 // 2. Terminal 工具
                 FloatingToolButton(
                     icon: "terminal.fill",
-                    tooltip: String(localized: "canvas.toolbar.terminal"),
+                    tooltip: "canvas.toolbar.terminal".localized,
                     isActive: activeDrawingTool == "terminal"
                 ) {
                     toggleDrawingTool("terminal")
@@ -43,7 +43,7 @@ struct CanvasToolbar: View {
                 // 3. Note 工具
                 FloatingToolButton(
                     icon: "doc.richtext",
-                    tooltip: String(localized: "canvas.toolbar.note"),
+                    tooltip: "canvas.toolbar.note".localized,
                     isActive: activeDrawingTool == "stickyNote"
                 ) {
                     toggleDrawingTool("stickyNote")
@@ -52,7 +52,7 @@ struct CanvasToolbar: View {
                 // 4. 链接文件（占位，暂未实现）
                 FloatingToolButton(
                     icon: "paperclip",
-                    tooltip: String(localized: "canvas.toolbar.text"),
+                    tooltip: "canvas.toolbar.text".localized,
                     isActive: activeDrawingTool == "linkedFile"
                 ) {
                     toggleDrawingTool("linkedFile")
@@ -61,7 +61,7 @@ struct CanvasToolbar: View {
                 // 5. FileTree 工具
                 FloatingToolButton(
                     icon: "folder",
-                    tooltip: String(localized: "canvas.toolbar.filetree"),
+                    tooltip: "canvas.toolbar.filetree".localized,
                     isActive: activeDrawingTool == "fileTree"
                 ) {
                     toggleDrawingTool("fileTree")
@@ -70,7 +70,7 @@ struct CanvasToolbar: View {
                 // 6. Portal 工具
                 FloatingToolButton(
                     icon: "globe",
-                    tooltip: String(localized: "canvas.toolbar.portal"),
+                    tooltip: "canvas.toolbar.portal".localized,
                     isActive: activeDrawingTool == "portal"
                 ) {
                     toggleDrawingTool("portal")
@@ -79,7 +79,7 @@ struct CanvasToolbar: View {
                 // 7. 格式（文本标签）
                 FloatingToolButton(
                     icon: "textformat",
-                    tooltip: String(localized: "canvas.toolbar.format"),
+                    tooltip: "canvas.toolbar.format".localized,
                     isActive: activeDrawingTool == "text"
                 ) {
                     toggleDrawingTool("text")
@@ -88,7 +88,7 @@ struct CanvasToolbar: View {
                 // 8. 手绘工具
                 FloatingToolButton(
                     icon: "pencil.and.scribble",
-                    tooltip: String(localized: "canvas.toolbar.draw"),
+                    tooltip: "canvas.toolbar.draw".localized,
                     isActive: activeDrawingTool == "drawing"
                 ) {
                     toggleDrawingTool("drawing")
@@ -111,16 +111,19 @@ struct CanvasToolbar: View {
             ) { preset, role, isManager, workDir in
                 createTerminal(preset: preset, role: role, isManager: isManager, workingDirectory: workDir)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showPortalSheet) {
             NewPortalSheet { url in
                 createPortal(url: url)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showFileTreeSheet) {
             NewFileTreeSheet(defaultPath: workspace.workingDirectory) { path in
                 createFileTree(rootPath: path)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
     }
 

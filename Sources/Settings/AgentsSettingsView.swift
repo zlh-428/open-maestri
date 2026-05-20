@@ -53,12 +53,14 @@ struct AgentsSettingsView: View {
                 appState.preferences.agentPresets.append(newPreset)
                 save()
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showAddRole) {
             RoleEditSheet(role: nil) { newRole in
                 appState.preferences.rolePresets.append(newRole)
                 save()
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(item: $roleToEdit) { role in
             RoleEditSheet(role: role) { updated in
@@ -73,6 +75,7 @@ struct AgentsSettingsView: View {
                 }
                 save()
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
     }
 
@@ -182,7 +185,7 @@ struct AddAgentPresetSheet: View {
             Form {
                 TextField("agent.name", text: $name)
                 TextField("terminal.command", text: $command)
-                    .help(String(localized: "agent.command.help"))
+                    .help("agent.command.help".localized)
                 Picker("agent.type", selection: $agentType) {
                     Text("Claude Code").tag("claude_code")
                     Text("Codex").tag("codex")
@@ -281,7 +284,7 @@ struct RoleEditSheet: View {
     private var roleBasicInfoTab: some View {
         Form {
             TextField("role.name", text: $name)
-                .help(String(localized: "role.name_placeholder.help"))
+                .help("role.name_placeholder.help".localized)
 
             Section("agent.section.role_instructions") {
                 TextEditor(text: $prompt)
@@ -390,7 +393,7 @@ struct RoleEditSheet: View {
 
     /// 生成的文件内容预览
     private var generatedFileContent: String {
-        let rolePrompt = prompt.isEmpty ? String(localized: "agent.role_prompt.placeholder") : prompt
+        let rolePrompt = prompt.isEmpty ? "agent.role_prompt.placeholder".localized : prompt
         return """
         <your_assigned_role>
         \(rolePrompt)

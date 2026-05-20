@@ -16,7 +16,7 @@ struct NoteEditingView: View {
             // 上下文工具栏
             HStack(spacing: 8) {
                 Toggle(isOn: $isFormatted) {
-                    Label(isFormatted ? String(localized: "note.preview") : String(localized: "note.edit"),
+                    Label(isFormatted ? "note.preview".localized : "note.edit".localized,
                           systemImage: isFormatted ? "eye" : "pencil")
                 }
                 .toggleStyle(.button)

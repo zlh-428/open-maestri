@@ -46,6 +46,7 @@ struct RoutineManagerView: View {
         .onAppear { routines = RoutineScheduler.shared.routines }
         .sheet(isPresented: $showCreate) {
             RoutineEditView(routines: $routines, availableTerminals: terminalList)
+                .environment(\.locale, LocalizationManager.shared.locale)
         }
     }
 

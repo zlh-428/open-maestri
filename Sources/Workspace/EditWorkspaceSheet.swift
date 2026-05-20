@@ -112,7 +112,7 @@ struct EditWorkspaceSheet: View {
             // 同步开关
             HStack {
                 Toggle("filetree.sync_config", isOn: $syncConfigFiles)
-                    .help(String(localized: "filetree.sync_config.help"))
+                    .help("filetree.sync_config.help".localized)
                     .onChange(of: syncConfigFiles) { _, sync in
                         if sync { agentsMdContent = claudeMdContent }
                     }

@@ -12,7 +12,7 @@ struct GitOperationsPanel: View {
             // 分支名
             HStack {
                 Image(systemName: "arrow.triangle.branch")
-                Text(currentBranch.isEmpty ? String(localized: "git.branch.unknown") : currentBranch)
+                Text(currentBranch.isEmpty ? "git.branch.unknown".localized : currentBranch)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()

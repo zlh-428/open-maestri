@@ -193,7 +193,7 @@ struct NewTerminalSheet: View {
                 }
             }
             .toggleStyle(.checkbox)
-            .help(String(localized: "terminal.maestro_recruit_help"))
+            .help("terminal.maestro_recruit_help".localized)
         }
         .padding(.top, 4)
 
@@ -207,7 +207,7 @@ struct NewTerminalSheet: View {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Text(workingDirectory.isEmpty ? String(localized: "workspace.working_dir.none") : abbreviatePath(workingDirectory))
+                    Text(workingDirectory.isEmpty ? "workspace.working_dir.none".localized : abbreviatePath(workingDirectory))
                         .font(.system(size: 12))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -291,7 +291,7 @@ struct NewTerminalSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             // 无角色选项
             Button { selectedRoleIdx = nil } label: {
-                RoleOptionRow(name: String(localized: "role.none"), icon: "xmark.circle", color: "#8E8E93",
+                RoleOptionRow(name: "role.none".localized, icon: "xmark.circle", color: "#8E8E93",
                         isSelected: selectedRoleIdx == nil)
             }
             .buttonStyle(.plain)

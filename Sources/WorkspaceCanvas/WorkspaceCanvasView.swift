@@ -154,7 +154,7 @@ struct WorkspaceCanvasView: View {
                         .buttonStyle(.plain)
                         .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
                         .clipShape(Circle())
-                        .help(String(localized: "floor.overview"))
+                        .help("floor.overview".localized)
 
                         // 缩略图按钮
                         Button {
@@ -167,7 +167,7 @@ struct WorkspaceCanvasView: View {
                         .buttonStyle(.plain)
                         .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
                         .clipShape(Circle())
-                        .help(String(localized: "tooltip.minimap"))
+                        .help("tooltip.minimap".localized)
                         .popover(isPresented: $showMinimap, arrowEdge: .top) {
                             CanvasMinimapPopover(
                                 nodes: workspace.nodes,
@@ -183,6 +183,7 @@ struct WorkspaceCanvasView: View {
                                     showMinimap = false
                                 }
                             )
+                            .environment(\.locale, LocalizationManager.shared.locale)
                         }
 
                         // Zoom 控件
@@ -265,6 +266,7 @@ struct WorkspaceCanvasView: View {
                 },
                 onDismiss: { showAssignRoleSheet = false }
             )
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(item: Binding(
             get: { terminalToEdit.map { EditTerminalItem(id: $0.nodeId, content: $0.content) } },
@@ -273,9 +275,11 @@ struct WorkspaceCanvasView: View {
             EditTerminalSheet(nodeId: item.id, content: item.content, workspace: workspace) {
                 terminalToEdit = nil
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showFloorOverview) {
             FloorOverviewView(workspace: workspace)
+                .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showTerminalSheetForDrawing) {
             NewTerminalSheet(
@@ -285,11 +289,13 @@ struct WorkspaceCanvasView: View {
             ) { preset, role, isManager, workDir in
                 createTerminalAtFrame(showTerminalDrawnFrame, preset: preset, role: role, isManager: isManager, workingDirectory: workDir)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showPortalSheetForDrawing) {
             NewPortalSheet { url in
                 createPortalAtFrame(showPortalDrawnFrame, url: url)
             }
+            .environment(\.locale, LocalizationManager.shared.locale)
         }
         .autosave(workspace: workspace)
     }
@@ -694,7 +700,7 @@ struct WorkspaceCanvasView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: fc.rootPath)
-        panel.prompt = String(localized: "panel.select_directory")
+        panel.prompt = "panel.select_directory".localized
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let newPath = url.path
 

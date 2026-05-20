@@ -10,10 +10,10 @@ struct NodeContextToolbar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            contextButton(icon: "square.and.pencil", tooltip: String(localized: "tooltip.node.edit"), action: onEdit)
-            contextButton(icon: "point.3.connected.trianglepath.dotted", tooltip: String(localized: "tooltip.node.connect_terminal"), action: onConnect)
-            contextButton(icon: "arrow.triangle.2.circlepath", tooltip: String(localized: "tooltip.refresh"), action: onRefresh)
-            contextButton(icon: "trash", tooltip: String(localized: "tooltip.node.delete"), action: onDelete)
+            contextButton(icon: "square.and.pencil", tooltip: "tooltip.node.edit".localized, action: onEdit)
+            contextButton(icon: "point.3.connected.trianglepath.dotted", tooltip: "tooltip.node.connect_terminal".localized, action: onConnect)
+            contextButton(icon: "arrow.triangle.2.circlepath", tooltip: "tooltip.refresh".localized, action: onRefresh)
+            contextButton(icon: "trash", tooltip: "tooltip.node.delete".localized, action: onDelete)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
@@ -43,9 +43,9 @@ struct FileTreeContextToolbar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            contextButton(icon: "folder.badge.questionmark", tooltip: String(localized: "tooltip.node.reveal_finder"), action: onRevealInFinder)
-            contextButton(icon: "folder.badge.gearshape", tooltip: String(localized: "tooltip.node.change_root"), action: onChangeRoot)
-            contextButton(icon: "trash", tooltip: String(localized: "tooltip.node.delete"), action: onDelete)
+            contextButton(icon: "folder.badge.questionmark", tooltip: "tooltip.node.reveal_finder".localized, action: onRevealInFinder)
+            contextButton(icon: "folder.badge.gearshape", tooltip: "tooltip.node.change_root".localized, action: onChangeRoot)
+            contextButton(icon: "trash", tooltip: "tooltip.node.delete".localized, action: onDelete)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
