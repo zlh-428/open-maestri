@@ -47,12 +47,13 @@ final class TerminalManager {
         if let wsId = workspaceId {
             terminalWorkspaceMap[id] = wsId
             // 加载历史 scrollback 到 outputBuffer（供 omaestri check 使用）
+            // 使用 bulkLoadHistory 批量注入，避免逐行触发 activityMonitor 和 NotificationCenter
             Task.detached(priority: .background) {
                 let store = ScrollbackStore()
                 let entries = (try? store.load(terminalId: id, workspaceId: wsId)) ?? []
                 if !entries.isEmpty {
                     Task { @MainActor in
-                        entries.forEach { session.recordOutput($0.text) }
+                        session.bulkLoadHistory(entries.map { $0.text })
                     }
                 }
             }
@@ -155,6 +156,15 @@ final class TerminalSession {
         }
         isIdle = false
         activityMonitor.recordOutput()
+    }
+
+    /// 批量加载历史记录（仅写入 buffer，不触发 activityMonitor 或 Notification）
+    /// 用于 scrollback 恢复场景，避免逐行触发大量副作用
+    func bulkLoadHistory(_ lines: [String]) {
+        outputBuffer.append(contentsOf: lines)
+        if outputBuffer.count > bufferMaxLines {
+            outputBuffer = Array(outputBuffer.suffix(bufferMaxLines))
+        }
     }
 
     /// 获取最近 N 行输出

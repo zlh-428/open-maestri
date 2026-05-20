@@ -160,8 +160,24 @@ final class PersistenceManager {
         try saveSync(state, to: appStateURL)
     }
 
+    // MARK: - 偏好内存缓存（避免重复磁盘 I/O）
+
+    /// 内存缓存：首次读取后保留，避免每次创建终端都触发同步磁盘读取
+    private var _cachedPreferences: Preferences?
+    private let _prefLock = NSLock()
+
     func loadPreferences() throws -> Preferences {
-        (try loadIfExists(Preferences.self, from: preferencesURL)) ?? Preferences()
+        _prefLock.lock()
+        if let cached = _cachedPreferences {
+            _prefLock.unlock()
+            return cached
+        }
+        _prefLock.unlock()
+        let prefs = (try loadIfExists(Preferences.self, from: preferencesURL)) ?? Preferences()
+        _prefLock.lock()
+        _cachedPreferences = prefs
+        _prefLock.unlock()
+        return prefs
     }
 
     /// 同步无抛出版本，供 HTTP 线程调用（返回默认值而非崩溃）
@@ -171,6 +187,10 @@ final class PersistenceManager {
 
     func savePreferences(_ prefs: Preferences) throws {
         try saveSync(prefs, to: preferencesURL)
+        // 写入后同步更新内存缓存，保证后续读取拿到最新值
+        _prefLock.lock()
+        _cachedPreferences = prefs
+        _prefLock.unlock()
     }
 
     func loadManifest() throws -> WorkspaceManifest {

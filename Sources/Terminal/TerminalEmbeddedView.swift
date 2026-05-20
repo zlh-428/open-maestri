@@ -52,10 +52,12 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
     @MainActor
     func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
-        // 根据实际视图尺寸更新 PTY 行列
+        // 根据实际视图尺寸更新 PTY 行列（防抖：相同尺寸跳过，避免 SwiftUI 重渲染时频繁发 SIGWINCH）
         let cols = max(Int(nsView.frame.width / 8), 20)
         let rows = max(Int(nsView.frame.height / 16), 5)
-        nsView.getTerminal().resize(cols: cols, rows: rows)
+        let terminal = nsView.getTerminal()
+        guard terminal.cols != cols || terminal.rows != rows else { return }
+        terminal.resize(cols: cols, rows: rows)
     }
 
     @MainActor
