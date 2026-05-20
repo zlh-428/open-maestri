@@ -53,6 +53,46 @@ if [ -d "$ASSETS_SRC" ]; then
     "$ASSETS_SRC" 2>/dev/null || true
 fi
 
+# 本地化字符串：将 .xcstrings 编译为各语言 .lproj/Localizable.strings
+XCSTRINGS="$PROJECT_DIR/Sources/Resources/Localizable.xcstrings"
+if [ -f "$XCSTRINGS" ]; then
+  echo "▶ Compiling localizations..."
+  python3 - "$XCSTRINGS" "$APP_BUNDLE/Contents/Resources" <<'PYEOF'
+import json, os, sys
+
+xcstrings_path = sys.argv[1]
+resources_dir = sys.argv[2]
+
+with open(xcstrings_path) as f:
+    data = json.load(f)
+
+langs = set()
+for val in data["strings"].values():
+    for lang in val.get("localizations", {}).keys():
+        langs.add(lang)
+
+for lang in langs:
+    lproj_dir = os.path.join(resources_dir, f"{lang}.lproj")
+    os.makedirs(lproj_dir, exist_ok=True)
+    strings_path = os.path.join(lproj_dir, "Localizable.strings")
+    lines = []
+    for key, val in data["strings"].items():
+        loc = val.get("localizations", {}).get(lang)
+        if loc:
+            string_unit = loc.get("stringUnit", {})
+            translated = string_unit.get("value", key)
+        else:
+            # fallback to source language
+            src = val.get("localizations", {}).get(data["sourceLanguage"], {})
+            translated = src.get("stringUnit", {}).get("value", key)
+        escaped = translated.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
+        lines.append(f'"{key}" = "{escaped}";')
+    with open(strings_path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"  ✅ {lang}.lproj/Localizable.strings ({len(lines)} keys)")
+PYEOF
+fi
+
 # Sparkle framework
 if [ -d "$SPARKLE" ]; then
   cp -R "$SPARKLE" "$APP_BUNDLE/Contents/Frameworks/"
