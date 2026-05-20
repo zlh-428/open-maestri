@@ -250,6 +250,7 @@ struct WorkspaceCanvasView: View {
         .onAppear {
             canvasOrigin = workspace.canvasOrigin
             zoom = workspace.canvasZoom
+            preInitializeAllTerminals()
         }
         .onReceive(NotificationCenter.default.publisher(for: .showFloorOverview)) { _ in
             showFloorOverview = true
@@ -629,6 +630,41 @@ struct WorkspaceCanvasView: View {
         workspace.addNode(recruitNode)
         workspace.addConnection(conn)
         Task { try? await workspace.save() }
+    }
+
+    // MARK: - 终端预初始化
+
+    /// 进入工作区时批量预初始化所有终端，不依赖视图渲染触发 PTY 启动
+    @MainActor
+    private func preInitializeAllTerminals() {
+        for node in workspace.nodes {
+            guard case .terminal(let tc) = node.content else { continue }
+            // 跳过已有 provider 的（防重复初始化）
+            guard TerminalProviderRegistry.shared.provider(for: tc.id) == nil else { continue }
+            // 跳过已在 TerminalManager 中的（视口渲染可能已触发）
+            guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
+
+            let preset = AgentPreset(
+                id: UUID(),
+                name: tc.name,
+                command: tc.command,
+                icon: tc.icon,
+                agentType: tc.agentType,
+                color: tc.color,
+                isActive: true,
+                isBuiltIn: false
+            )
+            let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
+                appState.preferences.rolePresets.first { $0.id == roleId }
+            }
+            _ = TerminalManager.shared.createTerminal(
+                id: tc.id,
+                workingDirectory: tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory,
+                preset: preset,
+                role: role,
+                workspaceId: workspace.id
+            )
+        }
     }
 
     // MARK: - 浮动工具栏操作

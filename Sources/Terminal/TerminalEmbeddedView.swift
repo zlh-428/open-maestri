@@ -35,11 +35,13 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
         // 单一的输出链路：PTY 输出 → TerminalSession 缓存 + ScrollbackStore
         if let session = TerminalManager.shared.terminals[terminalId] {
-            provider.onOutput = { text in
+            provider.onOutput = { [weak provider] text in
+                // 首次输出表示 shell prompt 就绪，触发发送暂存的 cd/command
+                provider?.handleFirstOutput()
                 Task { @MainActor in
                     session.recordOutput(text)
                 }
-                provider.recordOutputForScrollback(text)
+                provider?.recordOutputForScrollback(text)
             }
         }
 

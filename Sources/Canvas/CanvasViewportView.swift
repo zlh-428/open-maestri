@@ -126,6 +126,12 @@ final class CanvasViewportView: NSView {
     /// 按 zIndex 降序预排序的节点缓存（供 hitTest 从前到后命中检测使用）
     private(set) var sortedNodesByZIndexDesc: [CanvasNode] = []
 
+    /// 视口裁剪缓存：避免 layout() 每帧重新遍历所有节点
+    private var _cachedViewportNodes: [CanvasNode] = []
+    private var _cachedViewportOrigin: CGPoint = .zero
+    private var _cachedViewportZoom: CGFloat = 0
+    private var _viewportCacheDirty: Bool = true
+
     private func invalidateSortedNodesCache() {
         sortedNodesByZIndex = currentNodes.sorted { $0.zIndex < $1.zIndex }
         sortedNodesByZIndexDesc = sortedNodesByZIndex.reversed()
@@ -529,11 +535,23 @@ final class CanvasViewportView: NSView {
         // 更新 SwiftUI 节点树的 canvasOrigin/zoom，触发节点重新定位
         if let hostingView = nodesHostingView {
             let current = hostingView.rootView
-            let visibleNodes = viewportCulledNodes()
+
+            // 仅在视口参数变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
+            let needsRecalc = _viewportCacheDirty
+                || _cachedViewportOrigin != canvasOrigin
+                || _cachedViewportZoom != zoom
+                || currentNodes.count != _cachedViewportNodes.count
+            if needsRecalc {
+                _cachedViewportNodes = viewportCulledNodes()
+                _cachedViewportOrigin = canvasOrigin
+                _cachedViewportZoom = zoom
+                _viewportCacheDirty = false
+            }
+
             // 仅当 origin/zoom/可见节点变化时才更新（避免完全无变化时的多余赋值）
-            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != visibleNodes {
+            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != _cachedViewportNodes {
                 hostingView.rootView = CanvasNodesSwiftUIView(
-                    nodes: visibleNodes,
+                    nodes: _cachedViewportNodes,
                     canvasOrigin: canvasOrigin,
                     zoom: zoom,
                     selectedNodeIds: current.selectedNodeIds,
@@ -604,6 +622,8 @@ final class CanvasViewportView: NSView {
             return CanvasNode(id: node.id, frame: canvasFrame, content: node.content,
                               zIndex: node.zIndex, isLocked: node.isLocked)
         }
+        // 节点 frame 变化可能影响视口可见性，强制使裁剪缓存失效
+        _viewportCacheDirty = true
         needsLayout = true
     }
 

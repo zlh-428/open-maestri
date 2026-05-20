@@ -152,7 +152,7 @@ final class TerminalSession {
         let newLines = text.components(separatedBy: "\n")
         outputBuffer.append(contentsOf: newLines)
         if outputBuffer.count > bufferMaxLines {
-            outputBuffer = Array(outputBuffer.suffix(bufferMaxLines))
+            outputBuffer.removeFirst(outputBuffer.count - bufferMaxLines)
         }
         isIdle = false
         activityMonitor.recordOutput()
@@ -163,7 +163,7 @@ final class TerminalSession {
     func bulkLoadHistory(_ lines: [String]) {
         outputBuffer.append(contentsOf: lines)
         if outputBuffer.count > bufferMaxLines {
-            outputBuffer = Array(outputBuffer.suffix(bufferMaxLines))
+            outputBuffer.removeFirst(outputBuffer.count - bufferMaxLines)
         }
     }
 

@@ -20,8 +20,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logger.error("InterAgentServer failed to start: \(error)")
         }
 
-        // 2. 写入 omaestri skill 到用户全局 ~/.claude/skills/（幂等，应用启动时执行一次）
-        SkillInjector.shared.installSkillsIfNeeded()
+        // 2. 写入 omaestri skill 到用户全局 ~/.claude/skills/（幂等，后台执行避免阻塞主线程）
+        DispatchQueue.global(qos: .userInitiated).async {
+            SkillInjector.shared.installSkillsIfNeeded()
+        }
 
         // 3. 配置主窗口样式（透明 title bar，让画布充满窗口）
         DispatchQueue.main.async {

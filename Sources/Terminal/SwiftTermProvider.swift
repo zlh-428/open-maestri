@@ -34,6 +34,10 @@ final class SwiftTermProvider: NSObject {
     private let scrollbackFlushThreshold = 50
     /// 无法直接 execve 的命令（alias/函数等），shell 启动后延迟发送
     private var pendingCommand: String? = nil
+    /// shell 就绪后需要发送的 cd + pendingCommand（等待首次 PTY 输出触发）
+    private var pendingStartupCommands: [String] = []
+    /// 标记是否已经消费了 startup commands（仅触发一次）
+    private var startupCommandsSent: Bool = false
 
     init(terminalId: UUID, command: String, workingDirectory: String) {
         self.terminalId = terminalId
@@ -51,16 +55,19 @@ final class SwiftTermProvider: NSObject {
         let view = LocalProcessTerminalView(frame: effectiveFrame)
         view.processDelegate = self
 
-        // 应用终端主题（替代简单的 configureNativeColors）
-        applyCurrentTheme(to: view)
+        // 统一读取一次偏好，避免 applyCurrentTheme/applyCurrentFont/enableMetalIfNeeded 各读一次磁盘
+        let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
+
+        // 应用终端主题
+        applyThemeWithPrefs(to: view, prefs: prefs)
         // 应用终端字体
-        applyCurrentFont(to: view)
+        applyFontWithPrefs(to: view, prefs: prefs)
 
         terminalView = view
         isRunning = true
 
         // 启用 Metal GPU 渲染器（如果偏好中开启）
-        enableMetalIfNeeded(view: view)
+        enableMetalIfNeeded(view: view, metalEnabled: prefs.metalRendererEnabled)
 
         // 构建环境变量：保留系统环境 + 注入 MAESTRI_* + 扩展 PATH
         var env = ProcessInfo.processInfo.environment
@@ -122,25 +129,16 @@ final class SwiftTermProvider: NSObject {
         logger.debug("PTY started: \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
 
         // SwiftTerm 的 startProcess 不直接支持 cwd，通过 cd 命令切换到工作目录
-        // 若有 pendingCommand（alias/函数），在 cd 之后再发送，确保 shell 已完全初始化
+        // 将 cd + pendingCommand 暂存，等首次 PTY 输出（shell prompt 就绪）后再发送
         let hasCd = !workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory)
-        let pending = pendingCommand
         if hasCd {
             let escapedPath = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.write("cd '\(escapedPath)'\n")
-                if let cmd = pending {
-                    // 额外延迟确保 cd 已执行
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-                        self?.write("\(cmd)\n")
-                    }
-                }
-            }
-        } else if let cmd = pending {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                self?.write("\(cmd)\n")
-            }
+            pendingStartupCommands.append("cd '\(escapedPath)'")
         }
+        if let cmd = pendingCommand {
+            pendingStartupCommands.append(cmd)
+        }
+        startupCommandsSent = pendingStartupCommands.isEmpty
         return view
     }
 
@@ -156,6 +154,20 @@ final class SwiftTermProvider: NSObject {
             if FileManager.default.isExecutableFile(atPath: full) { return full }
         }
         return cmd  // fallback：让系统自己查找
+    }
+
+    // MARK: - Shell 就绪检测
+
+    /// 当 PTY 首次产生输出时调用——表示 shell 已完成初始化并打印了 prompt
+    /// 此时发送暂存的 cd + pendingCommand，保证不会出现原始回显
+    func handleFirstOutput() {
+        guard !startupCommandsSent else { return }
+        startupCommandsSent = true
+        guard !pendingStartupCommands.isEmpty else { return }
+        // 将所有 startup commands 合并为一行用 && 连接，减少多余 prompt 输出
+        let combined = pendingStartupCommands.joined(separator: " && ")
+        pendingStartupCommands.removeAll()
+        write(combined + "\n")
     }
 
     // MARK: - PTY 写入
@@ -204,19 +216,15 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - Metal 渲染器
 
-    /// 根据偏好启用或禁用 Metal GPU 渲染
-    private func enableMetalIfNeeded(view: LocalProcessTerminalView) {
-        // 读取偏好：metalRendererEnabled
-        // 注意：此处在启动时只调用一次，后续切换通过 applyMetalRenderer 实现
+    /// 根据偏好启用或禁用 Metal GPU 渲染（接受已加载的 metalEnabled 值，避免重复磁盘读取）
+    private func enableMetalIfNeeded(view: LocalProcessTerminalView, metalEnabled: Bool) {
+        guard metalEnabled else { return }
         Task { @MainActor in
-            let enabled = self.resolveMetalPreference()
-            if enabled {
-                do {
-                    try view.setUseMetal(true)
-                    self.logger.debug("Metal renderer enabled for terminal \(self.terminalId.uuidString.prefix(8))")
-                } catch {
-                    self.logger.warning("Failed to enable Metal renderer: \(error.localizedDescription)")
-                }
+            do {
+                try view.setUseMetal(true)
+                self.logger.debug("Metal renderer enabled for terminal \(self.terminalId.uuidString.prefix(8))")
+            } catch {
+                self.logger.warning("Failed to enable Metal renderer: \(error.localizedDescription)")
             }
         }
     }
@@ -232,17 +240,15 @@ final class SwiftTermProvider: NSObject {
         }
     }
 
-    private func resolveMetalPreference() -> Bool {
-        // 从 PersistenceManager 读取偏好（避免循环依赖 AppState）
-        if let prefs = try? PersistenceManager.shared.loadPreferences() {
-            return prefs.metalRendererEnabled
-        }
-        return true // 默认启用
-    }
-
     // MARK: - 主题应用
 
-    /// 应用当前主题到终端视图
+    /// 应用当前主题到终端视图（内部使用已加载的 prefs，避免重复磁盘读取）
+    private func applyThemeWithPrefs(to view: LocalProcessTerminalView, prefs: Preferences) {
+        let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)
+        TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
+    }
+
+    /// 应用当前主题到终端视图（公开接口，供外部设置变更时调用）
     func applyCurrentTheme(to view: LocalProcessTerminalView) {
         let preference: String
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
@@ -262,7 +268,14 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - 字体应用
 
-    /// 应用当前字体到终端视图
+    /// 应用当前字体到终端视图（内部使用已加载的 prefs，避免重复磁盘读取）
+    private func applyFontWithPrefs(to view: LocalProcessTerminalView, prefs: Preferences) {
+        let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
+            ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
+        view.font = font
+    }
+
+    /// 应用当前字体到终端视图（公开接口，供外部设置变更时调用）
     func applyCurrentFont(to view: LocalProcessTerminalView) {
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
             let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
@@ -283,7 +296,9 @@ final class SwiftTermProvider: NSObject {
     // MARK: - 停止
 
     func stop() {
+        guard isRunning else { return }
         isRunning = false
+        terminalView?.terminate()
         terminalView = nil
     }
 }
