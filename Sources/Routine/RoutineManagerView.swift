@@ -11,10 +11,10 @@ struct RoutineManagerView: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Text("Routines")
+                Text(verbatim: "Routines")
                     .font(.headline)
                 Spacer()
-                Button("完成") { dismiss() }
+                Button("button.done") { dismiss() }
                     .keyboardShortcut(.escape)
             }
             .padding()
@@ -35,7 +35,7 @@ struct RoutineManagerView: View {
                     showCreate = true
                 } label: {
                     Image(systemName: "plus")
-                    Text("新建 Routine")
+                    Text("routine.new")
                 }
                 .buttonStyle(.bordered)
                 Spacer()
@@ -54,10 +54,10 @@ struct RoutineManagerView: View {
             Image(systemName: "clock.arrow.2.circlepath")
                 .font(.system(size: 36))
                 .foregroundStyle(.secondary)
-            Text("暂无 Routine")
+            Text("routine.empty")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("创建定时任务，自动向 Agent 发送提示")
+            Text("routine.empty.hint")
                 .foregroundStyle(.tertiary)
                 .font(.caption)
         }

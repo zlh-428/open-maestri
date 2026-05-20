@@ -12,7 +12,7 @@ struct GitOperationsPanel: View {
             // 分支名
             HStack {
                 Image(systemName: "arrow.triangle.branch")
-                Text(currentBranch.isEmpty ? "未知分支" : currentBranch)
+                Text(currentBranch.isEmpty ? String(localized: "git.branch.unknown") : currentBranch)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -22,12 +22,12 @@ struct GitOperationsPanel: View {
             Divider()
 
             // Commit
-            TextField("提交信息...", text: $commitMessage)
+            TextField("git.commit_message_placeholder", text: $commitMessage)
                 .textFieldStyle(.roundedBorder)
                 .padding(.horizontal, 8)
 
             HStack(spacing: 4) {
-                Button("提交") {
+                Button("button.commit") {
                     try? gitProvider.commit(message: commitMessage, files: [])
                     commitMessage = ""
                 }

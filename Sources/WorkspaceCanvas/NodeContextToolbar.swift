@@ -10,10 +10,10 @@ struct NodeContextToolbar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            contextButton(icon: "square.and.pencil", tooltip: "编辑", action: onEdit)
-            contextButton(icon: "point.3.connected.trianglepath.dotted", tooltip: "连接到终端", action: onConnect)
-            contextButton(icon: "arrow.triangle.2.circlepath", tooltip: "刷新", action: onRefresh)
-            contextButton(icon: "trash", tooltip: "删除", action: onDelete)
+            contextButton(icon: "square.and.pencil", tooltip: String(localized: "tooltip.node.edit"), action: onEdit)
+            contextButton(icon: "point.3.connected.trianglepath.dotted", tooltip: String(localized: "tooltip.node.connect_terminal"), action: onConnect)
+            contextButton(icon: "arrow.triangle.2.circlepath", tooltip: String(localized: "tooltip.refresh"), action: onRefresh)
+            contextButton(icon: "trash", tooltip: String(localized: "tooltip.node.delete"), action: onDelete)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)
@@ -43,9 +43,9 @@ struct FileTreeContextToolbar: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            contextButton(icon: "folder.badge.questionmark", tooltip: "在访达中显示", action: onRevealInFinder)
-            contextButton(icon: "folder.badge.gearshape", tooltip: "更改根目录", action: onChangeRoot)
-            contextButton(icon: "trash", tooltip: "删除", action: onDelete)
+            contextButton(icon: "folder.badge.questionmark", tooltip: String(localized: "tooltip.node.reveal_finder"), action: onRevealInFinder)
+            contextButton(icon: "folder.badge.gearshape", tooltip: String(localized: "tooltip.node.change_root"), action: onChangeRoot)
+            contextButton(icon: "trash", tooltip: String(localized: "tooltip.node.delete"), action: onDelete)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 2)

@@ -49,58 +49,58 @@ struct OpenMaestriApp: App {
         .commands {
             // MARK: File 菜单
             CommandGroup(after: .newItem) {
-                Button("New Workspace") {
+                Button("menu.app.new_workspace") {
                     NotificationCenter.default.post(name: .showCreateWorkspace, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
 
                 Divider()
 
-                Button("Routines…") {
+                Button("menu.app.routines") {
                     showRoutines = true
                 }
                 .keyboardShortcut("r", modifiers: [.command, .option])
             }
 
             // MARK: View 菜单
-            CommandMenu("View") {
-                Button("Toggle Zoom") {
+            CommandMenu("menu.view") {
+                Button("menu.view.toggle_zoom") {
                     NotificationCenter.default.post(name: .toggleCanvasZoom, object: nil)
                 }
                 .keyboardShortcut("\\", modifiers: .command)
 
-                Button("Floor Overview") {
+                Button("menu.view.floor_overview") {
                     NotificationCenter.default.post(name: .showFloorOverview, object: nil)
                 }
                 .keyboardShortcut("\\", modifiers: [.command, .shift])
 
                 Divider()
 
-                Button("Zoom In") {
+                Button("menu.view.zoom_in") {
                     NotificationCenter.default.post(name: .canvasZoomIn, object: nil)
                 }
                 .keyboardShortcut("=", modifiers: .command)
 
-                Button("Zoom Out") {
+                Button("menu.view.zoom_out") {
                     NotificationCenter.default.post(name: .canvasZoomOut, object: nil)
                 }
                 .keyboardShortcut("-", modifiers: .command)
 
-                Button("Reset Zoom") {
+                Button("menu.view.reset_zoom") {
                     NotificationCenter.default.post(name: .canvasZoomReset, object: nil)
                 }
                 .keyboardShortcut("0", modifiers: .command)
 
                 Divider()
 
-                Button("Filter / Search") {
+                Button("menu.view.filter_search") {
                     NotificationCenter.default.post(name: .showCanvasFilter, object: nil)
                 }
                 .keyboardShortcut("p", modifiers: .command)
 
                 Divider()
 
-                Button("Open in Editor") {
+                Button("menu.view.open_in_editor") {
                     NotificationCenter.default.post(name: .openInEditor, object: nil)
                 }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
@@ -108,24 +108,24 @@ struct OpenMaestriApp: App {
 
             // MARK: Window 菜单補充
             CommandGroup(after: .windowSize) {
-                Button("Next Workspace") {
+                Button("menu.view.next_workspace") {
                     NotificationCenter.default.post(name: .nextWorkspace, object: nil)
                 }
                 .keyboardShortcut(.downArrow, modifiers: .command)
 
-                Button("Previous Workspace") {
+                Button("menu.view.prev_workspace") {
                     NotificationCenter.default.post(name: .prevWorkspace, object: nil)
                 }
                 .keyboardShortcut(.upArrow, modifiers: .command)
 
                 Divider()
 
-                Button("Next Terminal") {
+                Button("menu.view.next_terminal") {
                     NotificationCenter.default.post(name: .nextTerminal, object: nil)
                 }
                 .keyboardShortcut(.tab, modifiers: .control)
 
-                Button("Previous Terminal") {
+                Button("menu.view.prev_terminal") {
                     NotificationCenter.default.post(name: .prevTerminal, object: nil)
                 }
                 .keyboardShortcut(.tab, modifiers: [.control, .shift])

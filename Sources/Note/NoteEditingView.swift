@@ -16,7 +16,8 @@ struct NoteEditingView: View {
             // 上下文工具栏
             HStack(spacing: 8) {
                 Toggle(isOn: $isFormatted) {
-                    Label(isFormatted ? "预览" : "编辑", systemImage: isFormatted ? "eye" : "pencil")
+                    Label(isFormatted ? String(localized: "note.preview") : String(localized: "note.edit"),
+                          systemImage: isFormatted ? "eye" : "pencil")
                 }
                 .toggleStyle(.button)
                 .controlSize(.small)
@@ -48,7 +49,7 @@ struct NoteEditingView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                     if content.isEmpty {
-                        Text("在此输入笔记内容…")
+                        Text("note.placeholder")
                             .font(.system(.body, design: .monospaced))
                             .foregroundStyle(.tertiary)
                             .padding(.top, 8)

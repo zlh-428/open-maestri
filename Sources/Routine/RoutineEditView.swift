@@ -19,35 +19,35 @@ struct RoutineEditView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Text("新建 Routine").font(.headline)
+            Text("routine.new").font(.headline)
 
             Form {
-                TextField("名称", text: $name)
-                TextField("提示（用 && 分隔多条）", text: $prompt, axis: .vertical)
+                TextField("routine.name_placeholder", text: $name)
+                TextField("routine.prompt_placeholder", text: $prompt, axis: .vertical)
                     .lineLimit(3...6)
-                LabeledContent("间隔（分钟）") {
+                LabeledContent("routine.interval_minutes") {
                     Slider(value: $intervalMinutes, in: 1...120, step: 1)
                     Text("\(Int(intervalMinutes)) min").frame(width: 52)
                 }
                 if !availableTerminals.isEmpty {
-                    Picker("目标终端", selection: $selectedTerminalId) {
-                        Text("（无）").tag(UUID?.none)
+                    Picker("terminal.target", selection: $selectedTerminalId) {
+                        Text("role.none_tag").tag(UUID?.none)
                         ForEach(availableTerminals, id: \.id) { terminal in
                             Text(terminal.name).tag(UUID?.some(terminal.id))
                         }
                     }
                 } else {
-                    LabeledContent("目标终端") {
-                        Text("暂无活跃终端").foregroundStyle(.secondary)
+                    LabeledContent("terminal.target") {
+                        Text("terminal.no_active").foregroundStyle(.secondary)
                     }
                 }
             }
             .formStyle(.grouped)
 
             HStack {
-                Button("取消") { dismiss() }
+                Button("button.cancel") { dismiss() }
                 Spacer()
-                Button("创建") {
+                Button("button.create") {
                     let targetId = selectedTerminalId ?? availableTerminals.first?.id ?? UUID()
                     let r = Routine(
                         name: name,

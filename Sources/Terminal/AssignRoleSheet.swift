@@ -15,9 +15,9 @@ struct AssignRoleSheet: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("分配角色").font(.headline)
+                Text("menu.assign_role").font(.headline)
                 Spacer()
-                Button("取消") {
+                Button("button.cancel") {
                     dismiss()
                     onDismiss()
                 }
@@ -32,9 +32,9 @@ struct AssignRoleSheet: View {
                     Image(systemName: "person.badge.plus")
                         .font(.system(size: 32))
                         .foregroundStyle(.secondary)
-                    Text("暂无可用角色")
+                    Text("role.no_custom_roles")
                         .foregroundStyle(.secondary)
-                    Text("请在设置中添加角色预设")
+                    Text("role.assign.no_roles_hint")
                         .font(.caption)
                         .foregroundStyle(.tertiary)
                 }
@@ -55,7 +55,7 @@ struct AssignRoleSheet: View {
                                         .foregroundStyle(.secondary)
                                         .frame(width: 24, height: 24)
 
-                                    Text("取消分配")
+                                    Text("terminal.unassign_role")
                                         .font(.system(size: 13, weight: .medium))
                                         .foregroundStyle(.primary)
 

@@ -710,47 +710,47 @@ extension CanvasViewportView {
 
         switch node.content {
         case .terminal(let tc):
-            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
-            menu.addItem(menuItem("Edit Terminal", action: #selector(contextMenuEditTerminal(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.duplicate"), action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.edit_terminal"), action: #selector(contextMenuEditTerminal(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("Assign Role", action: #selector(contextMenuAssignRole(_:)), id: id))
-            let maestroTitle = tc.isManager ? "Disable Maestro" : "Enable Maestro"
+            menu.addItem(menuItem(String(localized: "canvas.context.assign_role"), action: #selector(contextMenuAssignRole(_:)), id: id))
+            let maestroTitle = tc.isManager ? String(localized: "menu.disable_maestro") : String(localized: "menu.enable_maestro")
             menu.addItem(menuItem(maestroTitle, action: #selector(contextMenuToggleMaestro(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.connect"), action: #selector(contextMenuConnect(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+            menu.addItem(destructiveItem(String(localized: "canvas.context.delete"), action: #selector(contextMenuClose(_:)), id: id))
 
         case .stickyNote:
-            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
-            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.duplicate"), action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.rename"), action: #selector(contextMenuRename(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.connect"), action: #selector(contextMenuConnect(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+            menu.addItem(destructiveItem(String(localized: "canvas.context.delete"), action: #selector(contextMenuClose(_:)), id: id))
 
         case .portal:
-            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
-            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.duplicate"), action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.rename"), action: #selector(contextMenuRename(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("Connect", action: #selector(contextMenuConnect(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.connect"), action: #selector(contextMenuConnect(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+            menu.addItem(destructiveItem(String(localized: "canvas.context.delete"), action: #selector(contextMenuClose(_:)), id: id))
 
         case .fileTree:
-            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
-            menu.addItem(menuItem("Rename", action: #selector(contextMenuRename(_:)), id: id))
-            let lockTitle = node.isLocked ? "Unlock" : "Lock"
+            menu.addItem(menuItem(String(localized: "canvas.context.duplicate"), action: #selector(contextMenuDuplicate(_:)), id: id))
+            menu.addItem(menuItem(String(localized: "canvas.context.rename"), action: #selector(contextMenuRename(_:)), id: id))
+            let lockTitle = node.isLocked ? String(localized: "menu.unlock") : String(localized: "menu.lock")
             menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+            menu.addItem(destructiveItem(String(localized: "canvas.context.delete"), action: #selector(contextMenuClose(_:)), id: id))
 
         case .text, .drawing:
-            menu.addItem(menuItem("Duplicate", action: #selector(contextMenuDuplicate(_:)), id: id))
-            let lockTitle = node.isLocked ? "Unlock" : "Lock"
+            menu.addItem(menuItem(String(localized: "canvas.context.duplicate"), action: #selector(contextMenuDuplicate(_:)), id: id))
+            let lockTitle = node.isLocked ? String(localized: "menu.unlock") : String(localized: "menu.lock")
             menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("Delete", action: #selector(contextMenuClose(_:)), id: id))
+            menu.addItem(destructiveItem(String(localized: "canvas.context.delete"), action: #selector(contextMenuClose(_:)), id: id))
         }
 
         return menu

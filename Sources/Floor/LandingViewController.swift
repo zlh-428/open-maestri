@@ -17,12 +17,12 @@ struct LandingView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "airplane")
-                Text("Landing: \(floor.name)").font(.headline)
+                Text(verbatim: "Landing: \(floor.name)").font(.headline)
             }
 
             HStack {
-                Text("目标分支：").foregroundStyle(.secondary)
-                TextField("目标分支", text: $targetBranch)
+                Text("floor.target_branch_label").foregroundStyle(.secondary)
+                TextField("floor.target_branch", text: $targetBranch)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 160)
             }
@@ -48,14 +48,14 @@ struct LandingView: View {
             if landSuccess {
                 HStack {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text("合并成功！Floor 已完成。").foregroundStyle(.green)
+                    Text("floor.merge_success").foregroundStyle(.green)
                 }
             }
 
             HStack {
-                Button("取消", action: onCancel).keyboardShortcut(.escape)
+                Button("button.cancel", action: onCancel).keyboardShortcut(.escape)
                 Spacer()
-                Button("合并") { performLand() }
+                Button("button.merge") { performLand() }
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
                     .disabled(isLanding || landSuccess)
@@ -70,7 +70,8 @@ struct LandingView: View {
     private func loadDiff() {
         Task.detached(priority: .userInitiated) {
             let result = (try? runGit(["diff", "--stat", floor.branchName], in: workingDirectory)) ?? ""
-            await MainActor.run { diffText = result.isEmpty ? "(无差异)" : result }
+            let noDiff = String(localized: "git.no_diff")
+            await MainActor.run { diffText = result.isEmpty ? noDiff : result }
         }
     }
 

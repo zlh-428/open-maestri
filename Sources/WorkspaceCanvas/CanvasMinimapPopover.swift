@@ -14,7 +14,7 @@ struct CanvasMinimapPopover: View {
     var body: some View {
         VStack(spacing: 0) {
             if nodes.isEmpty {
-                Text("画布为空")
+                Text("canvas.empty")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: mapSize.width, height: mapSize.height)

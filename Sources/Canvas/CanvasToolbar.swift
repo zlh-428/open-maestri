@@ -24,7 +24,7 @@ struct CanvasToolbar: View {
                 // 1. 选择工具（鼠标指针）
                 FloatingToolButton(
                     icon: "cursorarrow",
-                    tooltip: "选择工具",
+                    tooltip: String(localized: "canvas.toolbar.select"),
                     isActive: activeDrawingTool == nil && !isConnecting
                 ) {
                     activeDrawingTool = nil
@@ -34,7 +34,7 @@ struct CanvasToolbar: View {
                 // 2. Terminal 工具
                 FloatingToolButton(
                     icon: "terminal.fill",
-                    tooltip: "终端",
+                    tooltip: String(localized: "canvas.toolbar.terminal"),
                     isActive: activeDrawingTool == "terminal"
                 ) {
                     toggleDrawingTool("terminal")
@@ -43,7 +43,7 @@ struct CanvasToolbar: View {
                 // 3. Note 工具
                 FloatingToolButton(
                     icon: "doc.richtext",
-                    tooltip: "笔记",
+                    tooltip: String(localized: "canvas.toolbar.note"),
                     isActive: activeDrawingTool == "stickyNote"
                 ) {
                     toggleDrawingTool("stickyNote")
@@ -52,7 +52,7 @@ struct CanvasToolbar: View {
                 // 4. 链接文件（占位，暂未实现）
                 FloatingToolButton(
                     icon: "paperclip",
-                    tooltip: "链接文件",
+                    tooltip: String(localized: "canvas.toolbar.text"),
                     isActive: activeDrawingTool == "linkedFile"
                 ) {
                     toggleDrawingTool("linkedFile")
@@ -61,7 +61,7 @@ struct CanvasToolbar: View {
                 // 5. FileTree 工具
                 FloatingToolButton(
                     icon: "folder",
-                    tooltip: "文件树",
+                    tooltip: String(localized: "canvas.toolbar.filetree"),
                     isActive: activeDrawingTool == "fileTree"
                 ) {
                     toggleDrawingTool("fileTree")
@@ -70,7 +70,7 @@ struct CanvasToolbar: View {
                 // 6. Portal 工具
                 FloatingToolButton(
                     icon: "globe",
-                    tooltip: "门户网站",
+                    tooltip: String(localized: "canvas.toolbar.portal"),
                     isActive: activeDrawingTool == "portal"
                 ) {
                     toggleDrawingTool("portal")
@@ -79,7 +79,7 @@ struct CanvasToolbar: View {
                 // 7. 格式（文本标签）
                 FloatingToolButton(
                     icon: "textformat",
-                    tooltip: "格式",
+                    tooltip: String(localized: "canvas.toolbar.format"),
                     isActive: activeDrawingTool == "text"
                 ) {
                     toggleDrawingTool("text")
@@ -88,7 +88,7 @@ struct CanvasToolbar: View {
                 // 8. 手绘工具
                 FloatingToolButton(
                     icon: "pencil.and.scribble",
-                    tooltip: "手绘",
+                    tooltip: String(localized: "canvas.toolbar.draw"),
                     isActive: activeDrawingTool == "drawing"
                 ) {
                     toggleDrawingTool("drawing")

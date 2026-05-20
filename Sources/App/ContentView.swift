@@ -65,8 +65,8 @@ struct ContentView: View {
         .onAppear {
             if !appState.loadErrors.isEmpty { showLoadError = true }
         }
-        .alert("部分工作区加载失败", isPresented: $showLoadError) {
-            Button("好") { showLoadError = false }
+        .alert("alert.workspace.load_failed", isPresented: $showLoadError) {
+            Button("button.ok") { showLoadError = false }
         } message: {
             Text(appState.loadErrors.joined(separator: "\n"))
         }

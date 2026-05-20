@@ -44,7 +44,7 @@ struct GeneralSettingsView: View {
 
                 Toggle("general.ssh_enabled", isOn: $state.preferences.sshEnabled)
                 if appState.preferences.sshEnabled {
-                    TextField("Host", text: $state.preferences.sshHost)
+                    TextField("general.ssh_host", text: $state.preferences.sshHost)
                         .textFieldStyle(.roundedBorder)
                     TextField("general.ssh_username", text: $state.preferences.sshUser)
                         .textFieldStyle(.roundedBorder)

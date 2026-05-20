@@ -39,7 +39,7 @@ final class FileTreeOutlineNSView: NSView, NSOutlineViewDelegate, NSOutlineViewD
 
     private func setupViews() {
         let col = NSTableColumn(identifier: .init("name"))
-        col.title = "名称"
+        col.title = String(localized: "filetree.column.name")
         outlineView.addTableColumn(col)
         outlineView.outlineTableColumn = col
         outlineView.headerView = nil

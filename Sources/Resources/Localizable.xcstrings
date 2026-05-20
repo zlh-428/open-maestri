@@ -1398,6 +1398,348 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Search" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索" } }
       }
+    },
+    "menu.app.new_workspace" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建工作区" } }
+      }
+    },
+    "menu.app.routines" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Routines…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Routines…" } }
+      }
+    },
+    "menu.view" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "View" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "视图" } }
+      }
+    },
+    "menu.view.toggle_zoom" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Toggle Zoom" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "切换缩放" } }
+      }
+    },
+    "menu.view.floor_overview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Floor Overview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Floor 总览" } }
+      }
+    },
+    "menu.view.zoom_in" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom In" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "放大" } }
+      }
+    },
+    "menu.view.zoom_out" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Zoom Out" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "缩小" } }
+      }
+    },
+    "menu.view.reset_zoom" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset Zoom" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置缩放" } }
+      }
+    },
+    "menu.view.filter_search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Filter / Search" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "过滤/搜索" } }
+      }
+    },
+    "menu.view.open_in_editor" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open in Editor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在编辑器中打开" } }
+      }
+    },
+    "menu.view.next_workspace" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一个工作区" } }
+      }
+    },
+    "menu.view.prev_workspace" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Workspace" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一个工作区" } }
+      }
+    },
+    "menu.view.next_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Next Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下一个终端" } }
+      }
+    },
+    "menu.view.prev_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Previous Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上一个终端" } }
+      }
+    },
+    "agent.tab.basic_info" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Basic Info" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "基本信息" } }
+      }
+    },
+    "agent.tab.instructions_preview" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Instructions Preview" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "指令预览" } }
+      }
+    },
+    "agent.section.role_instructions" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Role Instructions" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色指令" } }
+      }
+    },
+    "agent.role.inject_hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "After assigning a role, the following content will be written to CLAUDE.md / AGENTS.md" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分配角色后，以下内容将写入 CLAUDE.md / AGENTS.md 文件" } }
+      }
+    },
+    "onboarding.step1.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Welcome to open-maestri" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "欢迎使用 open-maestri" } }
+      }
+    },
+    "onboarding.step1.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Visually manage your AI Agent team on the canvas" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在画布上可视化管理你的 AI Agent 团队" } }
+      }
+    },
+    "onboarding.step2.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create Agent Terminals" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建 Agent 终端" } }
+      }
+    },
+    "onboarding.step2.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag a terminal node from the top toolbar, choose Claude Code / Codex / Shell and more" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "从顶部工具栏拖入终端节点，选择 Claude Code / Codex / Shell 等预设" } }
+      }
+    },
+    "onboarding.step3.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect Agents" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接 Agent" } }
+      }
+    },
+    "onboarding.step3.subtitle" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect two terminals — omaestri skill is auto-injected so agents can communicate" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连线两个终端，omaestri skill 会自动注入，Agent 可以互相通信" } }
+      }
+    },
+    "terminal.name_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Terminal name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端名称" } }
+      }
+    },
+    "terminal.command_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "e.g. claude, codex, gemini" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "例如：claude、codex、gemini" } }
+      }
+    },
+    "terminal.edit.command_help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "e.g. claude, codex, gemini, zsh" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "例如：claude、codex、gemini、zsh" } }
+      }
+    },
+    "terminal.edit.maestro_help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Maestro can recruit sub-agents with omaestri recruit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Maestro 可以通过 omaestri recruit 招募子 Agent" } }
+      }
+    },
+    "terminal.maestro_recruit_help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Maestro terminals can recruit sub-agents with omaestri recruit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Maestro 终端可通过 omaestri recruit 命令招募子 Agent" } }
+      }
+    },
+    "terminal.unassign_role" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unassign Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消分配" } }
+      }
+    },
+    "workspace.section.basic_info" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Basic Info" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "基本信息" } }
+      }
+    },
+    "workspace.section.icon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标" } }
+      }
+    },
+    "workspace.tab.general" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "General" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "常规" } }
+      }
+    },
+    "workspace.tab.agent_instructions" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent Instructions" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Agent 指令" } }
+      }
+    },
+    "workspace.rename_group.alert" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename Group" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名分组" } }
+      }
+    },
+    "git.branch.unknown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Unknown Branch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未知分支" } }
+      }
+    },
+    "git.commit_message_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Commit message…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "提交信息…" } }
+      }
+    },
+    "routine.new" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Routine" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建 Routine" } }
+      }
+    },
+    "routine.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No Routines" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无 Routine" } }
+      }
+    },
+    "routine.empty.hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create scheduled tasks to automatically send prompts to agents" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建定时任务，自动向 Agent 发送提示" } }
+      }
+    },
+    "routine.name_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
+      }
+    },
+    "general.ssh_host" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Host" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Host" } }
+      }
+    },
+    "filetree.column.name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
+      }
+    },
+    "canvas.context.duplicate" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Duplicate" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "复制" } }
+      }
+    },
+    "canvas.context.edit_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Terminal" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑终端" } }
+      }
+    },
+    "canvas.context.assign_role" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Assign Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "分配角色" } }
+      }
+    },
+    "canvas.context.connect" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Connect" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接" } }
+      }
+    },
+    "canvas.context.rename" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名" } }
+      }
+    },
+    "canvas.context.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
+      }
+    },
+    "floor.hooks_title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Hooks — %@" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Hooks — %@" } }
+      }
+    },
+    "floor.land" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Land" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Land" } }
+      }
+    },
+    "floor.cancel" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cancel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "取消" } }
+      }
+    },
+    "menu.enable_maestro" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Enable Maestro" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用 Maestro 模式" } }
+      }
+    },
+    "menu.disable_maestro" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disable Maestro" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "停用 Maestro 模式" } }
+      }
+    },
+    "floor.hook.teardown" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Executed before Landing/deleting Floor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Landing/删除 Floor 前执行" } }
+      }
+    },
+    "role.assign.no_roles_hint" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add roles in Settings to get started" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "请在设置中添加角色预设" } }
+      }
+    },
+    "agent.role_prompt.placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "(Enter role instructions)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "（请输入角色指令）" } }
+      }
     }
   },
   "version" : "1"

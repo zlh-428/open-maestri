@@ -154,7 +154,7 @@ struct WorkspaceCanvasView: View {
                         .buttonStyle(.plain)
                         .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
                         .clipShape(Circle())
-                        .help("Floors")
+                        .help(String(localized: "floor.overview"))
 
                         // 缩略图按钮
                         Button {
@@ -167,7 +167,7 @@ struct WorkspaceCanvasView: View {
                         .buttonStyle(.plain)
                         .background(Color(NSColor.windowBackgroundColor).opacity(0.9))
                         .clipShape(Circle())
-                        .help("画布缩略图")
+                        .help(String(localized: "tooltip.minimap"))
                         .popover(isPresented: $showMinimap, arrowEdge: .top) {
                             CanvasMinimapPopover(
                                 nodes: workspace.nodes,
@@ -694,7 +694,7 @@ struct WorkspaceCanvasView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.directoryURL = URL(fileURLWithPath: fc.rootPath)
-        panel.prompt = "选择目录"
+        panel.prompt = String(localized: "panel.select_directory")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let newPath = url.path
 
@@ -737,10 +737,10 @@ struct EmptyCanvasPlaceholder: View {
             Image(systemName: "square.dashed")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("从这里开始")
+            Text("onboarding.from_here")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("在侧边栏创建一个工作区")
+            Text("workspace.sidebar.create_hint")
                 .foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

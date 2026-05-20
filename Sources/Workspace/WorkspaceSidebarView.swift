@@ -63,16 +63,16 @@ struct WorkspaceSidebarView: View {
             try? PersistenceManager.shared.saveSidebarLayout(sidebarLayout)
         }
         // 重命名分组 Alert
-        .alert("重命名分组", isPresented: $showRenameGroup, presenting: groupToRename) { group in
-            TextField("分组名称", text: $renameGroupText)
-            Button("确定") {
+        .alert("workspace.rename_group.alert", isPresented: $showRenameGroup, presenting: groupToRename) { group in
+            TextField("workspace.group_name", text: $renameGroupText)
+            Button("button.confirm") {
                 if let idx = sidebarLayout.groups.firstIndex(where: { $0.id == group.id }),
                    !renameGroupText.trimmingCharacters(in: .whitespaces).isEmpty {
                     sidebarLayout.groups[idx].name = renameGroupText.trimmingCharacters(in: .whitespaces)
                     saveSidebarLayout()
                 }
             }
-            Button("取消", role: .cancel) {}
+            Button("button.cancel", role: .cancel) {}
         } message: { _ in }
     }
 
@@ -104,9 +104,9 @@ struct WorkspaceSidebarView: View {
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .contextMenu {
-                                Button("重命名分组") { renameGroup(group) }
+                                Button("button.rename_group") { renameGroup(group) }
                                 Divider()
-                                Button("删除分组", role: .destructive) { deleteGroup(group) }
+                                Button("button.delete_group", role: .destructive) { deleteGroup(group) }
                             }
                     }
                 }
@@ -117,7 +117,7 @@ struct WorkspaceSidebarView: View {
                 workspaceRowItem(entry: entry, inGroup: nil)
             }
         }
-        .searchable(text: $searchText, placement: .sidebar, prompt: "搜索工作区")
+        .searchable(text: $searchText, placement: .sidebar, prompt: String(localized: "workspace.search"))
     }
 
     @ViewBuilder
@@ -142,16 +142,16 @@ struct WorkspaceSidebarView: View {
         ToolbarItem(placement: .primaryAction) {
             Menu {
                 Button { showCreate = true } label: {
-                    Label("新建工作区", systemImage: "plus.square")
+                    Label("workspace.new", systemImage: "plus.square")
                 }
                 Divider()
                 Button { addNewGroup() } label: {
-                    Label("新建分组", systemImage: "folder.badge.plus")
+                    Label("workspace.new_group", systemImage: "folder.badge.plus")
                 }
             } label: {
                 Image(systemName: "plus")
             }
-            .help("新建工作区或分组")
+            .help(String(localized: "workspace.new_or_group"))
         }
     }
 
@@ -171,34 +171,34 @@ struct WorkspaceSidebarView: View {
 
     @ViewBuilder
     private var deleteConfirmButtons: some View {
-        Button("删除", role: .destructive) {
+        Button("button.delete", role: .destructive) {
             if let entry = workspaceToDelete { deleteWorkspace(entry) }
         }
-        Button("取消", role: .cancel) {}
+        Button("button.cancel", role: .cancel) {}
     }
 
     // MARK: - 右键菜单
 
     @ViewBuilder
     private func buildContextMenu(for entry: WorkspaceEntry, inGroup groupId: UUID?) -> some View {
-        Button("编辑") { workspaceToEdit = entry; showEditSheet = true }
-        Button("复制") { duplicateWorkspace(entry) }
+        Button("button.edit") { workspaceToEdit = entry; showEditSheet = true }
+        Button("button.duplicate") { duplicateWorkspace(entry) }
         Divider()
-        let pinLabel: String = entry.isPinned ? "取消置顶" : "置顶"
+        let pinLabel: LocalizedStringKey = entry.isPinned ? "workspace.unpin" : "workspace.pin"
         Button(pinLabel) { togglePin(entry) }
         Divider()
         if let gId = groupId {
-            Button("从分组移除") { moveOut(entry: entry, fromGroup: gId) }
+            Button("button.remove_from_group") { moveOut(entry: entry, fromGroup: gId) }
             Divider()
         } else if !sidebarLayout.groups.isEmpty {
-            Menu("移入分组") {
+            Menu("workspace.move_to_group") {
                 ForEach(sidebarLayout.groups) { group in
                     Button(group.name) { moveIn(entry: entry, toGroup: group.id) }
                 }
             }
             Divider()
         }
-        Button("删除", role: .destructive) { workspaceToDelete = entry; showDeleteConfirm = true }
+        Button("button.delete", role: .destructive) { workspaceToDelete = entry; showDeleteConfirm = true }
     }
 
     // MARK: - 操作

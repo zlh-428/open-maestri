@@ -36,22 +36,22 @@ struct EditTerminalSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("编辑终端").font(.headline)
+                Text("terminal.edit.title").font(.headline)
                 Spacer()
-                Button("取消") { dismiss(); onDismiss() }.keyboardShortcut(.escape)
-                Button("保存") { save(); dismiss(); onDismiss() }
+                Button("button.cancel") { dismiss(); onDismiss() }.keyboardShortcut(.escape)
+                Button("button.save") { save(); dismiss(); onDismiss() }
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
             }.padding()
             Divider()
             Form {
-                TextField("名称", text: $name)
+                TextField("agent.name", text: $name)
                     .focused($focusedField, equals: .name)
-                TextField("启动命令", text: $command)
+                TextField("terminal.launch_command", text: $command)
                     .focused($focusedField, equals: .command)
-                    .help("例如：claude、codex、gemini、zsh")
-                Toggle("Maestro 模式", isOn: $isManager)
-                    .help("Maestro 可以通过 omaestri recruit 招募子 Agent")
+                    .help(String(localized: "terminal.edit.command_help"))
+                Toggle("terminal.maestro_mode", isOn: $isManager)
+                    .help(String(localized: "terminal.edit.maestro_help"))
             }.formStyle(.grouped).padding()
         }
         .frame(width: 380, height: 240)

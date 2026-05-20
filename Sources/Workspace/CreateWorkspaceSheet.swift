@@ -18,12 +18,12 @@ struct CreateWorkspaceSheet: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Text("新建工作区")
+                Text("workspace.new")
                     .font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }
+                Button("button.cancel") { dismiss() }
                     .keyboardShortcut(.escape)
-                Button("创建") { createWorkspace() }
+                Button("button.create") { createWorkspace() }
                     .keyboardShortcut(.return)
                     .disabled(name.isEmpty)
                     .buttonStyle(.borderedProminent)
@@ -33,8 +33,8 @@ struct CreateWorkspaceSheet: View {
             Divider()
 
             Form {
-                Section("基本信息") {
-                    TextField("工作区名称", text: $name)
+                Section("workspace.section.basic_info") {
+                    TextField("workspace.name", text: $name)
                         .textFieldStyle(.roundedBorder)
 
                     HStack(spacing: 8) {
@@ -45,12 +45,12 @@ struct CreateWorkspaceSheet: View {
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                        Button("选择…") { pickDirectory() }
+                        Button("button.choose_directory") { pickDirectory() }
                             .controlSize(.small)
                     }
                 }
 
-                Section("图标") {
+                Section("workspace.section.icon") {
                     LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 8) {
                         ForEach(iconOptions, id: \.self) { icon in
                             Button {
@@ -82,7 +82,7 @@ struct CreateWorkspaceSheet: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
-        panel.message = "选择工作区目录"
+        panel.message = String(localized: "panel.select_workspace_dir")
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
             workingDirectory = url.path

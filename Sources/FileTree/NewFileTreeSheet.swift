@@ -17,10 +17,10 @@ struct NewFileTreeSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("新建文件树").font(.headline)
+                Text("filetree.new").font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.escape)
-                Button("创建") { onConfirm(path); dismiss() }
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.create") { onConfirm(path); dismiss() }
                     .disabled(path.isEmpty)
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
@@ -28,8 +28,8 @@ struct NewFileTreeSheet: View {
             Divider()
             Form {
                 HStack {
-                    TextField("目录路径", text: $path).textFieldStyle(.roundedBorder)
-                    Button("选择…") {
+                    TextField("filetree.dir_path", text: $path).textFieldStyle(.roundedBorder)
+                    Button("button.choose_directory") {
                         let panel = NSOpenPanel()
                         panel.canChooseDirectories = true
                         panel.canChooseFiles = false

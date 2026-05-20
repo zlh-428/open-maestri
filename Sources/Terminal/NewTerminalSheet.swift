@@ -33,14 +33,14 @@ struct NewTerminalSheet: View {
 
         VStack(spacing: 0) {
             // MARK: 标题
-            Text("新建终端")
+            Text("terminal.new")
                 .font(.system(size: 13, weight: .semibold))
                 .padding(.top, 16)
                 .padding(.bottom, 12)
 
             // MARK: 快速开始 - Agent 图标行
             VStack(alignment: .leading, spacing: 8) {
-                Text("快速开始")
+                Text("onboarding.quick_start")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 20)
@@ -64,9 +64,9 @@ struct NewTerminalSheet: View {
 
             // MARK: 分段 Tab 控件
             Picker("", selection: $selectedTab) {
-                Text("详细信息").tag(0)
-                Text("外观").tag(1)
-                Text("角色").tag(2)
+                Text("label.details").tag(0)
+                Text("label.appearance").tag(1)
+                Text("role.tab").tag(2)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 20)
@@ -95,7 +95,7 @@ struct NewTerminalSheet: View {
 
             // MARK: 底部按钮
             HStack(spacing: 12) {
-                Button("取消") { dismiss() }
+                Button("button.cancel") { dismiss() }
                     .buttonStyle(.plain)
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 16)
@@ -109,7 +109,7 @@ struct NewTerminalSheet: View {
                             .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
                     )
 
-                Button("创建") {
+                Button("button.create") {
                     confirmCreation(presets: ps, roles: rs)
                 }
                 .buttonStyle(.borderedProminent)
@@ -151,10 +151,10 @@ struct NewTerminalSheet: View {
     private var detailsTabContent: some View {
         // 终端名称
         VStack(alignment: .leading, spacing: 4) {
-            Text("名称")
+            Text("terminal.name")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            TextField("终端名称", text: $terminalName)
+            TextField("terminal.name_placeholder", text: $terminalName)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 12))
                 .focused($focusedField, equals: .name)
@@ -162,10 +162,10 @@ struct NewTerminalSheet: View {
 
         // 命令
         VStack(alignment: .leading, spacing: 4) {
-            Text("命令")
+            Text("terminal.command")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-            TextField("例如: claude, codex, gemini", text: $command)
+            TextField("terminal.command_placeholder", text: $command)
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 12))
                 .focused($focusedField, equals: .command)
@@ -177,7 +177,7 @@ struct NewTerminalSheet: View {
                 HStack(spacing: 4) {
                     Image(systemName: "eye")
                         .font(.system(size: 11))
-                    Text("监控活动")
+                    Text("terminal.monitor")
                         .font(.system(size: 12))
                 }
             }
@@ -188,18 +188,18 @@ struct NewTerminalSheet: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 11))
                         .foregroundStyle(.purple)
-                    Text("Maestro")
+                    Text(verbatim: "Maestro")
                         .font(.system(size: 12))
                 }
             }
             .toggleStyle(.checkbox)
-            .help("Maestro 终端可通过 omaestri recruit 命令招募子 Agent")
+            .help(String(localized: "terminal.maestro_recruit_help"))
         }
         .padding(.top, 4)
 
         // 工作目录（只读显示 + 选择按钮）
         VStack(alignment: .leading, spacing: 4) {
-            Text("工作目录")
+            Text("workspace.working_dir")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             HStack(spacing: 6) {
@@ -207,7 +207,7 @@ struct NewTerminalSheet: View {
                     Image(systemName: "folder.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
-                    Text(workingDirectory.isEmpty ? "未选择" : abbreviatePath(workingDirectory))
+                    Text(workingDirectory.isEmpty ? String(localized: "workspace.working_dir.none") : abbreviatePath(workingDirectory))
                         .font(.system(size: 12))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
@@ -225,7 +225,7 @@ struct NewTerminalSheet: View {
                         .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
                 )
 
-                Button("选择…") {
+                Button("button.choose_directory") {
                     let panel = NSOpenPanel()
                     panel.canChooseDirectories = true
                     panel.canChooseFiles = false
@@ -276,7 +276,7 @@ struct NewTerminalSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("外观自定义功能即将推出")
+                Text("general.appearance.coming_soon")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)
@@ -291,13 +291,13 @@ struct NewTerminalSheet: View {
         VStack(alignment: .leading, spacing: 6) {
             // 无角色选项
             Button { selectedRoleIdx = nil } label: {
-                RoleOptionRow(name: "无角色", icon: "xmark.circle", color: "#8E8E93",
+                RoleOptionRow(name: String(localized: "role.none"), icon: "xmark.circle", color: "#8E8E93",
                         isSelected: selectedRoleIdx == nil)
             }
             .buttonStyle(.plain)
 
             if roles.isEmpty {
-                Text("暂无自定义角色，可在设置中添加")
+                Text("role.no_custom_roles")
                     .font(.system(size: 12))
                     .foregroundStyle(.tertiary)
                     .padding(.top, 8)

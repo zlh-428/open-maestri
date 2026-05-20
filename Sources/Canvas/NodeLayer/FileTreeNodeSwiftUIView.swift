@@ -194,7 +194,7 @@ private struct FileTreeSearchBar: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
-                Text("搜索")
+                Text("label.search")
                     .font(.system(size: 13))
                     .foregroundStyle(Color(nsColor: .placeholderTextColor))
 

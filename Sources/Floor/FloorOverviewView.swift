@@ -16,9 +16,9 @@ struct FloorOverviewView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("工作分支（Floors）").font(.headline)
+                Text("floor.work_branches").font(.headline)
                 Spacer()
-                Button("关闭") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.close") { dismiss() }.keyboardShortcut(.escape)
             }
             .padding()
 
@@ -64,7 +64,7 @@ struct FloorOverviewView: View {
             Divider()
 
             HStack {
-                Button("+ 新建 Floor") { showCreateFloor = true }
+                Button("floor.new_button") { showCreateFloor = true }
                     .buttonStyle(.borderedProminent)
                     .disabled(workspace.workingDirectory.isEmpty)
                 Spacer()
@@ -186,7 +186,7 @@ struct FloorRowView: View {
             }
             Spacer()
             if !isGround {
-                Button("Land") { onLand() }
+                Button("floor.land") { onLand() }
                     .buttonStyle(.bordered).controlSize(.small)
                 Button {
                     onHooks()
@@ -194,7 +194,7 @@ struct FloorRowView: View {
                     Image(systemName: "bolt.fill")
                 }
                 .buttonStyle(.plain)
-                .help("配置 Hooks")
+                .help(String(localized: "tooltip.config_hooks"))
             }
         }
         .padding(.horizontal, 12)
@@ -218,10 +218,10 @@ struct HooksConfigSheet: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Text("Hooks — \(floorName)")
+                Text("Hooks — \(floorName)", comment: "floor.hooks_title")
                     .font(.headline)
                 Spacer()
-                Button("关闭") { dismiss() }
+                Button("button.close") { dismiss() }
                     .keyboardShortcut(.escape)
             }
             .padding()
@@ -232,19 +232,19 @@ struct HooksConfigSheet: View {
                 VStack(spacing: 16) {
                     HooksPhaseSection(
                         title: "Setup",
-                        subtitle: "创建 Floor 后自动执行",
+                        subtitle: String(localized: "floor.hook.post_create"),
                         systemImage: "play.circle",
                         commands: $hooks.setup
                     )
 
-                    Toggle("自动执行 Setup Hooks", isOn: $hooks.autoRunSetup)
+                    Toggle("routine.auto_run_hooks", isOn: $hooks.autoRunSetup)
                         .padding(.horizontal)
 
                     Divider()
 
                     HooksPhaseSection(
                         title: "Run",
-                        subtitle: "手动触发时执行",
+                        subtitle: String(localized: "floor.hook.manual"),
                         systemImage: "bolt.circle",
                         commands: $hooks.run
                     )
@@ -253,7 +253,7 @@ struct HooksConfigSheet: View {
 
                     HooksPhaseSection(
                         title: "Teardown",
-                        subtitle: "Landing/删除 Floor 前执行",
+                        subtitle: String(localized: "floor.hook.teardown"),
                         systemImage: "stop.circle",
                         commands: $hooks.teardown
                     )
@@ -293,14 +293,14 @@ struct HooksPhaseSection: View {
             .padding(.horizontal)
 
             if commands.isEmpty {
-                Text("无命令")
+                Text("terminal.no_command")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .padding(.horizontal)
             } else {
                 ForEach(commands.indices, id: \.self) { idx in
                     HStack(spacing: 6) {
-                        TextField("shell 命令…", text: $commands[idx])
+                        TextField("routine.shell_command_placeholder", text: $commands[idx])
                             .font(.system(.body, design: .monospaced))
                             .textFieldStyle(.roundedBorder)
                         Button {
@@ -331,24 +331,24 @@ struct CreateFloorSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("新建 Floor").font(.headline)
+                Text("floor.new").font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.escape)
-                Button("创建") { onCreate(floorName, branchName); dismiss() }
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.create") { onCreate(floorName, branchName); dismiss() }
                     .disabled(floorName.isEmpty || branchName.isEmpty)
                     .keyboardShortcut(.return)
                     .buttonStyle(.borderedProminent)
             }.padding()
             Divider()
             Form {
-                TextField("Floor 名称", text: $floorName)
+                TextField("floor.name", text: $floorName)
                     .onChange(of: floorName) { _, v in
                         if !useExistingBranch {
                             branchName = v.lowercased().replacingOccurrences(of: " ", with: "-")
                         }
                     }
-                TextField("分支名", text: $branchName)
-                Toggle("使用已有分支", isOn: $useExistingBranch)
+                TextField("floor.branch_name", text: $branchName)
+                Toggle("floor.use_existing_branch", isOn: $useExistingBranch)
             }
             .formStyle(.grouped)
             .padding()

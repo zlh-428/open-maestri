@@ -38,11 +38,11 @@ struct EditWorkspaceSheet: View {
         VStack(spacing: 0) {
             // 标题栏
             HStack {
-                Text("编辑工作区")
+                Text("workspace.edit.title")
                     .font(.headline)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.escape)
-                Button("保存") { save() }
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.save") { save() }
                     .keyboardShortcut(.return)
                     .disabled(name.isEmpty || workingDirectory.isEmpty)
                     .buttonStyle(.borderedProminent)
@@ -53,8 +53,8 @@ struct EditWorkspaceSheet: View {
 
             // Tab 选择器
             Picker("", selection: $selectedTab) {
-                Text("常规").tag(EditTab.general)
-                Text("Agent 指令").tag(EditTab.agentInstructions)
+                Text("workspace.tab.general").tag(EditTab.general)
+                Text("workspace.tab.agent_instructions").tag(EditTab.agentInstructions)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -79,15 +79,15 @@ struct EditWorkspaceSheet: View {
 
     private var generalTab: some View {
         Form {
-            Section("基本信息") {
-                TextField("工作区名称", text: $name).textFieldStyle(.roundedBorder)
+            Section("workspace.section.basic_info") {
+                TextField("workspace.name", text: $name).textFieldStyle(.roundedBorder)
                 HStack {
-                    TextField("工作目录", text: $workingDirectory).textFieldStyle(.roundedBorder)
-                    Button("选择…") { pickDirectory() }
+                    TextField("workspace.working_dir", text: $workingDirectory).textFieldStyle(.roundedBorder)
+                    Button("button.choose_directory") { pickDirectory() }
                 }
             }
 
-            Section("图标") {
+            Section("workspace.section.icon") {
                 LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 8) {
                     ForEach(iconOptions, id: \.self) { icon in
                         Button { selectedIcon = icon } label: {
@@ -111,14 +111,14 @@ struct EditWorkspaceSheet: View {
         VStack(spacing: 0) {
             // 同步开关
             HStack {
-                Toggle("同步 CLAUDE.md ↔ AGENTS.md", isOn: $syncConfigFiles)
-                    .help("修改任意一个文件时，自动同步到另一个文件")
+                Toggle("filetree.sync_config", isOn: $syncConfigFiles)
+                    .help(String(localized: "filetree.sync_config.help"))
                     .onChange(of: syncConfigFiles) { _, sync in
                         if sync { agentsMdContent = claudeMdContent }
                     }
                 Spacer()
                 if agentFilesDirty {
-                    Button("保存文件") { saveAgentFiles() }
+                    Button("button.save_files") { saveAgentFiles() }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                 }
@@ -131,7 +131,7 @@ struct EditWorkspaceSheet: View {
             // 编辑区：同步时单栏，非同步时双栏
             if syncConfigFiles {
                 VStack(alignment: .leading, spacing: 4) {
-                    Label("CLAUDE.md / AGENTS.md（同步）", systemImage: "doc.text")
+                    Label("filetree.claude_agents_label", systemImage: "doc.text")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal)

@@ -12,23 +12,23 @@ struct OnboardingView: View {
             case 0:
                 OnboardingStep(
                     icon: "terminal.fill",
-                    title: "欢迎使用 open-maestri",
-                    subtitle: "在画布上可视化管理你的 AI Agent 团队",
-                    buttonLabel: "开始"
+                    title: String(localized: "onboarding.step1.title"),
+                    subtitle: String(localized: "onboarding.step1.subtitle"),
+                    buttonLabel: String(localized: "button.start")
                 ) { step = 1 }
             case 1:
                 OnboardingStep(
                     icon: "cpu",
-                    title: "创建 Agent 终端",
-                    subtitle: "从顶部工具栏拖入终端节点，选择 Claude Code / Codex / Shell 等预设",
-                    buttonLabel: "继续"
+                    title: String(localized: "onboarding.step2.title"),
+                    subtitle: String(localized: "onboarding.step2.subtitle"),
+                    buttonLabel: String(localized: "button.continue")
                 ) { step = 2 }
             default:
                 OnboardingStep(
                     icon: "link",
-                    title: "连接 Agent",
-                    subtitle: "连线两个终端，omaestri skill 会自动注入，Agent 可以互相通信",
-                    buttonLabel: "开始使用"
+                    title: String(localized: "onboarding.step3.title"),
+                    subtitle: String(localized: "onboarding.step3.subtitle"),
+                    buttonLabel: String(localized: "button.get_started")
                 ) { hasCompleted = true }
             }
             Spacer()

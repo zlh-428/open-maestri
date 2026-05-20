@@ -258,8 +258,8 @@ struct RoleEditSheet: View {
 
             // Tab 切换
             Picker("", selection: $selectedTab) {
-                Text("基本信息").tag(0)
-                Text("指令预览").tag(1)
+                Text("agent.tab.basic_info").tag(0)
+                Text("agent.tab.instructions_preview").tag(1)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 16)
@@ -283,7 +283,7 @@ struct RoleEditSheet: View {
             TextField("role.name", text: $name)
                 .help(String(localized: "role.name_placeholder.help"))
 
-            Section("角色指令") {
+            Section("agent.section.role_instructions") {
                 TextEditor(text: $prompt)
                     .frame(height: 120)
                     .font(.system(.body, design: .monospaced))
@@ -336,7 +336,7 @@ struct RoleEditSheet: View {
                 Image(systemName: "info.circle")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
-                Text("分配角色后，以下内容将写入 CLAUDE.md / AGENTS.md 文件")
+                Text("agent.role.inject_hint")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -348,7 +348,7 @@ struct RoleEditSheet: View {
                 HStack(spacing: 4) {
                     Image(systemName: "doc.text")
                         .font(.system(size: 10))
-                    Text("CLAUDE.md / AGENTS.md")
+                    Text(verbatim: "CLAUDE.md / AGENTS.md")
                         .font(.system(size: 11, weight: .medium))
                 }
                 .foregroundStyle(.secondary)
@@ -390,7 +390,7 @@ struct RoleEditSheet: View {
 
     /// 生成的文件内容预览
     private var generatedFileContent: String {
-        let rolePrompt = prompt.isEmpty ? "(请输入角色指令)" : prompt
+        let rolePrompt = prompt.isEmpty ? String(localized: "agent.role_prompt.placeholder") : prompt
         return """
         <your_assigned_role>
         \(rolePrompt)
