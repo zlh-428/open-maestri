@@ -20,6 +20,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logger.error("InterAgentServer failed to start: \(error)")
         }
 
+        // 2. 写入 omaestri skill 到用户全局 ~/.claude/skills/（幂等，应用启动时执行一次）
+        SkillInjector.shared.installSkillsIfNeeded()
+
         // 2. Sparkle 自动更新（Debug 构建跳过自动检查，避免签名/appcast 缺失报错）
         #if DEBUG
         updaterController = SPUStandardUpdaterController(
