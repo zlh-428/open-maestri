@@ -2,7 +2,8 @@ import SwiftUI
 import AppKit
 import SwiftTerm
 
-/// SwiftTerm PTY 终端嵌入视图
+/// 终端嵌入视图（NSViewRepresentable 包装 MaestroTerminalView）
+/// makeNSView 返回 MaestroTerminalView（NSView 直接子类），Coordinator 持有 provider
 struct TerminalEmbeddedView: NSViewRepresentable {
     let terminalId: UUID
     let command: String
@@ -10,183 +11,103 @@ struct TerminalEmbeddedView: NSViewRepresentable {
     var serverPort: UInt16 = 0
     var workspaceId: UUID?
 
+    // MARK: - Coordinator
     @MainActor
-    func makeNSView(context: Context) -> LocalProcessTerminalView {
-        // 复用已有 provider（切换工作区后 Canvas 重建时不重启 PTY）
-        if let existing = TerminalProviderRegistry.shared.provider(for: terminalId),
-           let existingView = existing.terminalView {
-            existing.terminalView?.removeFromSuperview()
-            // 重新 attach 时同步最新主题和字体（preferences 可能在离开期间已变更）
-            existing.applyCurrentTheme(to: existingView)
-            existing.applyCurrentFont(to: existingView)
-            return existingView
-        }
+    final class Coordinator: NSObject {
+        var provider: SwiftTermProvider?
+        var isAttached: Bool = false
+        var lastTheme: String = ""
+        var lastFontName: String = ""
+        var lastFontSize: CGFloat = 0
 
-        let provider = SwiftTermProvider(
-            terminalId: terminalId,
-            command: command,
-            workingDirectory: workingDirectory
-        )
-        provider.serverPort = serverPort > 0 ? serverPort : InterAgentServer.shared.port
-        provider.workspaceId = workspaceId
+        private var providerReadyObserver: NSObjectProtocol?
+        private var shellReadyObserver: NSObjectProtocol?
 
-        // 使用 .zero，让父视图的 autoresizingMask 决定实际尺寸
-        let view = provider.start(in: .zero)
-
-        // 单一的输出链路：PTY 输出 → TerminalSession 缓存 + ScrollbackStore
-        if let session = TerminalManager.shared.terminals[terminalId] {
-            provider.onOutput = { [weak provider] text in
-                // 首次输出表示 shell prompt 就绪，触发发送暂存的 cd/command
-                provider?.handleFirstOutput()
+        func setupObservers(terminalId: UUID, maestroView: MaestroTerminalView) {
+            teardownObservers()
+            providerReadyObserver = NotificationCenter.default.addObserver(
+                forName: .terminalProviderReady, object: nil, queue: .main
+            ) { [weak self, weak maestroView] notif in
+                guard let tid = notif.userInfo?["terminalId"] as? UUID, tid == terminalId,
+                      let self, let maestroView else { return }
                 Task { @MainActor in
-                    session.recordOutput(text)
+                    self.attachIfNeeded(to: maestroView, terminalId: terminalId)
                 }
-                provider?.recordOutputForScrollback(text)
             }
-        }
-
-        // 注册 provider 引用（仅用于 TerminalManager.write → PTY 写入路径）
-        let tid = terminalId
-        let wsId = workspaceId
-        TerminalProviderRegistry.shared.register(terminalId: tid, provider: provider)
-
-        // 异步加载历史 scrollback，在 shell 初始化完成后 feed 到终端 buffer
-        // 用户重启后可向上滚动查看历史输出
-        if let wsId {
-            Task.detached(priority: .background) { [weak provider] in
-                let store = ScrollbackStore()
-                guard let entries = try? store.load(terminalId: tid, workspaceId: wsId),
-                      !entries.isEmpty else { return }
-                let historyText = entries.map { $0.text }.joined(separator: "\r\n") + "\r\n"
-
-                // 等待 shell 初始化完成：先等 startup commands 发送，再额外等 500ms
-                // 覆盖两种场景：
-                // 1. 有 pendingStartupCommands：等 startupCommandsSent=true（prompt 静默检测后）
-                // 2. 无 pendingStartupCommands：startupCommandsSent 初始为 true，等固定 1.5s 给 shell 初始化
-                let hasStartupWork = await MainActor.run { !(provider?.startupCommandsSent ?? true) }
-                if hasStartupWork {
-                    // 等待 startup commands 发送完成（最多 5s）
-                    for _ in 0..<50 {
-                        try? await Task.sleep(for: .milliseconds(100))
-                        let done = await MainActor.run { provider?.startupCommandsSent ?? true }
-                        if done { break }
-                    }
-                    try? await Task.sleep(for: .milliseconds(300))
-                } else {
-                    // 无 startup work，等待 shell 完成 .zshrc 初始化
-                    try? await Task.sleep(for: .milliseconds(1500))
-                }
-
-                await MainActor.run { [weak provider] in
-                    guard let provider, let view = provider.terminalView else { return }
-                    view.feed(text: historyText)
+            shellReadyObserver = NotificationCenter.default.addObserver(
+                forName: .terminalShellReady, object: nil, queue: .main
+            ) { [weak maestroView] notif in
+                guard let tid = notif.userInfo?["terminalId"] as? UUID, tid == terminalId,
+                      let wsId = notif.userInfo?["workspaceId"] as? UUID else { return }
+                Task { @MainActor in
+                    maestroView?.loadScrollback(workspaceId: wsId)
                 }
             }
         }
 
-        return view
+        func teardownObservers() {
+            if let obs = providerReadyObserver { NotificationCenter.default.removeObserver(obs) }
+            if let obs = shellReadyObserver { NotificationCenter.default.removeObserver(obs) }
+            providerReadyObserver = nil
+            shellReadyObserver = nil
+        }
+
+        @MainActor
+        func attachIfNeeded(to maestroView: MaestroTerminalView, terminalId: UUID) {
+            guard !isAttached,
+                  let provider = TerminalManager.shared.providers[terminalId] else { return }
+            self.provider = provider
+            maestroView.attach(provider: provider)
+            isAttached = true
+        }
+
+        deinit {
+            // deinit 是 nonisolated，把 observer 引用拷出来异步清理
+            let obs1 = providerReadyObserver
+            let obs2 = shellReadyObserver
+            if let obs1 { NotificationCenter.default.removeObserver(obs1) }
+            if let obs2 { NotificationCenter.default.removeObserver(obs2) }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    @MainActor
+    func makeNSView(context: Context) -> MaestroTerminalView {
+        let maestroView = MaestroTerminalView(terminalId: terminalId)
+        maestroView.autoresizingMask = [.width, .height]
+        context.coordinator.setupObservers(terminalId: terminalId, maestroView: maestroView)
+        // provider 可能已就绪（工作区切换回来）
+        context.coordinator.attachIfNeeded(to: maestroView, terminalId: terminalId)
+        return maestroView
     }
 
     @MainActor
-    func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
-        // 根据实际视图尺寸更新 PTY 行列
-        // 防抖：相同尺寸跳过 + 高频 resize 时通过 debounce 合并 SIGWINCH 信号
-        // frame 为 zero 或极小时跳过（避免预览模式切换期间错误 resize 导致 terminal buffer 被清空）
-        guard nsView.frame.width > 40, nsView.frame.height > 20 else { return }
-        let cols = max(Int(nsView.frame.width / 8), 20)
-        let rows = max(Int(nsView.frame.height / 16), 5)
-        let terminal = nsView.getTerminal()
-        guard terminal.cols != cols || terminal.rows != rows else { return }
-        // 使用延迟执行合并快速连续的 resize（如窗口拖拽），
-        // 避免对 PTY 发送过多 SIGWINCH 导致子进程抖动
-        TerminalResizeDebouncer.shared.scheduleResize(terminalId: terminalId, cols: cols, rows: rows, terminal: terminal)
-    }
-
-    @MainActor
-    static func dismantleNSView(_ nsView: LocalProcessTerminalView, coordinator: ()) {
-        // 视图销毁时从注册表中移除，防止内存泄漏
-    }
-}
-
-// MARK: - TerminalProviderRegistry
-
-/// 全局注册表：terminalId → SwiftTermProvider
-/// 职责：
-///   1. 存储 provider 引用，供 TerminalManager.write 转发写入 PTY
-///   2. 缓存 LocalProcessTerminalView，使其生命周期独立于 Canvas View 层级，
-///      实现切换工作区时 PTY 进程不重置（复用已有 terminalView）
-final class TerminalProviderRegistry {
-    static let shared = TerminalProviderRegistry()
-    private var providers: [UUID: SwiftTermProvider] = [:]
-    private let lock = NSLock()
-    private init() {}
-
-    func register(terminalId: UUID, provider: SwiftTermProvider) {
-        lock.lock(); defer { lock.unlock() }
-        providers[terminalId] = provider
-        // 将 TerminalManager.write 路径接通：TerminalSession.onOutput → PTY.write
-        // 注意：仅在 session.onOutput 为 nil 时才设置，避免覆盖 makeNSView 中已设置的回调
-        Task { @MainActor in
-            if let session = TerminalManager.shared.terminals[terminalId],
-               session.onOutput == nil {
-                session.onOutput = { [weak provider] text in
-                    provider?.write(text)
-                }
+    func updateNSView(_ nsView: MaestroTerminalView, context: Context) {
+        // 只做主题/字体差量更新（resize 由 MaestroTerminalView.layout() 处理）
+        guard context.coordinator.isAttached, let tv = nsView.terminalView else { return }
+        if let prefs = try? PersistenceManager.shared.loadPreferences() {
+            let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)
+            if context.coordinator.lastTheme != themeId {
+                TerminalThemeRegistry.shared.apply(themeId: themeId, to: tv)
+                context.coordinator.lastTheme = themeId
+            }
+            if context.coordinator.lastFontName != prefs.terminalFontFamily
+                || context.coordinator.lastFontSize != prefs.terminalFontSize {
+                let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
+                    ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
+                tv.font = font
+                context.coordinator.lastFontName = prefs.terminalFontFamily
+                context.coordinator.lastFontSize = prefs.terminalFontSize
             }
         }
     }
 
-    func unregister(terminalId: UUID) {
-        lock.lock(); defer { lock.unlock() }
-        providers.removeValue(forKey: terminalId)
-    }
-
-    func provider(for terminalId: UUID) -> SwiftTermProvider? {
-        lock.lock(); defer { lock.unlock() }
-        return providers[terminalId]
-    }
-
-    func allProviders() -> [SwiftTermProvider] {
-        lock.lock(); defer { lock.unlock() }
-        return Array(providers.values)
-    }
-
-    /// 将已缓存的 terminalView 从当前父视图移除（供 Canvas 层重新 attach 前调用）
     @MainActor
-    func detachTerminalView(for terminalId: UUID) {
-        guard let view = providers[terminalId]?.terminalView else { return }
-        view.removeFromSuperview()
-    }
-
-    /// 退出时终止所有 PTY 进程，避免僵尸进程（必须在主线程调用）
-    @MainActor
-    func terminateAll() {
-        lock.lock(); defer { lock.unlock() }
-        for (_, provider) in providers {
-            provider.stop()
-        }
-        providers.removeAll()
-    }
-}
-
-// MARK: - TerminalResizeDebouncer
-
-/// PTY resize 防抖器：合并 100ms 内的多次 resize 调用为一次 SIGWINCH
-/// 避免窗口拖拽时对 PTY 子进程发送过多信号导致抖动
-@MainActor
-final class TerminalResizeDebouncer {
-    static let shared = TerminalResizeDebouncer()
-    private var pendingTasks: [UUID: Task<Void, Never>] = [:]
-    private init() {}
-
-    /// 调度 resize（取消前一次未执行的 resize，延迟 100ms 执行）
-    func scheduleResize(terminalId: UUID, cols: Int, rows: Int, terminal: Terminal) {
-        pendingTasks[terminalId]?.cancel()
-        pendingTasks[terminalId] = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled else { return }
-            terminal.resize(cols: cols, rows: rows)
-            self?.pendingTasks.removeValue(forKey: terminalId)
-        }
+    static func dismantleNSView(_ nsView: MaestroTerminalView, coordinator: Coordinator) {
+        coordinator.teardownObservers()
+        nsView.detach()
+        coordinator.isAttached = false
+        coordinator.provider = nil
     }
 }
