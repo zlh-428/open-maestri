@@ -65,6 +65,10 @@ final class GitStatusProvider {
         try run(["push"])
     }
 
+    func fetch() throws {
+        try run(["fetch", "--all", "--prune"])
+    }
+
     func diff() throws -> String {
         try run(["diff"])
     }

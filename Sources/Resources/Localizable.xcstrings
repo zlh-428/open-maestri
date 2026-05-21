@@ -1788,6 +1788,108 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "(Enter role instructions)" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "（请输入角色指令）" } }
       }
+    },
+    "filetree.menu.new_file" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New File" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建文件" } }
+      }
+    },
+    "filetree.menu.new_folder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建文件夹" } }
+      }
+    },
+    "filetree.menu.open" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开" } }
+      }
+    },
+    "filetree.menu.open_folder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在访达中打开" } }
+      }
+    },
+    "filetree.menu.reveal_in_finder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reveal in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在访达中显示" } }
+      }
+    },
+    "filetree.menu.rename" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名" } }
+      }
+    },
+    "filetree.menu.delete" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
+      }
+    },
+    "filetree.delete.confirm_title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete "%@"?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除"%@"？" } }
+      }
+    },
+    "filetree.delete.confirm_message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This action cannot be undone." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "此操作无法撤销。" } }
+      }
+    },
+    "filetree.new_file.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New File" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建文件" } }
+      }
+    },
+    "filetree.new_file.placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "File name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件名" } }
+      }
+    },
+    "filetree.new_folder.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建文件夹" } }
+      }
+    },
+    "filetree.new_folder.placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Folder name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件夹名" } }
+      }
+    },
+    "filetree.rename.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rename" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重命名" } }
+      }
+    },
+    "git.action.pull" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Pull" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Pull" } }
+      }
+    },
+    "git.action.push" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Push" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Push" } }
+      }
+    },
+    "git.action.fetch" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Fetch" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Fetch" } }
+      }
     }
   },
   "version" : "1"

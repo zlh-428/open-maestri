@@ -56,7 +56,40 @@ struct FileTreeNodeSwiftUIView: View {
 
     @Environment(\.dropTargetNodeId) private var dropTargetNodeId
 
+    /// 每个节点独立的导航状态（State 保证生命周期绑定到视图）
+    @State private var navState: FileTreeNavigationState
+    @State private var viewMode: FileTreeViewMode = .list
+    @State private var showGitPanel = false
+    @State private var currentBranch: String = ""
+
     private var isDropTarget: Bool { dropTargetNodeId == nodeId }
+
+    init(
+        nodeId: UUID,
+        content: FileTreeContent,
+        isSelected: Bool,
+        isLocked: Bool,
+        zoom: CGFloat,
+        workspace: WorkspaceManager?,
+        onActivated: ((UUID) -> Void)? = nil,
+        onClose: ((UUID) -> Void)? = nil,
+        onRename: ((UUID, String) -> Void)? = nil,
+        onDuplicate: ((UUID) -> Void)? = nil,
+        onLockToggle: ((UUID, Bool) -> Void)? = nil
+    ) {
+        self.nodeId = nodeId
+        self.content = content
+        self.isSelected = isSelected
+        self.isLocked = isLocked
+        self.zoom = zoom
+        self.workspace = workspace
+        self.onActivated = onActivated
+        self.onClose = onClose
+        self.onRename = onRename
+        self.onDuplicate = onDuplicate
+        self.onLockToggle = onLockToggle
+        _navState = State(initialValue: FileTreeNavigationState(rootPath: content.rootPath))
+    }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -70,18 +103,45 @@ struct FileTreeNodeSwiftUIView: View {
                 }
 
             VStack(spacing: 0) {
-                // 自定义导航栏 Header
+                // 对标 Maestri 的 Header 工具栏
                 FileTreeNavigationBar(
-                    rootPath: content.rootPath,
-                    isLocked: isLocked
+                    navState: navState,
+                    viewMode: $viewMode,
+                    showGitPanel: $showGitPanel,
+                    currentBranch: currentBranch,
+                    isLocked: isLocked,
+                    rootPath: content.rootPath
                 )
                 .frame(height: CanvasNodeConstants.headerHeight + 8)
 
                 Divider().opacity(0.3)
 
-                // 文件列表内容区
-                FileTreeRepresentable(nodeId: nodeId, content: content, workspace: workspace)
+                // 文件内容区（根据 viewMode 切换）
+                if viewMode == .list {
+                    FileTreeRepresentable(
+                        nodeId: nodeId,
+                        content: content,
+                        navState: navState,
+                        onBranchLoaded: { branch in
+                            currentBranch = branch
+                        }
+                    )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    FileTreeGridRepresentable(
+                        nodeId: nodeId,
+                        navState: navState
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+
+                // Git 操作面板（可折叠）
+                if showGitPanel {
+                    Divider().opacity(0.3)
+                    FileTreeGitPanelView(rootPath: navState.currentPath)
+                        .frame(height: 120)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
 
                 Divider().opacity(0.3)
 
@@ -90,6 +150,7 @@ struct FileTreeNodeSwiftUIView: View {
                     .frame(height: 40)
             }
             .clipShape(RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius))
+            .animation(.easeInOut(duration: 0.2), value: showGitPanel)
 
             // 选中蓝色虚线边框
             if isSelected {
@@ -110,54 +171,56 @@ struct FileTreeNodeSwiftUIView: View {
             }
         }
         // 右键菜单由 AppKit 层 CanvasViewportView.menu(for:) 统一处理
-        // （SwiftUI .contextMenu 因 allowsHitTesting(false) 永远不会触发）
     }
 }
 
-// MARK: - 导航栏（对标 Maestri 文件树 Header）
+// MARK: - 顶部导航工具栏（对标 Maestri [<][>] 路径 [List|Grid] [Branch]）
 
 private struct FileTreeNavigationBar: View {
-    let rootPath: String
+    @Bindable var navState: FileTreeNavigationState
+    @Binding var viewMode: FileTreeViewMode
+    @Binding var showGitPanel: Bool
+    let currentBranch: String
     let isLocked: Bool
-
-    private var directoryName: String {
-        URL(fileURLWithPath: rootPath).lastPathComponent
-    }
+    let rootPath: String
 
     var body: some View {
         HStack(spacing: 0) {
-            // 后退/前进按钮组
+            // ─── 后退 / 前进 按钮 ───
             HStack(spacing: 0) {
-                Button(action: {}) {
+                Button(action: { navState.goBack() }) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(navState.canGoBack ? Color.primary : Color.secondary.opacity(0.4))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(!navState.canGoBack)
 
-                Button(action: {}) {
+                Button(action: { navState.goForward() }) {
                     Image(systemName: "chevron.right")
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(navState.canGoForward ? Color.primary : Color.secondary.opacity(0.4))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(!navState.canGoForward)
             }
             .padding(.leading, 8)
 
-            // 目录名称
-            Text(directoryName)
+            // ─── 当前目录名称（截断显示） ───
+            Text(navState.currentDirectoryName)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
-                .truncationMode(.tail)
+                .truncationMode(.middle)
                 .padding(.leading, 4)
+                .help(navState.currentPath)   // hover tooltip 显示完整路径
 
             Spacer()
 
-            // 锁定图标
+            // ─── 锁定图标 ───
             if isLocked {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))
@@ -165,22 +228,129 @@ private struct FileTreeNavigationBar: View {
                     .padding(.trailing, 4)
             }
 
-            // 排序/视图模式按钮
-            Button(action: {}) {
-                HStack(spacing: 2) {
+            // ─── Git Branch 指示器 ───
+            if !currentBranch.isEmpty {
+                Button(action: { withAnimation { showGitPanel.toggle() } }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10))
+                        Text(currentBranch)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(showGitPanel ? Color.accentColor : Color.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(showGitPanel ? Color.accentColor.opacity(0.12) : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, 4)
+            }
+
+            // ─── List / Grid 视图切换 ───
+            HStack(spacing: 1) {
+                Button(action: { viewMode = .list }) {
                     Image(systemName: "list.bullet")
                         .font(.system(size: 12))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 8))
+                        .foregroundStyle(viewMode == .list ? Color.accentColor : Color.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(viewMode == .list ? Color.accentColor.opacity(0.12) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
                 }
-                .foregroundStyle(.primary)
-                .frame(width: 36, height: 28)
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+
+                Button(action: { viewMode = .grid }) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 12))
+                        .foregroundStyle(viewMode == .grid ? Color.accentColor : Color.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(viewMode == .grid ? Color.accentColor.opacity(0.12) : Color.clear)
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Git 操作面板（折叠区域）
+
+private struct FileTreeGitPanelView: View {
+    let rootPath: String
+    @State private var commitMessage = ""
+    @State private var branch = ""
+
+    private var gitProvider: GitStatusProvider {
+        GitStatusProvider(workingDirectory: rootPath)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                Text(branch.isEmpty ? "git.branch.unknown".localized : branch)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.top, 8)
+
+            HStack(spacing: 6) {
+                TextField("git.commit_message_placeholder", text: $commitMessage)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 12))
+                Button("button.commit") {
+                    try? gitProvider.commit(message: commitMessage, files: [])
+                    commitMessage = ""
+                }
+                .disabled(commitMessage.isEmpty)
+                .controlSize(.small)
+                .buttonStyle(.bordered)
+            }
+            .padding(.horizontal, 10)
+
+            HStack(spacing: 4) {
+                GitActionButton(label: "Pull", icon: "arrow.down") { try? gitProvider.pull() }
+                GitActionButton(label: "Push", icon: "arrow.up") { try? gitProvider.push() }
+                GitActionButton(label: "Fetch", icon: "arrow.clockwise") { try? gitProvider.fetch() }
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 8)
+        }
+        .onAppear { branch = (try? gitProvider.currentBranch()) ?? "" }
+    }
+}
+
+private struct GitActionButton: View {
+    let label: String
+    let icon: String
+    let action: () throws -> Void
+
+    var body: some View {
+        Button(action: { try? action() }) {
+            HStack(spacing: 3) {
+                Image(systemName: icon).font(.system(size: 10))
+                Text(label).font(.system(size: 11))
+            }
+        }
+        .controlSize(.small)
+        .buttonStyle(.bordered)
     }
 }
 
@@ -212,28 +382,69 @@ private struct FileTreeSearchBar: View {
     }
 }
 
-// MARK: - NSViewRepresentable 桥接
+// MARK: - NSViewRepresentable 桥接（List 模式）
 
 struct FileTreeRepresentable: NSViewRepresentable {
     let nodeId: UUID
     let content: FileTreeContent
-    let workspace: WorkspaceManager?
+    @Bindable var navState: FileTreeNavigationState
+    var onBranchLoaded: ((String) -> Void)?
 
     func makeNSView(context: Context) -> NSView {
         // 复用已注册的 view（避免切换工作区时重建）
         if let existing = FileTreeViewRegistry.shared.view(for: nodeId) {
+            // 将最新的 navState 回调注入到已有 view
+            existing.onNavigateTo = { path in
+                navState.navigateTo(path)
+            }
+            existing.onBranchLoaded = onBranchLoaded
             return existing
         }
 
         let fileTreeView = FileTreeOutlineView(rootPath: content.rootPath)
-        // 设置导航回调：双击文件夹 → 更新根路径
-        fileTreeView.onDirectoryClicked = { [weak fileTreeView] dirPath in
-            fileTreeView?.changeRoot(to: dirPath)
+        fileTreeView.onNavigateTo = { path in
+            navState.navigateTo(path)
         }
-        // 注册到全局 registry，供画布路由滚动事件
+        fileTreeView.onBranchLoaded = onBranchLoaded
+
         FileTreeViewRegistry.shared.register(nodeId: nodeId, view: fileTreeView)
         return fileTreeView
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard let ftv = nsView as? FileTreeOutlineView else { return }
+        // navState.currentPath 变化时，更新 outline view 的根目录
+        if ftv.currentRootPath != navState.currentPath {
+            ftv.changeRoot(to: navState.currentPath)
+        }
+        // 保证回调始终是最新的
+        ftv.onNavigateTo = { path in
+            navState.navigateTo(path)
+        }
+        ftv.onBranchLoaded = onBranchLoaded
+    }
+}
+
+// MARK: - NSViewRepresentable 桥接（Grid 模式）
+
+struct FileTreeGridRepresentable: NSViewRepresentable {
+    let nodeId: UUID
+    @Bindable var navState: FileTreeNavigationState
+
+    func makeNSView(context: Context) -> FileTreeIconGridView {
+        let grid = FileTreeIconGridView(rootPath: navState.currentPath)
+        grid.onNavigateTo = { path in
+            navState.navigateTo(path)
+        }
+        return grid
+    }
+
+    func updateNSView(_ nsView: FileTreeIconGridView, context: Context) {
+        if nsView.rootPath != navState.currentPath {
+            nsView.changeRoot(to: navState.currentPath)
+        }
+        nsView.onNavigateTo = { path in
+            navState.navigateTo(path)
+        }
+    }
 }

@@ -31,10 +31,13 @@ final class FileTreeOutlineView: NSView {
     /// 内部 NSScrollView（供外部路由滚动事件使用）
     var innerScrollView: NSScrollView? { outlineNSView?.scrollViewRef }
 
-    /// 单击文件夹时的回调（Finder 式导航：传入目标文件夹路径）
-    var onDirectoryClicked: ((String) -> Void)?
-    /// 单击文件时的回调
-    var onFileClicked: ((String) -> Void)?
+    /// SwiftUI 层通过此回调得知用户双击进入了某目录，更新 navState
+    var onNavigateTo: ((String) -> Void)?
+    /// Git 分支加载完成后的回调
+    var onBranchLoaded: ((String) -> Void)?
+
+    /// 当前根路径（供 FileTreeRepresentable.updateNSView 比较使用）
+    var currentRootPath: String { store.rootPath }
 
     init(rootPath: String) {
         self.store = FileTreeStateStore(rootPath: rootPath)
@@ -43,12 +46,20 @@ final class FileTreeOutlineView: NSView {
         let outline = FileTreeOutlineNSView(store: store)
         outline.frame = bounds
         outline.autoresizingMask = [.width, .height]
-        outline.onDirectoryClicked = { [weak self] path in
-            self?.onDirectoryClicked?(path)
+
+        // 双击目录 → 通知 navState 导航
+        outline.onNavigateTo = { [weak self] path in
+            self?.onNavigateTo?(path)
         }
-        outline.onFileClicked = { [weak self] path in
-            self?.onFileClicked?(path)
+        // 双击文件 → 默认应用打开
+        outline.onFileOpened = { path in
+            NSWorkspace.shared.open(URL(fileURLWithPath: path))
         }
+        // 分支信息加载完成
+        outline.onBranchLoaded = { [weak self] branch in
+            self?.onBranchLoaded?(branch)
+        }
+
         addSubview(outline)
         outlineNSView = outline
     }
@@ -67,6 +78,8 @@ final class FileTreeOutlineView: NSView {
         Task { @MainActor [weak self] in
             await self?.store.reload()
             self?.outlineNSView?.reloadData()
+            // 刷新分支信息
+            self?.outlineNSView?.reloadBranch()
         }
     }
 
