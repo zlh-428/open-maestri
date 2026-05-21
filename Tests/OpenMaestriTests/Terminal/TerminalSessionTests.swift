@@ -1,6 +1,7 @@
 import XCTest
 @testable import open_maestri
 
+@MainActor
 final class TerminalSessionTests: XCTestCase {
 
     func testOutputBufferRecordsLines() {
