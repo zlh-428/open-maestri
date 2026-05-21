@@ -57,6 +57,17 @@ final class ConnectionOverlayView: NSView {
     /// 连线命中检测容差（像素）
     private static let hitTolerance: CGFloat = 8.0
 
+    // MARK: - 临时连线数据（连线工具拖动期间由 CanvasViewportView 同步）
+
+    /// 临时连线起点节点的屏幕坐标 frame
+    var tempConnectionFromFrame: CGRect? = nil {
+        didSet { if oldValue != tempConnectionFromFrame { needsDisplay = true } }
+    }
+    /// 临时连线终点（鼠标当前屏幕坐标）
+    var tempConnectionToPoint: CGPoint? = nil {
+        didSet { if oldValue != tempConnectionToPoint { needsDisplay = true } }
+    }
+
     // MARK: - 初始化
 
     override init(frame: NSRect) {
@@ -201,6 +212,111 @@ final class ConnectionOverlayView: NSView {
                 drawLabel(label, at: mid)
             }
         }
+
+        // 临时连线绘制（连线工具拖动时）
+        drawTemporaryConnectionLine()
+    }
+
+    // MARK: - 临时连线绘制
+
+    /// 绘制连线工具拖动时的临时虚线（直线）
+    private func drawTemporaryConnectionLine() {
+        guard let fromFrame = tempConnectionFromFrame else { return }
+
+        // 鼠标未移动时，绘制四个边缘连接点指示器
+        guard let toPoint = tempConnectionToPoint else {
+            drawEdgeConnectors(on: fromFrame)
+            return
+        }
+
+        // 计算从节点边缘出发的锚点（向鼠标方向与边框的交点）
+        let fromCenter = CGPoint(x: fromFrame.midX, y: fromFrame.midY)
+        let fromPoint = Self.edgeAnchor(of: fromFrame, center: fromCenter, toward: toPoint)
+
+        // 绘制虚线直线
+        let path = NSBezierPath()
+        path.move(to: fromPoint)
+        path.line(to: toPoint)
+        path.lineWidth = 2
+        path.setLineDash([6, 4], count: 2, phase: 0)
+        NSColor.systemBlue.withAlphaComponent(0.8).setStroke()
+        path.stroke()
+
+        // 起点连接点指示器（在节点边缘出发点画小圆圈）
+        drawConnectorDot(at: fromPoint)
+
+        // 终点指示器（鼠标位置画小圆圈）
+        drawConnectorDot(at: toPoint, color: NSColor.systemBlue.withAlphaComponent(0.5))
+
+        // 源节点边框高亮（淡蓝色）
+        let borderPath = NSBezierPath(roundedRect: fromFrame, xRadius: 6, yRadius: 6)
+        borderPath.lineWidth = 1.5
+        NSColor.systemBlue.withAlphaComponent(0.4).setStroke()
+        borderPath.stroke()
+    }
+
+    /// 在节点四个边缘中点绘制连接点圆圈（连线模式激活但鼠标未移动时）
+    private func drawEdgeConnectors(on frame: CGRect) {
+        let midPoints = [
+            CGPoint(x: frame.midX, y: frame.minY),  // 上
+            CGPoint(x: frame.midX, y: frame.maxY),  // 下
+            CGPoint(x: frame.minX, y: frame.midY),  // 左
+            CGPoint(x: frame.maxX, y: frame.midY),  // 右
+        ]
+
+        // 节点边框高亮
+        let borderPath = NSBezierPath(roundedRect: frame, xRadius: 6, yRadius: 6)
+        borderPath.lineWidth = 1.5
+        NSColor.systemBlue.withAlphaComponent(0.4).setStroke()
+        borderPath.stroke()
+
+        // 四个连接点
+        for pt in midPoints {
+            drawConnectorDot(at: pt)
+        }
+    }
+
+    /// 绘制连接器圆点（蓝色外圈 + 白色内圈）
+    private func drawConnectorDot(at point: CGPoint, color: NSColor = .systemBlue) {
+        let outerRadius: CGFloat = 5.0
+        let innerRadius: CGFloat = 2.5
+        let outerRect = CGRect(
+            x: point.x - outerRadius, y: point.y - outerRadius,
+            width: outerRadius * 2, height: outerRadius * 2
+        )
+        color.setFill()
+        NSBezierPath(ovalIn: outerRect).fill()
+
+        let innerRect = CGRect(
+            x: point.x - innerRadius, y: point.y - innerRadius,
+            width: innerRadius * 2, height: innerRadius * 2
+        )
+        NSColor.white.setFill()
+        NSBezierPath(ovalIn: innerRect).fill()
+    }
+
+    // MARK: - 边缘锚点计算
+
+    /// 计算从节点边框出发的锚点（从 frame 中心向 target 方向做射线，返回与边框的交点）
+    static func edgeAnchor(of frame: CGRect, center: CGPoint, toward target: CGPoint) -> CGPoint {
+        let dx = target.x - center.x
+        let dy = target.y - center.y
+        guard abs(dx) > 0.001 || abs(dy) > 0.001 else { return center }
+
+        let halfW = frame.width / 2.0
+        let halfH = frame.height / 2.0
+        var t: CGFloat = .greatestFiniteMagnitude
+
+        if abs(dx) > 0.001 {
+            let tx = halfW / abs(dx)
+            if tx < t { t = tx }
+        }
+        if abs(dy) > 0.001 {
+            let ty = halfH / abs(dy)
+            if ty < t { t = ty }
+        }
+
+        return CGPoint(x: center.x + dx * t, y: center.y + dy * t)
     }
 
     /// 计算控制点序列的 axis-aligned bounding box

@@ -104,6 +104,28 @@ struct WorkspaceCanvasView: View {
                     // 数字徽章由 TerminalNodeView 自行管理
                 },
                 onConnectionCreated: { idA, idB in
+                    // 防止同一对节点重复连接
+                    let alreadyConnected = workspace.connections.contains {
+                        ($0.terminalIdA == idA && $0.terminalIdB == idB) ||
+                        ($0.terminalIdA == idB && $0.terminalIdB == idA)
+                    } || workspace.noteConnections.contains {
+                        ($0.terminalId == idA && $0.noteNodeId == idB) ||
+                        ($0.terminalId == idB && $0.noteNodeId == idA)
+                    } || workspace.portalConnections.contains {
+                        ($0.terminalId == idA && $0.portalNodeId == idB) ||
+                        ($0.terminalId == idB && $0.portalNodeId == idA)
+                    } || workspace.noteToNoteConnections.contains {
+                        ($0.noteNodeIdA == idA && $0.noteNodeIdB == idB) ||
+                        ($0.noteNodeIdA == idB && $0.noteNodeIdB == idA)
+                    } || workspace.portalToPortalConnections.contains {
+                        ($0.portalIdA == idA && $0.portalIdB == idB) ||
+                        ($0.portalIdA == idB && $0.portalIdB == idA)
+                    }
+                    guard !alreadyConnected else {
+                        isConnecting = false
+                        return
+                    }
+
                     // 根据节点内容类型选择正确的连接类型
                     let typeA = workspace.nodes.first { $0.id == idA }.map { contentTypeName($0.content) }
                     let typeB = workspace.nodes.first { $0.id == idB }.map { contentTypeName($0.content) }
@@ -634,36 +656,58 @@ struct WorkspaceCanvasView: View {
 
     // MARK: - 终端预初始化
 
-    /// 进入工作区时批量预初始化所有终端，不依赖视图渲染触发 PTY 启动
+    /// 进入工作区时异步分批预初始化终端 session（不启动 PTY）
+    /// PTY 真正启动延迟到 TerminalEmbeddedView.makeNSView，避免集中阻塞主线程
     @MainActor
     private func preInitializeAllTerminals() {
-        for node in workspace.nodes {
-            guard case .terminal(let tc) = node.content else { continue }
-            // 跳过已有 provider 的（防重复初始化）
-            guard TerminalProviderRegistry.shared.provider(for: tc.id) == nil else { continue }
-            // 跳过已在 TerminalManager 中的（视口渲染可能已触发）
-            guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
+        let nodes = workspace.nodes
+        let wsId = workspace.id
+        let wsDir = workspace.workingDirectory
+        let rolePresets = appState.preferences.rolePresets
 
-            let preset = AgentPreset(
-                id: UUID(),
-                name: tc.name,
-                command: tc.command,
-                icon: tc.icon,
-                agentType: tc.agentType,
-                color: tc.color,
-                isActive: true,
-                isBuiltIn: false
-            )
-            let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
-                appState.preferences.rolePresets.first { $0.id == roleId }
+        // 筛出需要初始化的终端节点
+        let pending = nodes.filter { node -> Bool in
+            guard case .terminal(let tc) = node.content else { return false }
+            return TerminalManager.shared.terminals[tc.id] == nil
+        }
+        guard !pending.isEmpty else { return }
+
+        // 每批最多 3 个，每批之间间隔 80ms，避免瞬间大量 PTY fork 阻塞主线程
+        let batchSize = 3
+        for (batchIndex, batchStart) in stride(from: 0, to: pending.count, by: batchSize).enumerated() {
+            let batch = Array(pending[batchStart..<min(batchStart + batchSize, pending.count)])
+            let delay = Double(batchIndex) * 0.08
+
+            Task { @MainActor in
+                if delay > 0 { try? await Task.sleep(for: .milliseconds(Int(delay * 1000))) }
+                for node in batch {
+                    guard case .terminal(let tc) = node.content else { continue }
+                    // 二次检查，避免 delay 期间重复创建
+                    guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
+                    guard TerminalProviderRegistry.shared.provider(for: tc.id) == nil else { continue }
+
+                    let preset = AgentPreset(
+                        id: UUID(),
+                        name: tc.name,
+                        command: tc.command,
+                        icon: tc.icon,
+                        agentType: tc.agentType,
+                        color: tc.color,
+                        isActive: true,
+                        isBuiltIn: false
+                    )
+                    let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
+                        rolePresets.first { $0.id == roleId }
+                    }
+                    _ = TerminalManager.shared.createTerminal(
+                        id: tc.id,
+                        workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
+                        preset: preset,
+                        role: role,
+                        workspaceId: wsId
+                    )
+                }
             }
-            _ = TerminalManager.shared.createTerminal(
-                id: tc.id,
-                workingDirectory: tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory,
-                preset: preset,
-                role: role,
-                workspaceId: workspace.id
-            )
         }
     }
 

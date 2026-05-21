@@ -38,6 +38,7 @@ final class CanvasNodeRenderer {
         // 画布 pan/zoom 变化时直接刷新连线屏幕坐标（绕过 SwiftUI 时序问题）
         canvas.onViewportPanned = { [weak self] in
             self?.rerenderConnections()
+            self?.canvas?.syncTemporaryConnectionToOverlay()
         }
     }
 
@@ -178,6 +179,8 @@ final class CanvasNodeRenderer {
         overlay.autoresizingMask = [.width, .height]
         canvas.addSubview(overlay)
         overlayView = overlay
+        // 注册 overlay 引用到画布（供临时连线同步使用）
+        canvas.connectionOverlayView = overlay
 
         // 连线右键删除回调
         overlay.onDeleteConnection = { [weak self] connectionId in

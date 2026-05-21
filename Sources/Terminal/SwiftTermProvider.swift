@@ -39,8 +39,8 @@ final class SwiftTermProvider: NSObject {
     private var pendingCommand: String? = nil
     /// shell 就绪后需要发送的 cd + pendingCommand（等待首次 PTY 输出触发）
     private var pendingStartupCommands: [String] = []
-    /// 标记是否已经消费了 startup commands（仅触发一次）
-    private var startupCommandsSent: Bool = false
+    /// 标记是否已经消费了 startup commands（仅触发一次）；外部只读，用于 scrollback feed 时机检测
+    private(set) var startupCommandsSent: Bool = false
 
     init(terminalId: UUID, command: String, workingDirectory: String) {
         self.terminalId = terminalId
@@ -161,13 +161,50 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - Shell 就绪检测
 
-    /// 当 PTY 首次产生输出时调用——表示 shell 已完成初始化并打印了 prompt
-    /// 此时发送暂存的 cd + pendingCommand，保证不会出现原始回显
+    /// 最近一次接收到 PTY 输出的时间戳（用于 prompt 静默检测）
+    private var lastOutputTime: ContinuousClock.Instant = .now
+    /// 已接收的 PTY 输出累计字节数（用于判断初始化进度）
+    private var receivedOutputCount: Int = 0
+    /// 是否已调度了 startup 命令发送任务
+    private var startupScheduled: Bool = false
+
+    /// 当 PTY 产生输出时调用
+    /// 策略：不在首次输出立即发送，而是检测"shell 静默"（300ms 无新输出）再发送
+    /// 这样能可靠跳过 .zshrc sourcing 期间的大量输出，等 prompt 真正就绪
     func handleFirstOutput() {
+        guard !startupCommandsSent, !pendingStartupCommands.isEmpty else { return }
+        lastOutputTime = .now
+        receivedOutputCount += 1
+
+        // 调度一次静默检测（只调度一次，后续不断刷新 lastOutputTime）
+        guard !startupScheduled else { return }
+        startupScheduled = true
+
+        Task { @MainActor [weak self] in
+            // 等待直到检测到连续 300ms 无新输出（shell prompt 就绪的可靠信号）
+            for _ in 0..<30 {  // 最多等待 3s
+                try? await Task.sleep(for: .milliseconds(300))
+                guard let self else { return }
+                guard !self.startupCommandsSent else { return }
+                let elapsed = ContinuousClock.now - self.lastOutputTime
+                if elapsed >= .milliseconds(280) {
+                    // shell 已静默 300ms，认为 prompt 就绪
+                    self.sendStartupCommands()
+                    return
+                }
+            }
+            // 超时兜底：3s 后强制发送
+            guard let self else { return }
+            if !self.startupCommandsSent {
+                self.sendStartupCommands()
+            }
+        }
+    }
+
+    private func sendStartupCommands() {
         guard !startupCommandsSent else { return }
         startupCommandsSent = true
         guard !pendingStartupCommands.isEmpty else { return }
-        // 将所有 startup commands 合并为一行用 && 连接，减少多余 prompt 输出
         let combined = pendingStartupCommands.joined(separator: " && ")
         pendingStartupCommands.removeAll()
         write(combined + "\n")

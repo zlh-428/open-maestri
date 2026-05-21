@@ -45,6 +45,8 @@ final class CanvasViewportView: NSView {
     var drawingLayerView: DrawingLayerView?
     var drawingOverlayView: DrawingOverlayView?
     private(set) var snapGuideView: MagneticSnapGuideView?
+    /// 连线 overlay 视图（由 CanvasNodeRenderer 创建后注册，用于绘制临时连线）
+    weak var connectionOverlayView: ConnectionOverlayView?
 
     /// 节点视图映射（nodeId → NSView）
     private(set) var nodeViews: [UUID: NSView] = [:]
@@ -73,10 +75,17 @@ final class CanvasViewportView: NSView {
     // MARK: - 连线工具状态
     /// 连线起点节点 ID（nil = 未开始连线）
     var connectingFromNodeId: UUID? = nil {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            syncTemporaryConnectionToOverlay()
+        }
     }
     /// 连线时鼠标当前屏幕坐标（用于绘制临时连线）
-    var connectionDragPoint: CGPoint? = nil
+    var connectionDragPoint: CGPoint? = nil {
+        didSet {
+            syncTemporaryConnectionToOverlay()
+        }
+    }
     /// 连线完成回调（传入两个节点 UUID，调用者判断类型）
     var onConnectionCreated: ((UUID, UUID) -> Void)? = nil
 
@@ -109,6 +118,20 @@ final class CanvasViewportView: NSView {
         NSCursor.arrow.set()
     }
 
+    /// 将临时连线状态同步到 ConnectionOverlayView（确保临时连线绘制在正确的视图层级）
+    func syncTemporaryConnectionToOverlay() {
+        guard let overlay = connectionOverlayView else { return }
+        if let fromId = connectingFromNodeId,
+           let fromCanvasFrame = nodeCanvasFrames[fromId] {
+            let screenFrame = canvasRectToScreen(fromCanvasFrame)
+            overlay.tempConnectionFromFrame = screenFrame
+            overlay.tempConnectionToPoint = connectionDragPoint
+        } else {
+            overlay.tempConnectionFromFrame = nil
+            overlay.tempConnectionToPoint = nil
+        }
+    }
+
     /// 节点内容类型查询（由 CanvasNodeRenderer 在创建节点后注册）
     var nodeContentTypes: [UUID: String] = [:]  // nodeId → "terminal"|"stickyNote"|"portal"|"fileTree"
 
@@ -138,6 +161,11 @@ final class CanvasViewportView: NSView {
     private var _viewportCacheDirty: Bool = true
     /// 视口缓存容差：origin 变化小于此值（画布坐标）时不重新裁剪，避免微小平移触发 O(n) 遍历
     private static let viewportCacheTolerance: CGFloat = 50.0
+
+    /// pan/zoom 时 rootView 节流：上次更新 rootView 的时间戳
+    /// 连续 pan/zoom 期间最多 60fps（每 16ms 最多一次 rootView 更新），避免每帧重建 SwiftUI 树
+    private var _lastRootViewUpdateTime: TimeInterval = 0
+    private static let rootViewUpdateMinInterval: TimeInterval = 1.0 / 60.0  // 60fps 上限
 
     private func invalidateSortedNodesCache() {
         sortedNodesByZIndex = currentNodes.sorted { $0.zIndex < $1.zIndex }
@@ -616,7 +644,18 @@ final class CanvasViewportView: NSView {
             }
 
             // 仅当 origin/zoom/可见节点变化时才重建 rootView（避免完全无变化时的冗余赋值）
-            if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != _cachedViewportNodes {
+            let nodesChanged = current.nodes != _cachedViewportNodes
+            let viewportChanged = current.canvasOrigin != canvasOrigin || current.zoom != zoom
+            if nodesChanged || viewportChanged {
+                // pan/zoom 时节流：60fps 上限，避免每帧重建 SwiftUI 树触发所有终端 updateNSView
+                // 节点集合变化时强制立即更新（用户操作需要即时响应）
+                let now = CACurrentMediaTime()
+                let shouldUpdate = nodesChanged
+                    || isDragging  // 节点拖拽时保持实时更新
+                    || (now - _lastRootViewUpdateTime) >= Self.rootViewUpdateMinInterval
+                guard shouldUpdate else { return }
+                _lastRootViewUpdateTime = now
+
                 hostingView.rootView = CanvasNodesSwiftUIView(
                     nodes: _cachedViewportNodes,
                     canvasOrigin: canvasOrigin,
@@ -776,8 +815,18 @@ final class CanvasViewportView: NSView {
         super.draw(dirtyRect)
         // 背景由 CanvasBackground 子视图负责绘制
         // 磁吸辅助线、框选矩形、绘制预览矩形由 MagneticSnapGuideView（最顶层）负责绘制
-        // 此处只绘制临时连线
-        drawTemporaryConnection()
+        // 临时连线已迁移到 ConnectionOverlayView 绘制（避免被子视图遮挡）
+    }
+
+    // MARK: - Tracking Area 维护
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        // 连线模式下需要 mouseMoved 事件来跟踪鼠标位置
+        if isInConnectingMode || connectingFromNodeId != nil {
+            for ta in trackingAreas { removeTrackingArea(ta) }
+            addTrackingArea(makeTrackingArea())
+        }
     }
 }
 

@@ -47,7 +47,42 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
         // 注册 provider 引用（仅用于 TerminalManager.write → PTY 写入路径）
         let tid = terminalId
+        let wsId = workspaceId
         TerminalProviderRegistry.shared.register(terminalId: tid, provider: provider)
+
+        // 异步加载历史 scrollback，在 shell 初始化完成后 feed 到终端 buffer
+        // 用户重启后可向上滚动查看历史输出
+        if let wsId {
+            Task.detached(priority: .background) { [weak provider] in
+                let store = ScrollbackStore()
+                guard let entries = try? store.load(terminalId: tid, workspaceId: wsId),
+                      !entries.isEmpty else { return }
+                let historyText = entries.map { $0.text }.joined(separator: "\r\n") + "\r\n"
+
+                // 等待 shell 初始化完成：先等 startup commands 发送，再额外等 500ms
+                // 覆盖两种场景：
+                // 1. 有 pendingStartupCommands：等 startupCommandsSent=true（prompt 静默检测后）
+                // 2. 无 pendingStartupCommands：startupCommandsSent 初始为 true，等固定 1.5s 给 shell 初始化
+                let hasStartupWork = await MainActor.run { !(provider?.startupCommandsSent ?? true) }
+                if hasStartupWork {
+                    // 等待 startup commands 发送完成（最多 5s）
+                    for _ in 0..<50 {
+                        try? await Task.sleep(for: .milliseconds(100))
+                        let done = await MainActor.run { provider?.startupCommandsSent ?? true }
+                        if done { break }
+                    }
+                    try? await Task.sleep(for: .milliseconds(300))
+                } else {
+                    // 无 startup work，等待 shell 完成 .zshrc 初始化
+                    try? await Task.sleep(for: .milliseconds(1500))
+                }
+
+                await MainActor.run { [weak provider] in
+                    guard let provider, let view = provider.terminalView else { return }
+                    view.feed(text: historyText)
+                }
+            }
+        }
 
         return view
     }
@@ -56,6 +91,8 @@ struct TerminalEmbeddedView: NSViewRepresentable {
     func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
         // 根据实际视图尺寸更新 PTY 行列
         // 防抖：相同尺寸跳过 + 高频 resize 时通过 debounce 合并 SIGWINCH 信号
+        // frame 为 zero 或极小时跳过（避免预览模式切换期间错误 resize 导致 terminal buffer 被清空）
+        guard nsView.frame.width > 40, nsView.frame.height > 20 else { return }
         let cols = max(Int(nsView.frame.width / 8), 20)
         let rows = max(Int(nsView.frame.height / 16), 5)
         let terminal = nsView.getTerminal()
