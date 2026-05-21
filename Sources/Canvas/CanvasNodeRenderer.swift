@@ -232,7 +232,7 @@ final class CanvasNodeRenderer {
             workspace: workspace,
             onActivated: { [weak canvas] id in
                 guard let canvas else { return }
-                if let provider = TerminalProviderRegistry.shared.provider(for: id),
+                if let provider = TerminalManager.shared.providers[id],
                    let tv = provider.terminalView {
                     tv.window?.makeFirstResponder(tv)
                 }
@@ -363,7 +363,7 @@ final class CanvasNodeRenderer {
             forName: .canvasNodeActivated, object: nil, queue: .main
         ) { [weak self] notif in
             guard let id = notif.userInfo?["nodeId"] as? UUID else { return }
-            if let provider = TerminalProviderRegistry.shared.provider(for: id),
+            if let provider = TerminalManager.shared.providers[id],
                let tv = provider.terminalView {
                 tv.window?.makeFirstResponder(tv)
             }

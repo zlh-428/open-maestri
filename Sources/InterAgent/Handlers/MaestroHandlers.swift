@@ -88,10 +88,10 @@ final class MaestroHandlers {
         let activeWsId = (try? PersistenceManager.shared.loadAppState())?.activeWorkspaceId
         _ = tm.createTerminal(
             id: recruitId,
+            command: effectivePreset.command,
             workingDirectory: maestroSession.workingDirectory,
-            preset: effectivePreset,
-            role: role,
-            workspaceId: activeWsId
+            workspaceId: activeWsId,
+            roleName: role?.name
         )
         tm.writeLine(to: recruitId, text: "export OMAESTRI_AGENT_NAME=\"\(recruitName)\"")
         // 同步到 TerminalSession 供 ListHandler 使用

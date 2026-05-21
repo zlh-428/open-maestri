@@ -96,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 所有清理已在 applicationShouldTerminate 完成
         // 此处仅做最终资源释放（PTY 进程等）
         logger.debug("Application will terminate — final cleanup")
-        TerminalProviderRegistry.shared.terminateAll()
+        TerminalManager.shared.shutdown()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

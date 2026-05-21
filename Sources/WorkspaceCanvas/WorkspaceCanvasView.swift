@@ -447,8 +447,11 @@ struct WorkspaceCanvasView: View {
         let wsId = workspace.id
         Task { @MainActor in
             _ = TerminalManager.shared.createTerminal(
-                id: tc.id, workingDirectory: tc.workingDirectory,
-                preset: preset, role: role, workspaceId: wsId
+                id: tc.id,
+                command: preset.command,
+                workingDirectory: tc.workingDirectory,
+                workspaceId: wsId,
+                roleName: role?.name
             )
         }
         Task { try? await workspace.save() }
@@ -602,7 +605,7 @@ struct WorkspaceCanvasView: View {
         switch node.content {
         case .terminal(let tc):
             // 将文件路径写入终端 PTY（shell 转义后空格分隔）
-            if let provider = TerminalProviderRegistry.shared.provider(for: tc.id) {
+            if let provider = TerminalManager.shared.providers[tc.id] {
                 let escaped = paths.map { shellEscape($0) }
                 provider.write(escaped.joined(separator: " "))
             }
@@ -684,27 +687,17 @@ struct WorkspaceCanvasView: View {
                     guard case .terminal(let tc) = node.content else { continue }
                     // 二次检查，避免 delay 期间重复创建
                     guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
-                    guard TerminalProviderRegistry.shared.provider(for: tc.id) == nil else { continue }
+                    guard TerminalManager.shared.providers[tc.id] == nil else { continue }
 
-                    let preset = AgentPreset(
-                        id: UUID(),
-                        name: tc.name,
-                        command: tc.command,
-                        icon: tc.icon,
-                        agentType: tc.agentType,
-                        color: tc.color,
-                        isActive: true,
-                        isBuiltIn: false
-                    )
                     let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
                         rolePresets.first { $0.id == roleId }
                     }
                     _ = TerminalManager.shared.createTerminal(
                         id: tc.id,
+                        command: tc.command,
                         workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
-                        preset: preset,
-                        role: role,
-                        workspaceId: wsId
+                        workspaceId: wsId,
+                        roleName: role?.name
                     )
                 }
             }
@@ -862,53 +855,40 @@ struct WorkspaceCanvasView: View {
     private func restartTerminalWithRole(terminalId: UUID, role: RolePreset, workingDirectory: String) {
         // 先移除旧终端
         TerminalManager.shared.removeTerminal(id: terminalId)
-        TerminalProviderRegistry.shared.unregister(terminalId: terminalId)
 
-        // 查找对应的 AgentPreset
+        // 查找对应的 TerminalContent
         guard let node = workspace.nodes.first(where: {
             if case .terminal(let tc) = $0.content { return tc.id == terminalId }
             return false
         }), case .terminal(let tc) = node.content else { return }
 
-        let preset = AgentPreset(
-            id: UUID(), name: tc.name, command: tc.command,
-            icon: tc.icon, agentType: tc.agentType,
-            color: tc.color, isActive: true, isBuiltIn: false
-        )
-
         // 重新创建终端（RoleInjector 已在 applyRole 中写入文件）
         _ = TerminalManager.shared.createTerminal(
             id: terminalId,
+            command: tc.command,
             workingDirectory: workingDirectory,
-            preset: preset,
-            role: role,
-            workspaceId: workspace.id
+            workspaceId: workspace.id,
+            roleName: role.name
         )
     }
 
     /// 重启终端在原始工作目录（取消角色后）
     private func restartTerminalInOriginalDir(terminalId: UUID, workingDirectory: String) {
         TerminalManager.shared.removeTerminal(id: terminalId)
-        TerminalProviderRegistry.shared.unregister(terminalId: terminalId)
 
         guard let node = workspace.nodes.first(where: {
             if case .terminal(let tc) = $0.content { return tc.id == terminalId }
             return false
         }), case .terminal(let tc) = node.content else { return }
 
-        let preset = AgentPreset(
-            id: UUID(), name: tc.name, command: tc.command,
-            icon: tc.icon, agentType: tc.agentType,
-            color: tc.color, isActive: true, isBuiltIn: false
-        )
         let dir = workingDirectory.isEmpty ? workspace.workingDirectory : workingDirectory
 
         _ = TerminalManager.shared.createTerminal(
             id: terminalId,
+            command: tc.command,
             workingDirectory: dir,
-            preset: preset,
-            role: nil,
-            workspaceId: workspace.id
+            workspaceId: workspace.id,
+            roleName: nil
         )
     }
 

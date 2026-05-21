@@ -161,10 +161,21 @@ struct CanvasToolbar: View {
         )
         addNode(node)
         let wsId = workspace.id
+        let startDir: String
+        if let role {
+            startDir = RoleInjector.shared.prepareRoleDirectory(
+                roleId: role.id, rolePrompt: role.prompt, workingDirectory: dir
+            )
+        } else {
+            startDir = dir
+        }
         Task { @MainActor in
             _ = TerminalManager.shared.createTerminal(
-                id: tc.id, workingDirectory: tc.workingDirectory,
-                preset: preset, role: role, workspaceId: wsId
+                id: tc.id,
+                command: preset.command,
+                workingDirectory: startDir,
+                workspaceId: wsId,
+                roleName: role?.name
             )
         }
     }

@@ -191,7 +191,7 @@ extension CanvasViewportView {
         guard number - 1 < sorted.count else { return }
         let targetNode = sorted[number - 1]
         // 聚焦到对应 TerminalView
-        if let provider = TerminalProviderRegistry.shared.provider(for: targetNode.id),
+        if let provider = TerminalManager.shared.providers[targetNode.id],
            let tv = provider.terminalView {
             window?.makeFirstResponder(tv)
         }
@@ -225,7 +225,7 @@ extension CanvasViewportView {
 
         let target = sorted[nextIndex]
         selectedNodeIds = [target.id]
-        if let provider = TerminalProviderRegistry.shared.provider(for: target.id),
+        if let provider = TerminalManager.shared.providers[target.id],
            let tv = provider.terminalView {
             window?.makeFirstResponder(tv)
         }
@@ -251,13 +251,13 @@ extension CanvasViewportView {
 
     /// 切换当前选中终端节点的自动滚动锁定状态
     private func toggleAutoScrollLock() {
-        // NSHostingView 迁移后通过 TerminalProviderRegistry 操作，不依赖 TerminalNodeView
+        // NSHostingView 迁移后通过 TerminalManager.providers 操作，不依赖 TerminalNodeView
         let targetIds: [UUID] = selectedNodeIds.isEmpty
             ? currentNodes.filter { if case .terminal = $0.content { return true }; return false }.map { $0.id }
             : Array(selectedNodeIds)
 
         for id in targetIds {
-            guard let provider = TerminalProviderRegistry.shared.provider(for: id) else { continue }
+            guard let provider = TerminalManager.shared.providers[id] else { continue }
             let newLocked = !provider.isAutoScrollLocked
             provider.setAutoScrollLocked(newLocked)
         }

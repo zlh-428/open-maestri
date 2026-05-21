@@ -99,7 +99,6 @@ final class WorkspaceManager: Identifiable {
            case .terminal = node.content {
             Task { @MainActor in
                 TerminalManager.shared.removeTerminal(id: nodeId)
-                TerminalProviderRegistry.shared.unregister(terminalId: nodeId)
             }
         }
         nodes.removeAll { $0.id == nodeId }

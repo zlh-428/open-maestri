@@ -74,6 +74,6 @@ struct TerminalSettingsView: View {
     }
 
     private func allProviders() -> [SwiftTermProvider] {
-        TerminalProviderRegistry.shared.allProviders()
+        Array(TerminalManager.shared.providers.values)
     }
 }

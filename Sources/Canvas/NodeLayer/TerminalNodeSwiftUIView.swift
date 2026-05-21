@@ -37,21 +37,13 @@ struct TerminalNodeSwiftUIView: View {
             onDuplicate: { onDuplicate?(nodeId) },
             onLockToggle: { onLockToggle?(nodeId, $0) }
         ) {
-            if TerminalPreviewEmbeddedView.shouldShowPreview(nodeSize: nodeSize, zoom: zoom) {
-                TerminalPreviewEmbeddedView(
-                    terminalId: content.id,
-                    content: content,
-                    nodeSize: nodeSize
-                )
-            } else {
-                TerminalEmbeddedView(
-                    terminalId: content.id,
-                    command: content.command,
-                    workingDirectory: content.workingDirectory,
-                    serverPort: InterAgentServer.shared.port,
-                    workspaceId: workspace?.id
-                )
-            }
+            TerminalEmbeddedView(
+                terminalId: content.id,
+                command: content.command,
+                workingDirectory: content.workingDirectory,
+                serverPort: InterAgentServer.shared.port,
+                workspaceId: workspace?.id
+            )
         }
         .onAppear {
             needsAttention = AttentionNotifier.shared.needsAttention(terminalId: content.id)

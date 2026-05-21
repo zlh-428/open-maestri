@@ -485,7 +485,7 @@ final class CanvasViewportView: NSView {
             )
             guard contentScreenFrame.contains(locInCanvas) else { break }
             // Terminal 节点：路由滚动事件给 TerminalView
-            if let provider = TerminalProviderRegistry.shared.provider(for: selectedId),
+            if let provider = TerminalManager.shared.providers[selectedId],
                let terminalView = provider.terminalView {
                 terminalView.scrollWheel(with: event)
                 return nil

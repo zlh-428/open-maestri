@@ -229,7 +229,7 @@ extension CanvasViewportView {
             )
             // 如果节点已经处于选中状态，将鼠标事件路由给终端视图（支持文字选中）
             if wasAlreadySelected,
-               let provider = TerminalProviderRegistry.shared.provider(for: id),
+               let provider = TerminalManager.shared.providers[id],
                let terminalView = provider.terminalView {
                 interaction = .contentInteraction(id, contentTarget: terminalView)
                 // 转发原始 mouseDown 事件给终端视图（SwiftTerm 自行做坐标转换）

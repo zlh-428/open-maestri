@@ -101,7 +101,7 @@ struct GeneralSettingsView: View {
 
     private func applyMetalToAll(enabled: Bool) {
         Task { @MainActor in
-            for provider in TerminalProviderRegistry.shared.allProviders() {
+            for provider in Array(TerminalManager.shared.providers.values) {
                 provider.applyMetalRenderer(enabled: enabled)
             }
         }
