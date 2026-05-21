@@ -37,13 +37,17 @@ struct TerminalNodeSwiftUIView: View {
             onDuplicate: { onDuplicate?(nodeId) },
             onLockToggle: { onLockToggle?(nodeId, $0) }
         ) {
-            TerminalEmbeddedView(
-                terminalId: content.id,
-                command: content.command,
-                workingDirectory: content.workingDirectory,
-                serverPort: InterAgentServer.shared.port,
-                workspaceId: workspace?.id
-            )
+            ZStack {
+                // 深色背景：终端 attach 前避免白屏闪烁，对标 Maestri 即时黑色背景
+                Color(nsColor: NSColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0))
+                TerminalEmbeddedView(
+                    terminalId: content.id,
+                    command: content.command,
+                    workingDirectory: content.workingDirectory,
+                    serverPort: InterAgentServer.shared.port,
+                    workspaceId: workspace?.id
+                )
+            }
         }
         .onAppear {
             needsAttention = AttentionNotifier.shared.needsAttention(terminalId: content.id)
