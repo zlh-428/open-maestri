@@ -4,6 +4,11 @@ import OSLog
 /// 终端注意力通知管理器
 /// 当未选中的终端有重要输出（Agent 完成任务等）时，标记红色注意力点
 /// 与 Maestri 的 AttentionNotifier 对齐
+///
+/// 触发条件（必须全部满足）：
+/// 1. 终端 shell 已就绪（completedProviders 中存在）
+/// 2. 终端从「运行中」变为「空闲」（表示一段输出完成）
+/// 3. 该终端不是当前画布选中节点
 @MainActor
 final class AttentionNotifier {
     static let shared = AttentionNotifier()
@@ -11,6 +16,9 @@ final class AttentionNotifier {
 
     /// 需要注意力的终端集合
     private(set) var attentionTerminals: Set<UUID> = []
+
+    /// 当前画布选中的节点 ID 集合（CanvasNode.id == TerminalContent.id）
+    private var selectedNodeIds: Set<UUID> = []
 
     /// 注意力状态变化回调（terminalId, needsAttention）
     var onAttentionChanged: ((UUID, Bool) -> Void)?
@@ -28,15 +36,33 @@ final class AttentionNotifier {
                 self.markNeedsAttention(terminalId: terminalId)
             }
         }
+
+        // 监听画布节点激活通知，追踪当前选中节点
+        NotificationCenter.default.addObserver(
+            forName: .canvasNodeActivated,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self,
+                  let nodeId = notification.userInfo?["nodeId"] as? UUID else { return }
+            Task { @MainActor in
+                self.selectedNodeIds = [nodeId]
+                // 选中时自动清除该节点的红点
+                self.clearAttention(terminalId: nodeId)
+            }
+        }
     }
 
     // MARK: - 标记需要注意力
 
     /// 标记终端需要注意力（当后台终端 Agent 完成输出时触发）
-    /// 仅当终端不是当前选中节点时才标记
+    /// 仅当终端不是当前选中节点，且 shell 已初始化完成时才标记
     func markNeedsAttention(terminalId: UUID) {
-        // 检查是否是当前选中的终端（选中的不需要红点）
-        if isTerminalSelected(terminalId) { return }
+        // shell 未就绪时不标记（避免启动阶段的初始化输出触发红点）
+        guard TerminalManager.shared.completedProviders.contains(terminalId) else { return }
+
+        // 当前选中的终端不标记
+        if selectedNodeIds.contains(terminalId) { return }
 
         guard !attentionTerminals.contains(terminalId) else { return }
         attentionTerminals.insert(terminalId)
@@ -82,14 +108,5 @@ final class AttentionNotifier {
 
     func needsAttention(terminalId: UUID) -> Bool {
         attentionTerminals.contains(terminalId)
-    }
-
-    // MARK: - Private
-
-    private func isTerminalSelected(_ terminalId: UUID) -> Bool {
-        // 通过 canvasNodeActivated 通知记录的当前选中节点来判断
-        // 这里简单检查：如果终端是当前画布选中节点，则不标记
-        // 需要由画布层在选中终端时调用 clearAttention
-        return false
     }
 }
