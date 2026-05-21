@@ -136,6 +136,8 @@ final class CanvasViewportView: NSView {
     private var _cachedViewportOrigin: CGPoint = .zero
     private var _cachedViewportZoom: CGFloat = 0
     private var _viewportCacheDirty: Bool = true
+    /// 视口缓存容差：origin 变化小于此值（画布坐标）时不重新裁剪，避免微小平移触发 O(n) 遍历
+    private static let viewportCacheTolerance: CGFloat = 50.0
 
     private func invalidateSortedNodesCache() {
         sortedNodesByZIndex = currentNodes.sorted { $0.zIndex < $1.zIndex }
@@ -541,11 +543,25 @@ final class CanvasViewportView: NSView {
         if let hostingView = nodesHostingView {
             let current = hostingView.rootView
 
-            // 仅在视口参数变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
-            let needsRecalc = _viewportCacheDirty
-                || _cachedViewportOrigin != canvasOrigin
+            // 拖动中跳过视口裁剪更新（节点位置由 SwiftUI 通过 origin/zoom 重算，无需重新筛选可见集）
+            let isDragging: Bool
+            switch interaction {
+            case .draggingNode, .batchDragging, .resizingNode:
+                isDragging = true
+            default:
+                isDragging = false
+            }
+
+            // 仅在视口参数大幅变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
+            // 容差策略：origin 微小变化（< 50 画布单位 ≈ 亚节点级平移）不触发重算
+            let originDelta = hypot(_cachedViewportOrigin.x - canvasOrigin.x,
+                                    _cachedViewportOrigin.y - canvasOrigin.y)
+            let needsRecalc = !isDragging && (
+                _viewportCacheDirty
                 || _cachedViewportZoom != zoom
                 || currentNodes.count != _cachedViewportNodes.count
+                || originDelta > Self.viewportCacheTolerance
+            )
             if needsRecalc {
                 _cachedViewportNodes = viewportCulledNodes()
                 _cachedViewportOrigin = canvasOrigin
@@ -553,7 +569,7 @@ final class CanvasViewportView: NSView {
                 _viewportCacheDirty = false
             }
 
-            // 仅当 origin/zoom/可见节点变化时才更新（避免完全无变化时的多余赋值）
+            // 仅当 origin/zoom/可见节点变化时才重建 rootView（避免完全无变化时的冗余赋值）
             if current.canvasOrigin != canvasOrigin || current.zoom != zoom || current.nodes != _cachedViewportNodes {
                 hostingView.rootView = CanvasNodesSwiftUIView(
                     nodes: _cachedViewportNodes,

@@ -54,12 +54,15 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
     @MainActor
     func updateNSView(_ nsView: LocalProcessTerminalView, context: Context) {
-        // 根据实际视图尺寸更新 PTY 行列（防抖：相同尺寸跳过，避免 SwiftUI 重渲染时频繁发 SIGWINCH）
+        // 根据实际视图尺寸更新 PTY 行列
+        // 防抖：相同尺寸跳过 + 高频 resize 时通过 debounce 合并 SIGWINCH 信号
         let cols = max(Int(nsView.frame.width / 8), 20)
         let rows = max(Int(nsView.frame.height / 16), 5)
         let terminal = nsView.getTerminal()
         guard terminal.cols != cols || terminal.rows != rows else { return }
-        terminal.resize(cols: cols, rows: rows)
+        // 使用延迟执行合并快速连续的 resize（如窗口拖拽），
+        // 避免对 PTY 发送过多 SIGWINCH 导致子进程抖动
+        TerminalResizeDebouncer.shared.scheduleResize(terminalId: terminalId, cols: cols, rows: rows, terminal: terminal)
     }
 
     @MainActor
@@ -126,5 +129,27 @@ final class TerminalProviderRegistry {
             provider.stop()
         }
         providers.removeAll()
+    }
+}
+
+// MARK: - TerminalResizeDebouncer
+
+/// PTY resize 防抖器：合并 100ms 内的多次 resize 调用为一次 SIGWINCH
+/// 避免窗口拖拽时对 PTY 子进程发送过多信号导致抖动
+@MainActor
+final class TerminalResizeDebouncer {
+    static let shared = TerminalResizeDebouncer()
+    private var pendingTasks: [UUID: Task<Void, Never>] = [:]
+    private init() {}
+
+    /// 调度 resize（取消前一次未执行的 resize，延迟 100ms 执行）
+    func scheduleResize(terminalId: UUID, cols: Int, rows: Int, terminal: Terminal) {
+        pendingTasks[terminalId]?.cancel()
+        pendingTasks[terminalId] = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { return }
+            terminal.resize(cols: cols, rows: rows)
+            self?.pendingTasks.removeValue(forKey: terminalId)
+        }
     }
 }

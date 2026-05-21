@@ -185,7 +185,14 @@ final class ConnectionOverlayView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        // dirtyRect 裁剪：仅绘制 bounding box 与 dirtyRect 相交的连线
+        let inflatedDirty = dirtyRect.insetBy(dx: -10, dy: -10) // 扩展少许容差避免边缘截断
         for conn in connections {
+            // 快速 bounding box 检测：用首尾中三点估算连线包围盒
+            guard !conn.screenPoints.isEmpty else { continue }
+            let bbox = boundingBox(of: conn.screenPoints)
+            guard inflatedDirty.intersects(bbox) else { continue }
+
             let isHighlighted = conn.id == highlightedConnectionId
             RopePathRenderer.draw(points: conn.screenPoints, status: conn.status, isHighlighted: isHighlighted)
 
@@ -194,6 +201,21 @@ final class ConnectionOverlayView: NSView {
                 drawLabel(label, at: mid)
             }
         }
+    }
+
+    /// 计算控制点序列的 axis-aligned bounding box
+    private func boundingBox(of points: [CGPoint]) -> CGRect {
+        var minX = CGFloat.greatestFiniteMagnitude
+        var minY = CGFloat.greatestFiniteMagnitude
+        var maxX = -CGFloat.greatestFiniteMagnitude
+        var maxY = -CGFloat.greatestFiniteMagnitude
+        for p in points {
+            if p.x < minX { minX = p.x }
+            if p.y < minY { minY = p.y }
+            if p.x > maxX { maxX = p.x }
+            if p.y > maxY { maxY = p.y }
+        }
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     private func drawLabel(_ text: String, at point: CGPoint) {

@@ -109,6 +109,13 @@ final class RopeSimulation {
     /// 每帧更新回调（用于实时更新渲染层）
     var onTick: (([UUID: [CGPoint]]) -> Void)?
 
+    /// 缓存的 allPoints 字典（避免每帧分配新字典，仅在绳索数量变化时重建 keys）
+    private var _cachedAllPoints: [UUID: [CGPoint]] = [:]
+    private var _cachedAllPointsDirty: Bool = true
+
+    /// 复用的约束前位置缓冲区（避免每条绳索每帧分配新数组）
+    private var _preConstraintBuffer: [CGPoint] = []
+
     // MARK: - 生命周期
 
     deinit {
@@ -121,6 +128,7 @@ final class RopeSimulation {
     func addRope(id: UUID, anchorA: CGPoint, anchorB: CGPoint) {
         let rope = Rope(id: id, anchorA: anchorA, anchorB: anchorB)
         ropes[id] = rope
+        _cachedAllPointsDirty = true
         wake()
     }
 
@@ -138,6 +146,7 @@ final class RopeSimulation {
     /// 移除绳索（断开连接时调用）
     func removeRope(id: UUID) {
         ropes.removeValue(forKey: id)
+        _cachedAllPointsDirty = true
         if ropes.isEmpty {
             sleep()
         }
@@ -192,13 +201,21 @@ final class RopeSimulation {
         ropes[id]?.points
     }
 
-    /// 获取所有绳索的当前控制点
+    /// 获取所有绳索的当前控制点（复用内部缓存字典，避免每帧分配新字典）
     func allPoints() -> [UUID: [CGPoint]] {
-        var result: [UUID: [CGPoint]] = [:]
-        for (id, rope) in ropes {
-            result[id] = rope.points
+        if _cachedAllPointsDirty {
+            _cachedAllPoints.removeAll(keepingCapacity: true)
+            for (id, rope) in ropes {
+                _cachedAllPoints[id] = rope.points
+            }
+            _cachedAllPointsDirty = false
+        } else {
+            // 绳索数量未变，仅更新各绳索的点位置引用
+            for (id, rope) in ropes {
+                _cachedAllPoints[id] = rope.points
+            }
         }
-        return result
+        return _cachedAllPoints
     }
 
     /// 强制唤醒（外部可在需要时调用，如连接刚创建）
@@ -304,9 +321,15 @@ final class RopeSimulation {
         guard count >= 2 else { return }
 
         // --- Step 1: 记录约束前位置（用于 Step 4 准确计算运动量） ---
-        // 使用 prevPoints 暂存"本帧起始位置"，后续对比约束后的最终位置
-        // 注意：这里的 preConstraint 是约束前快照，与 Verlet 的 prevPoints 不同
-        let preConstraintPositions: [CGPoint] = rope.points
+        // 复用 _preConstraintBuffer 避免每条绳索每帧分配新数组
+        if _preConstraintBuffer.count != count {
+            _preConstraintBuffer = rope.points
+        } else {
+            for i in 0..<count {
+                _preConstraintBuffer[i] = rope.points[i]
+            }
+        }
+        let preConstraintPositions = _preConstraintBuffer
 
         // --- Step 2: Verlet 积分（位移 = 当前位置 - 上帧位置 + 加速度） ---
         for i in 1..<(count - 1) {

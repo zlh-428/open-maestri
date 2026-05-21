@@ -117,8 +117,11 @@ final class TerminalSession {
     /// onOutput 未就绪时暂存待写文本
     private var pendingWrites: [String] = []
 
-    /// 近期输出缓存（最多 500 行，供 omaestri check 使用）
-    private var outputBuffer: [String] = []
+    /// 近期输出环形缓冲区（最多 500 行，供 omaestri check 使用）
+    /// 使用环形索引避免 removeFirst 的 O(n) 拷贝开销
+    private var outputRing: [String] = []
+    private var outputRingStart: Int = 0  // 逻辑起始位置
+    private var outputRingCount: Int = 0  // 当前有效行数
     private let bufferMaxLines = 500
 
     private let activityMonitor = TerminalActivityMonitor()
@@ -150,10 +153,7 @@ final class TerminalSession {
     /// 记录 PTY 输出到缓存（由 SwiftTermProvider 在收到输出时调用）
     func recordOutput(_ text: String) {
         let newLines = text.components(separatedBy: "\n")
-        outputBuffer.append(contentsOf: newLines)
-        if outputBuffer.count > bufferMaxLines {
-            outputBuffer.removeFirst(outputBuffer.count - bufferMaxLines)
-        }
+        appendToRing(newLines)
         isIdle = false
         activityMonitor.recordOutput()
     }
@@ -161,15 +161,41 @@ final class TerminalSession {
     /// 批量加载历史记录（仅写入 buffer，不触发 activityMonitor 或 Notification）
     /// 用于 scrollback 恢复场景，避免逐行触发大量副作用
     func bulkLoadHistory(_ lines: [String]) {
-        outputBuffer.append(contentsOf: lines)
-        if outputBuffer.count > bufferMaxLines {
-            outputBuffer.removeFirst(outputBuffer.count - bufferMaxLines)
-        }
+        appendToRing(lines)
     }
 
     /// 获取最近 N 行输出
     func recentOutput(lines: Int = 20) -> String {
-        Array(outputBuffer.suffix(lines)).joined(separator: "\n")
+        let count = min(lines, outputRingCount)
+        guard count > 0 else { return "" }
+        var result: [String] = []
+        result.reserveCapacity(count)
+        // 从环形缓冲区尾部取 count 行
+        let startIdx = (outputRingStart + outputRingCount - count) % outputRing.count
+        for i in 0..<count {
+            result.append(outputRing[(startIdx + i) % outputRing.count])
+        }
+        return result.joined(separator: "\n")
+    }
+
+    // MARK: - Ring Buffer 内部实现
+
+    /// 将新行追加到环形缓冲区（O(1) 均摊，无数组元素移动）
+    private func appendToRing(_ newLines: [String]) {
+        // 初始化环形缓冲区（首次写入时分配固定容量）
+        if outputRing.isEmpty {
+            outputRing = Array(repeating: "", count: bufferMaxLines)
+        }
+        for line in newLines {
+            let writeIdx = (outputRingStart + outputRingCount) % bufferMaxLines
+            outputRing[writeIdx] = line
+            if outputRingCount < bufferMaxLines {
+                outputRingCount += 1
+            } else {
+                // 缓冲区已满，覆盖最旧元素，移动起始指针
+                outputRingStart = (outputRingStart + 1) % bufferMaxLines
+            }
+        }
     }
 
     /// 标记空闲（由 activityMonitor 回调触发）

@@ -367,7 +367,10 @@ extension CanvasViewportView {
             )
         }
         needsLayout = true
-        needsDisplay = true
+        // 仅在有临时连线时才触发 draw（draw() 只负责绘制临时连线，无临时连线时 needsDisplay 浪费）
+        if connectingFromNodeId != nil {
+            needsDisplay = true
+        }
         notifyViewportChanged()
         // 立即重渲染连线（不等 SwiftUI updateNSView 回路）
         onViewportPanned?()
@@ -384,7 +387,10 @@ extension CanvasViewportView {
             y: mouseCanvas.y - mouseScreen.y / zoom
         )
         needsLayout = true
-        needsDisplay = true
+        // 仅在有临时连线时才触发 draw
+        if connectingFromNodeId != nil {
+            needsDisplay = true
+        }
         notifyViewportChanged()
         // 立即重渲染连线（不等 SwiftUI updateNSView 回路）
         onViewportPanned?()

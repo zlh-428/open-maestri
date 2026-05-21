@@ -27,6 +27,9 @@ final class WorkspaceManager: Identifiable {
     /// 该工作区未读的"任务完成"通知数（终端从 active→idle 时累积，用户切回时清零）
     var unreadActivityCount: Int = 0
 
+    /// 脏标记：有未持久化的修改时为 true（autosave 时仅保存 dirty 的工作区）
+    var isDirty: Bool = false
+
     /// Terminal 节点数量（侧边栏徽章用，避免在 View body 里做 O(n) filter）
     var terminalCount: Int {
         nodes.count(where: { if case .terminal = $0.content { true } else { false } })
@@ -72,6 +75,7 @@ final class WorkspaceManager: Identifiable {
         let payload = buildPayload()
         let doc = WorkspaceDocument(payload: payload)
         try await pm.saveWorkspace(doc)
+        isDirty = false
         logger.debug("Workspace \(self.id) saved")
     }
 
@@ -86,6 +90,7 @@ final class WorkspaceManager: Identifiable {
 
     func addNode(_ node: CanvasNode) {
         nodes.append(node)
+        isDirty = true
     }
 
     func removeNode(id nodeId: UUID) {
@@ -98,6 +103,7 @@ final class WorkspaceManager: Identifiable {
             }
         }
         nodes.removeAll { $0.id == nodeId }
+        isDirty = true
         connections.removeAll { $0.terminalIdA == nodeId || $0.terminalIdB == nodeId }
         noteConnections.removeAll { $0.terminalId == nodeId || $0.noteNodeId == nodeId }
         portalConnections.removeAll { $0.terminalId == nodeId || $0.portalNodeId == nodeId }
@@ -107,6 +113,7 @@ final class WorkspaceManager: Identifiable {
         if let idx = nodes.firstIndex(where: { $0.id == nodeId }) {
             nodes[idx].frame = frame
             nodes[idx].lastModifiedAt = Date()
+            isDirty = true
         }
     }
 
@@ -115,16 +122,19 @@ final class WorkspaceManager: Identifiable {
     func addConnection(_ conn: TerminalConnection) {
         connections.removeAll { $0.id == conn.id }
         connections.append(conn)
+        isDirty = true
     }
 
     func addNoteConnection(_ conn: NoteConnection) {
         noteConnections.removeAll { $0.id == conn.id }
         noteConnections.append(conn)
+        isDirty = true
     }
 
     func addPortalConnection(_ conn: PortalConnection) {
         portalConnections.removeAll { $0.id == conn.id }
         portalConnections.append(conn)
+        isDirty = true
     }
 
     func addPortalToPortalConnection(_ conn: PortalToPortalConnection) {
@@ -137,6 +147,7 @@ final class WorkspaceManager: Identifiable {
         noteConnections.removeAll { $0.id == connId }
         portalConnections.removeAll { $0.id == connId }
         portalToPortalConnections.removeAll { $0.id == connId }
+        isDirty = true
     }
 
     // MARK: - 私有辅助

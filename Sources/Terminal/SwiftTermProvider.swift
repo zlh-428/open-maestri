@@ -32,6 +32,9 @@ final class SwiftTermProvider: NSObject {
     private let scrollbackStore = ScrollbackStore()
     private var pendingScrollback: [ScrollbackEntry] = []
     private let scrollbackFlushThreshold = 50
+    /// 时间防抖：距上次 flush 不满 2 秒时延迟执行（减少高频小量输出的 I/O 次数）
+    private var scrollbackDebounceTask: Task<Void, Never>?
+    private var lastFlushTime: ContinuousClock.Instant = .now
     /// 无法直接 execve 的命令（alias/函数等），shell 启动后延迟发送
     private var pendingCommand: String? = nil
     /// shell 就绪后需要发送的 cd + pendingCommand（等待首次 PTY 输出触发）
@@ -343,7 +346,20 @@ extension SwiftTermProvider: LocalProcessTerminalViewDelegate {
             pendingScrollback.append(ScrollbackEntry(attributes: [], text: line))
         }
         if pendingScrollback.count >= scrollbackFlushThreshold {
+            // 行数阈值达到：立即 flush
+            scrollbackDebounceTask?.cancel()
+            scrollbackDebounceTask = nil
             Task { await flushScrollback() }
+        } else {
+            // 时间防抖：2 秒内的小量输出合并为一次写入
+            if scrollbackDebounceTask == nil {
+                scrollbackDebounceTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+                    await self?.flushScrollback()
+                    self?.scrollbackDebounceTask = nil
+                }
+            }
         }
     }
 

@@ -128,11 +128,16 @@ final class AppState {
         do {
             try pm.saveManifest(manifest)
             try pm.savePreferences(preferences)
-            // 保存所有工作区（节点、连接、画布状态）
-            for ws in await MainActor.run(body: { workspaces }) {
+            // 仅保存有修改的工作区（dirty flag），避免每 30s 全量序列化所有工作区
+            let dirtyWorkspaces = await MainActor.run(body: {
+                workspaces.filter { $0.isDirty }
+            })
+            for ws in dirtyWorkspaces {
                 try await ws.save()
             }
-            logger.debug("Autosave completed (\(self.workspaces.count) workspaces)")
+            if !dirtyWorkspaces.isEmpty {
+                logger.debug("Autosave completed (\(dirtyWorkspaces.count) dirty workspaces saved)")
+            }
         } catch {
             logger.error("Autosave failed: \(error)")
         }

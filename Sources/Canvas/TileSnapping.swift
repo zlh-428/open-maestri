@@ -9,6 +9,10 @@ struct TileSnapping {
     /// 磁吸吸附阈值（画布坐标，小于此距离时自动对齐）
     static let snapThreshold: CGFloat = 12.0
 
+    /// 邻近过滤扩展半径（画布坐标）：仅考虑距离拖动节点此范围内的节点参与 snap
+    /// 设为 snapThreshold * 50 可覆盖绝大多数合理布局间距，减少远处节点的无效计算
+    private static let proximityRadius: CGFloat = 600.0
+
     // MARK: - 主入口
 
     /// 计算拖动节点的磁吸目标位置
@@ -32,7 +36,12 @@ struct TileSnapping {
         var bestDX: CGFloat = snapThreshold + 1
         var bestDY: CGFloat = snapThreshold + 1
 
+        // 预过滤：仅对距拖动节点 proximityRadius 范围内的节点做 snap 计算
+        let expandedFrame = draggingFrame.insetBy(dx: -proximityRadius, dy: -proximityRadius)
+
         for other in otherFrames {
+            // 空间过滤：跳过离拖动节点太远的节点
+            guard expandedFrame.intersects(other) else { continue }
             let oMinX = other.minX, oMaxX = other.maxX
             let oMinY = other.minY, oMaxY = other.maxY
 
