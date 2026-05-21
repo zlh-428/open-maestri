@@ -135,11 +135,15 @@ final class SwiftTermProvider: NSObject {
         let startDir: String? = (!workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory))
             ? workingDirectory : nil
 
-        // Scrollback 恢复：在 PTY 启动前将历史数据 feed 到终端视图
-        // 对标 Maestri：重启后即时显示历史记录（黑灰色），然后新 shell prompt 追加在后面
-        if let wsId = workspaceId {
-            feedScrollbackBeforeStart(view: view, workspaceId: wsId)
-        }
+        // 增大 scrollback buffer（默认 500 行太小，长会话 resize 时会截断历史）
+        view.getTerminal().changeScrollback(10000)
+
+        // TODO: Scrollback 恢复暂时禁用——feed 纯文本行到 SwiftTerm buffer 后，
+        // resize 触发 reflow 会导致 UI 错乱（行缺少 isWrapped 标记）。
+        // 需要找到一种 resize-safe 的历史恢复方案后再启用。
+        // if let wsId = workspaceId {
+        //     feedScrollbackBeforeStart(view: view, workspaceId: wsId)
+        // }
 
         view.startProcess(
             executable: args[0],
@@ -338,23 +342,17 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - Scrollback 恢复（启动时 feed 历史到终端视图）
 
-    /// 在 PTY startProcess 前将保存的 scrollback 数据 feed 到终端视图
-    /// 使用 SwiftTerm 的 feed(text:) API 直接渲染到 terminal buffer
-    /// 对标 Maestri：重启后立即显示历史记录，无需等待 PTY 输出
-    ///
-    /// 保存格式：每个 entry.text 是一行已渲染的屏幕文本（从 terminal buffer 提取），
-    /// 不含光标移动等控制序列，因此可以安全地逐行 feed 回任意尺寸的终端。
+    /// 在 PTY startProcess 前将保存的 scrollback 数据 feed 到终端视图。
+    /// resize 时 reflow 可能导致显示错位，但磁盘快照通过 snapshotScrollbackBeforeResize
+    /// 保护，不会丢失历史。
     private func feedScrollbackBeforeStart(view: LocalProcessTerminalView, workspaceId: UUID) {
         let store = ScrollbackStore()
         guard let entries = try? store.load(terminalId: terminalId, workspaceId: workspaceId),
               !entries.isEmpty else { return }
 
         // 检测旧格式数据（含光标移动等 CSI 序列）：如果发现则跳过恢复
-        // 旧格式是原始 PTY 输出，含 \x1b[...A/B/C/D/G/H/J/K 等光标控制，不可安全回放
-        // 新格式是 translateToString 提取的纯文本行，只含可打印字符
         let sampleEntries = entries.suffix(min(20, entries.count))
         let hasCursorMovement = sampleEntries.contains { entry in
-            // CSI 序列以 ESC[ 开头，后跟光标移动命令字符（A-H, J, K, f）
             entry.text.range(of: "\u{1b}\\[[0-9;]*[ABCDHJKf]", options: .regularExpression) != nil
         }
         if hasCursorMovement {
@@ -362,17 +360,12 @@ final class SwiftTermProvider: NSObject {
             return
         }
 
-        // 增大 scrollback buffer 以容纳历史记录（默认 500 太小，resize 时会丢失）
-        view.changeScrollback(10000)
-
         // 取最后 2000 行
         let maxRestoreLines = 2000
         let toRestore = entries.count > maxRestoreLines
             ? Array(entries.suffix(maxRestoreLines))
             : entries
 
-        // 逐行 feed：每行是从 terminal buffer 提取的已渲染屏幕行（纯文本），
-        // 用 \r\n 结尾模拟终端正常输出。不含光标移动/清屏等序列，resize 安全。
         let text = toRestore.map { $0.text }.joined(separator: "\r\n")
         guard !text.isEmpty else { return }
 
@@ -386,6 +379,8 @@ final class SwiftTermProvider: NSObject {
     /// 每行是 translateToString 的纯文本输出，不含光标移动/清屏等控制序列。
     /// 恢复时可安全 feed 到任意尺寸的终端而不会错位。
     func recordOutputForScrollback(_ text: String) {
+        // resize 冻结期内跳过，防止 reflow 破坏的 buffer 被持久化
+        guard !scrollbackFrozen else { return }
         // 标记有新数据到达，触发 debounce 快照保存
         scrollbackDirty = true
         if scrollbackDebounceTask == nil {
@@ -400,6 +395,9 @@ final class SwiftTermProvider: NSObject {
 
     /// 是否有新数据需要快照
     private var scrollbackDirty = false
+
+    /// resize 后短暂冻结 scrollback 写入，防止 reflow 后的破坏 buffer 覆盖磁盘快照
+    private var scrollbackFrozen = false
 
     /// 从 terminal buffer 提取所有行并持久化
     func flushScrollback() async {
@@ -433,7 +431,47 @@ final class SwiftTermProvider: NSObject {
     func flushScrollbackNow() {
         Task { await flushScrollback() }
     }
+
+    /// resize 前同步调用：立即把当前 buffer 内容写入磁盘，不走 debounce。
+    /// 必须在 terminalView.frame 变化（触发 SwiftTerm reflow）之前调用，
+    /// 否则 reflow 会破坏 buffer 内容，导致历史记录丢失。
+    func snapshotScrollbackBeforeResize() {
+        guard let wsId = workspaceId, let view = terminalView else { return }
+        let terminal = view.getTerminal()
+        let data = terminal.getBufferAsData()
+        guard !data.isEmpty else { return }
+
+        let fullText = String(decoding: data, as: UTF8.self)
+        var lines = fullText.components(separatedBy: "\n")
+        while let last = lines.last, last.isEmpty { lines.removeLast() }
+        guard !lines.isEmpty else { return }
+
+        let maxLines = 5000
+        let toKeep = lines.count > maxLines ? Array(lines.suffix(maxLines)) : lines
+        let entries = toKeep.map { ScrollbackEntry(attributes: [], text: $0) }
+
+        // 取消正在进行的 debounce task，避免 resize 后的破坏 buffer 覆盖这次快照
+        scrollbackDebounceTask?.cancel()
+        scrollbackDebounceTask = nil
+        scrollbackDirty = false
+
+        // 冻结 scrollback 写入 2 秒：resize 完成后 PTY 可能立即有输出（SIGWINCH 响应），
+        // 此时 buffer 已被 reflow 破坏，不能让这些输出触发新的 flush
+        scrollbackFrozen = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            self?.scrollbackFrozen = false
+        }
+
+        let store = scrollbackStore
+        let termId = terminalId
+        Task.detached(priority: .utility) {
+            try? await store.save(entries: entries, terminalId: termId, workspaceId: wsId)
+        }
+        logger.debug("Pre-resize snapshot: \(toKeep.count) lines for terminal \(self.terminalId.uuidString.prefix(8))")
+    }
 }
+
 
 // MARK: - LocalProcessTerminalViewDelegate
 

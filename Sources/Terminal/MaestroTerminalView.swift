@@ -16,9 +16,17 @@ final class MaestroTerminalView: NSView {
     var onTitleChange: ((String) -> Void)?
     var onProcessExit: ((Int32?) -> Void)?
 
+    /// resize 防抖：暂存目标 bounds，200ms 静默后才真正更新 tv.frame
+    private var pendingBounds: CGRect = .zero
+    private var resizeDebounceTask: Task<Void, Never>?
+    /// true = terminalView 首次出现在 layout 中，跳过防抖直接同步
+    private var isInitialLayout: Bool = true
+
     init(terminalId: UUID, frame: NSRect = .zero) {
         self.terminalId = terminalId
         super.init(frame: frame)
+        wantsLayer = true
+        updateBackgroundFromTheme()
     }
 
     required init?(coder: NSCoder) { fatalError("not supported") }
@@ -34,6 +42,7 @@ extension MaestroTerminalView {
                 existing.removeFromSuperview()
                 existing.frame = bounds
                 existing.autoresizingMask = [.width, .height]
+                updateBackgroundFromTheme()
                 addSubview(existing)
             }
             terminalView = existing
@@ -57,6 +66,7 @@ extension MaestroTerminalView {
     /// removeFromSuperview，不停止 PTY（工作区切换用）。
     func detach() {
         terminalView?.removeFromSuperview()
+        isInitialLayout = true
         logger.debug("Detached terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
@@ -67,6 +77,20 @@ extension MaestroTerminalView {
         let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
             ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
         tv.font = font
+        // attach 完成后清除占位背景，避免遮住 SwiftTerm 自己的 layer
+        layer?.backgroundColor = nil
+    }
+
+    /// 用当前主题的背景色填充 layer，作为 PTY attach 前的占位色防止闪烁
+    func updateBackgroundFromTheme() {
+        let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
+        let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)
+        if let theme = TerminalThemeRegistry.shared.theme(for: themeId),
+           let color = NSColor(hex: theme.background) {
+            layer?.backgroundColor = color.cgColor
+        } else {
+            layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+        }
     }
 }
 
@@ -75,9 +99,47 @@ extension MaestroTerminalView {
 extension MaestroTerminalView {
     override func layout() {
         super.layout()
-        // 同步子视图 frame；LocalProcessTerminalView 的 setFrameSize 会自动触发
-        // processSizeChange → terminalDelegate.sizeChanged → SIGWINCH，无需手动 resize
-        terminalView?.frame = bounds
+        guard let tv = terminalView else {
+            isInitialLayout = true
+            return
+        }
+
+        let newBounds = bounds
+
+        // bounds 没变，只同步 origin（平移画布等场景）
+        if tv.frame.size == newBounds.size {
+            tv.frame = newBounds
+            return
+        }
+
+        // 首次 layout（attach 后第一次拿到真实尺寸）：立即同步，不走防抖。
+        // 此时合成树尚未提交，用户不会看到 reflow 过程。
+        if isInitialLayout {
+            isInitialLayout = false
+            TerminalManager.shared.providers[terminalId]?.snapshotScrollbackBeforeResize()
+            tv.frame = newBounds
+            return
+        }
+
+        // bounds 正在变化（resize 拖拽中）：使用防抖，避免每帧触发 SwiftTerm reflow。
+        // 先把终端子视图锁定在旧尺寸（内容稳定不闪烁），200ms 静默后才真正 resize。
+        pendingBounds = newBounds
+        resizeDebounceTask?.cancel()
+        resizeDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, let self else { return }
+            self.commitResize()
+        }
+    }
+
+    private func commitResize() {
+        guard let tv = terminalView, tv.frame.size != pendingBounds.size else {
+            terminalView?.frame = pendingBounds
+            return
+        }
+        // resize 真正落地前先快照 scrollback，防止 reflow 破坏 buffer
+        TerminalManager.shared.providers[terminalId]?.snapshotScrollbackBeforeResize()
+        tv.frame = pendingBounds
     }
 }
 
