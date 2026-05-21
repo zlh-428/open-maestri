@@ -36,7 +36,7 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
 
     final class Coordinator {
         var renderer: CanvasNodeRenderer?
-        var lastNodeCount: Int = 0
+        var lastSyncKey: String = ""  // 节点/连接变化时触发完整同步
         var lastViewportKey: String = ""  // zoom+origin 变化时触发连线重算
     }
 
@@ -104,17 +104,18 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         // 同步角色预设到 renderer（供 TerminalNodeView 右键菜单使用）
         renderer.rolePresets = rolePresets
 
-        let nodeCount = ws.nodes.count
+        // 用节点 ID 集合构建 syncKey，避免"删一个再加一个"时数量不变导致漏同步
+        let nodeIds = ws.nodes.map { $0.id.uuidString }.sorted().joined(separator: ",")
         let connCount = ws.connections.count + ws.noteConnections.count + ws.portalConnections.count
             + ws.portalToPortalConnections.count + ws.noteToNoteConnections.count
-        let currentHash = nodeCount * 1000 + connCount
+        let currentSyncKey = "\(nodeIds)|\(connCount)"
         let viewportKey = "\(canvasOrigin.x.rounded())_\(canvasOrigin.y.rounded())_\(zoom)"
 
-        if currentHash != context.coordinator.lastNodeCount {
-            // 节点/连接数量变化：完整同步
+        if currentSyncKey != context.coordinator.lastSyncKey {
+            // 节点集合或连接数量变化：完整同步
             renderer.sync(nodes: ws.nodes, workspace: ws)
             renderer.syncConnections(workspace: ws)
-            context.coordinator.lastNodeCount = currentHash
+            context.coordinator.lastSyncKey = currentSyncKey
             context.coordinator.lastViewportKey = viewportKey
         } else if originChanged || zoomChanged {
             // viewport pan/zoom 变化：轻量级重渲染（只重算屏幕坐标映射，不重算锚点）

@@ -194,6 +194,7 @@ extension CanvasViewportView {
             let hit = hitTestCanvas(at: loc)
             if case .canvas = hit {
                 interaction = .drawing(start: loc)
+                drawingLastSnappedRect = nil
                 return
             }
             // 绘制模式下点击节点 → fall through 正常走节点交互
@@ -425,16 +426,42 @@ extension CanvasViewportView {
             snapGuideView?.selectionRect = rect
             needsDisplay = true
 
-        // --- 节点绘制模式 ---
+        // --- 节点绘制模式（网格吸附 + haptic）---
         case .drawing(let start):
             drawingCurrentPoint = loc
-            let rect = CGRect(
-                x: min(start.x, loc.x),
-                y: min(start.y, loc.y),
-                width: abs(loc.x - start.x),
-                height: abs(loc.y - start.y)
+
+            // 将起点和当前点转为画布坐标，吸附到网格
+            let grid = Constants.canvasGridSpacing
+            let canvasStart = screenToCanvas(start)
+            let canvasCurrent = screenToCanvas(loc)
+
+            let snappedStartX = (canvasStart.x / grid).rounded() * grid
+            let snappedStartY = (canvasStart.y / grid).rounded() * grid
+            let snappedCurrentX = (canvasCurrent.x / grid).rounded() * grid
+            let snappedCurrentY = (canvasCurrent.y / grid).rounded() * grid
+
+            let snappedCanvasRect = CGRect(
+                x: min(snappedStartX, snappedCurrentX),
+                y: min(snappedStartY, snappedCurrentY),
+                width: abs(snappedCurrentX - snappedStartX),
+                height: abs(snappedCurrentY - snappedStartY)
             )
-            snapGuideView?.drawingRect = rect
+
+            // 检测网格跨越：矩形变化时触发触觉反馈
+            if let lastRect = drawingLastSnappedRect, lastRect != snappedCanvasRect {
+                NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+            }
+            drawingLastSnappedRect = snappedCanvasRect
+
+            // 将吸附后的画布矩形转回屏幕坐标用于绘制预览
+            let screenOrigin = canvasToScreen(snappedCanvasRect.origin)
+            let screenRect = CGRect(
+                x: screenOrigin.x,
+                y: screenOrigin.y,
+                width: snappedCanvasRect.width * zoom,
+                height: snappedCanvasRect.height * zoom
+            )
+            snapGuideView?.drawingRect = screenRect
             needsDisplay = true
 
         // --- 内容区交互（终端文字选中等）---
@@ -458,6 +485,7 @@ extension CanvasViewportView {
                                       startFrame: CGRect) {
         let minW = CanvasNodeConstants.minNodeWidth * zoom
         let minH = CanvasNodeConstants.minNodeHeight * zoom
+        let grid = Constants.canvasGridSpacing
 
         var x = startFrame.origin.x
         var y = startFrame.origin.y
@@ -504,11 +532,55 @@ extension CanvasViewportView {
             h = newH
         }
 
+        // 将活动边吸附到画布网格（与拖拽/绘制保持一致）
+        // 先转为画布坐标取整，再转回屏幕坐标
+        let rawCanvasOrigin = screenToCanvas(CGPoint(x: x, y: y))
+        let rawCanvasW = w / zoom
+        let rawCanvasH = h / zoom
+
+        let snappedCanvasOrigin: CGPoint
+        let snappedCanvasW: CGFloat
+        let snappedCanvasH: CGFloat
+
+        switch edge {
+        case .right, .bottomRight, .topRight:
+            // 右边活动：吸附右边
+            let snappedRight = ((rawCanvasOrigin.x + rawCanvasW) / grid).rounded() * grid
+            snappedCanvasW = max(snappedRight - rawCanvasOrigin.x, CanvasNodeConstants.minNodeWidth)
+            snappedCanvasOrigin = rawCanvasOrigin
+            snappedCanvasH = rawCanvasH
+        case .left, .bottomLeft, .topLeft:
+            // 左边活动：吸附左边（右边固定）
+            let fixedRight = rawCanvasOrigin.x + rawCanvasW
+            let snappedLeft = (rawCanvasOrigin.x / grid).rounded() * grid
+            snappedCanvasW = max(fixedRight - snappedLeft, CanvasNodeConstants.minNodeWidth)
+            snappedCanvasOrigin = CGPoint(x: fixedRight - snappedCanvasW, y: rawCanvasOrigin.y)
+            snappedCanvasH = rawCanvasH
+        case .bottom:
+            // 下边活动：吸附下边
+            let snappedBottom = ((rawCanvasOrigin.y + rawCanvasH) / grid).rounded() * grid
+            snappedCanvasH = max(snappedBottom - rawCanvasOrigin.y, CanvasNodeConstants.minNodeHeight)
+            snappedCanvasOrigin = rawCanvasOrigin
+            snappedCanvasW = rawCanvasW
+        case .top:
+            // 上边活动：吸附上边（下边固定）
+            let fixedBottom = rawCanvasOrigin.y + rawCanvasH
+            let snappedTop = (rawCanvasOrigin.y / grid).rounded() * grid
+            snappedCanvasH = max(fixedBottom - snappedTop, CanvasNodeConstants.minNodeHeight)
+            snappedCanvasOrigin = CGPoint(x: rawCanvasOrigin.x, y: fixedBottom - snappedCanvasH)
+            snappedCanvasW = rawCanvasW
+        }
+
+        let newCanvasFrame = CGRect(x: snappedCanvasOrigin.x, y: snappedCanvasOrigin.y,
+                                    width: snappedCanvasW, height: snappedCanvasH)
+
+        // 网格跨越时触发触觉反馈（与拖拽/绘制一致）
+        if let prev = nodeCanvasFrames[id], prev != newCanvasFrame {
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+        }
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        let canvasOriginPt = screenToCanvas(CGPoint(x: x, y: y))
-        let newCanvasFrame = CGRect(x: canvasOriginPt.x, y: canvasOriginPt.y,
-                                    width: w / zoom, height: h / zoom)
         nodeCanvasFrames[id] = newCanvasFrame
         // 同步更新 currentNodes，避免 layout() 重建 SwiftUI 视图时使用旧 frame 导致"弹回"
         updateNodeFrameInPlace(id: id, frame: newCanvasFrame)
@@ -582,31 +654,40 @@ extension CanvasViewportView {
             needsDisplay = true
 
         case .drawing(let start):
-            let current = drawingCurrentPoint ?? start
-            let rect = CGRect(
-                x: min(start.x, current.x),
-                y: min(start.y, current.y),
-                width: abs(current.x - start.x),
-                height: abs(current.y - start.y)
+            // 使用网格吸附后的矩形创建节点
+            let grid = Constants.canvasGridSpacing
+            let canvasStart = screenToCanvas(start)
+            let canvasCurrent = screenToCanvas(drawingCurrentPoint ?? start)
+
+            let snappedStartX = (canvasStart.x / grid).rounded() * grid
+            let snappedStartY = (canvasStart.y / grid).rounded() * grid
+            let snappedCurrentX = (canvasCurrent.x / grid).rounded() * grid
+            let snappedCurrentY = (canvasCurrent.y / grid).rounded() * grid
+
+            let snappedRect = CGRect(
+                x: min(snappedStartX, snappedCurrentX),
+                y: min(snappedStartY, snappedCurrentY),
+                width: abs(snappedCurrentX - snappedStartX),
+                height: abs(snappedCurrentY - snappedStartY)
             )
-            if rect.width > 20 && rect.height > 20 {
-                let canvasRect = CGRect(
-                    origin: screenToCanvas(rect.origin),
-                    size: CGSize(width: rect.width / zoom, height: rect.height / zoom)
-                )
-                onNodeDrawn?(drawingNodeType, canvasRect)
+
+            // 最小绘制尺寸判定（画布坐标 20pt）
+            if snappedRect.width > 20 && snappedRect.height > 20 {
+                onNodeDrawn?(drawingNodeType, snappedRect)
             } else {
+                // 点击创建：使用吸附后的起点作为中心
                 let defaultSize = defaultNodeSize(for: drawingNodeType)
-                let canvasPoint = screenToCanvas(start)
                 let canvasRect = CGRect(
-                    x: canvasPoint.x - defaultSize.width / 2,
-                    y: canvasPoint.y - defaultSize.height / 2,
+                    x: snappedStartX - defaultSize.width / 2,
+                    y: snappedStartY - defaultSize.height / 2,
                     width: defaultSize.width,
                     height: defaultSize.height
                 )
                 onNodeDrawn?(drawingNodeType, canvasRect)
             }
+            NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             drawingCurrentPoint = nil
+            drawingLastSnappedRect = nil
             snapGuideView?.drawingRect = nil
             needsDisplay = true
 

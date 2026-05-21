@@ -543,7 +543,7 @@ final class CanvasViewportView: NSView {
         if let hostingView = nodesHostingView {
             let current = hostingView.rootView
 
-            // 拖动中跳过视口裁剪更新（节点位置由 SwiftUI 通过 origin/zoom 重算，无需重新筛选可见集）
+            // 拖动中跳过视口裁剪（不重新筛选可见集），但需把实时 frame 同步进缓存
             let isDragging: Bool
             switch interaction {
             case .draggingNode, .batchDragging, .resizingNode:
@@ -552,21 +552,30 @@ final class CanvasViewportView: NSView {
                 isDragging = false
             }
 
-            // 仅在视口参数大幅变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
-            // 容差策略：origin 微小变化（< 50 画布单位 ≈ 亚节点级平移）不触发重算
-            let originDelta = hypot(_cachedViewportOrigin.x - canvasOrigin.x,
-                                    _cachedViewportOrigin.y - canvasOrigin.y)
-            let needsRecalc = !isDragging && (
-                _viewportCacheDirty
-                || _cachedViewportZoom != zoom
-                || currentNodes.count != _cachedViewportNodes.count
-                || originDelta > Self.viewportCacheTolerance
-            )
-            if needsRecalc {
-                _cachedViewportNodes = viewportCulledNodes()
-                _cachedViewportOrigin = canvasOrigin
-                _cachedViewportZoom = zoom
-                _viewportCacheDirty = false
+            if isDragging {
+                // 将 sortedNodesByZIndex 中已更新的 frame 写回 _cachedViewportNodes
+                // 避免 SwiftUI 层看到旧坐标导致节点原地不动
+                let liveFrames = Dictionary(uniqueKeysWithValues: sortedNodesByZIndex.map { ($0.id, $0.frame) })
+                for i in _cachedViewportNodes.indices {
+                    if let liveFrame = liveFrames[_cachedViewportNodes[i].id] {
+                        _cachedViewportNodes[i].frame = liveFrame
+                    }
+                }
+            } else {
+                // 仅在视口参数大幅变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
+                // 容差策略：origin 微小变化（< 50 画布单位 ≈ 亚节点级平移）不触发重算
+                let originDelta = hypot(_cachedViewportOrigin.x - canvasOrigin.x,
+                                        _cachedViewportOrigin.y - canvasOrigin.y)
+                let needsRecalc = _viewportCacheDirty
+                    || _cachedViewportZoom != zoom
+                    || currentNodes.count != _cachedViewportNodes.count
+                    || originDelta > Self.viewportCacheTolerance
+                if needsRecalc {
+                    _cachedViewportNodes = viewportCulledNodes()
+                    _cachedViewportOrigin = canvasOrigin
+                    _cachedViewportZoom = zoom
+                    _viewportCacheDirty = false
+                }
             }
 
             // 仅当 origin/zoom/可见节点变化时才重建 rootView（避免完全无变化时的冗余赋值）
@@ -702,6 +711,8 @@ final class CanvasViewportView: NSView {
     var marqueeCurrentPoint: CGPoint?
     /// 节点绘制模式当前鼠标位置
     var drawingCurrentPoint: CGPoint?
+    /// 绘制模式网格吸附：上一次吸附后的画布矩形（用于检测网格跨越并触发 haptic）
+    var drawingLastSnappedRect: CGRect?
     /// 磁吸/网格 snap 辅助状态
     var lastSnapActive: Bool = false
     var lastSnappedGridOrigin: CGPoint? = nil

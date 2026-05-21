@@ -208,6 +208,9 @@ final class CanvasNodeRenderer {
         let lockedIds = Set(nodes.filter { $0.isLocked }.map { $0.id })
 
         // 先更新 currentNodes（触发排序缓存更新），再用排序后的数组构建 SwiftUI 视图
+        // 重建 nodeCanvasFrames：清理已删除节点的旧条目，避免旧 UUID 残留干扰 hitTest 和拖拽
+        let activeIds = Set(nodes.map { $0.id })
+        canvas.nodeCanvasFrames = canvas.nodeCanvasFrames.filter { activeIds.contains($0.key) }
         for node in nodes {
             canvas.nodeCanvasFrames[node.id] = node.frame
         }
