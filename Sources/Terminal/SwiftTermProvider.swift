@@ -5,7 +5,7 @@ import AppKit
 
 /// SwiftTerm PTY 适配层 — 只负责 PTY 进程管理
 /// - 通过子类化 LocalProcessTerminalView（OmLocalProcessTerminalView）的 dataReceived 检测输出
-/// - shellReadyCallback：shell 就绪（300ms 静默）后触发一次
+/// - shellReadyCallback：shell 就绪（100ms 静默）后触发一次
 @MainActor
 final class SwiftTermProvider: NSObject {
     private let logger = Logger.make(category: "SwiftTermProvider")
@@ -53,8 +53,6 @@ final class SwiftTermProvider: NSObject {
     // MARK: - Scrollback
 
     private let scrollbackStore = ScrollbackStore()
-    private var pendingScrollback: [ScrollbackEntry] = []
-    private let scrollbackFlushThreshold = 50
     private var scrollbackDebounceTask: Task<Void, Never>?
 
     // MARK: - Init
@@ -137,6 +135,12 @@ final class SwiftTermProvider: NSObject {
         let startDir: String? = (!workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory))
             ? workingDirectory : nil
 
+        // Scrollback 恢复：在 PTY 启动前将历史数据 feed 到终端视图
+        // 对标 Maestri：重启后即时显示历史记录（黑灰色），然后新 shell prompt 追加在后面
+        if let wsId = workspaceId {
+            feedScrollbackBeforeStart(view: view, workspaceId: wsId)
+        }
+
         view.startProcess(
             executable: args[0],
             args: Array(args.dropFirst()),
@@ -158,7 +162,7 @@ final class SwiftTermProvider: NSObject {
             onDataReceived?(text)
             recordOutputForScrollback(text)
         }
-        // Shell 就绪检测
+        // Shell 就绪检测（100ms 静默即认为就绪，对标 Maestri 快速启动）
         lastOutputTime = .now
         guard !shellReadyCalled, !shellReadyScheduled else { return }
         guard !pendingStartupCommands.isEmpty || shellReadyCallback != nil else {
@@ -167,10 +171,11 @@ final class SwiftTermProvider: NSObject {
         }
         shellReadyScheduled = true
         Task { @MainActor [weak self] in
+            // 快速检测：100ms 间隔轮询，最多等待 3s
             for _ in 0..<30 {
-                try? await Task.sleep(for: .milliseconds(300))
+                try? await Task.sleep(for: .milliseconds(100))
                 guard let self, !self.shellReadyCalled else { return }
-                if ContinuousClock.now - self.lastOutputTime >= .milliseconds(280) {
+                if ContinuousClock.now - self.lastOutputTime >= .milliseconds(80) {
                     self.fireShellReady()
                     return
                 }
@@ -215,6 +220,24 @@ final class SwiftTermProvider: NSObject {
     func stop() {
         guard isRunning else { return }
         isRunning = false
+        // 退出前做最后一次 scrollback 快照（必须在 terminalView 置 nil 之前）
+        if let view = terminalView, let wsId = workspaceId {
+            let terminal = view.getTerminal()
+            let data = terminal.getBufferAsData()
+            if !data.isEmpty {
+                let fullText = String(decoding: data, as: UTF8.self)
+                var lines = fullText.components(separatedBy: "\n")
+                while let last = lines.last, last.isEmpty { lines.removeLast() }
+                if !lines.isEmpty {
+                    let maxLines = 5000
+                    let toKeep = lines.count > maxLines ? Array(lines.suffix(maxLines)) : lines
+                    let entries = toKeep.map { ScrollbackEntry(attributes: [], text: $0) }
+                    Task.detached { [scrollbackStore, terminalId] in
+                        try? await scrollbackStore.save(entries: entries, terminalId: terminalId, workspaceId: wsId)
+                    }
+                }
+            }
+        }
         terminalView?.terminate()
         terminalView = nil
     }
@@ -313,34 +336,98 @@ final class SwiftTermProvider: NSObject {
         logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
-    // MARK: - Scrollback 持久化
+    // MARK: - Scrollback 恢复（启动时 feed 历史到终端视图）
 
-    func recordOutputForScrollback(_ text: String) {
-        let lines = text.components(separatedBy: "\n")
-        for line in lines where !line.isEmpty {
-            pendingScrollback.append(ScrollbackEntry(attributes: [], text: line))
+    /// 在 PTY startProcess 前将保存的 scrollback 数据 feed 到终端视图
+    /// 使用 SwiftTerm 的 feed(text:) API 直接渲染到 terminal buffer
+    /// 对标 Maestri：重启后立即显示历史记录，无需等待 PTY 输出
+    ///
+    /// 保存格式：每个 entry.text 是一行已渲染的屏幕文本（从 terminal buffer 提取），
+    /// 不含光标移动等控制序列，因此可以安全地逐行 feed 回任意尺寸的终端。
+    private func feedScrollbackBeforeStart(view: LocalProcessTerminalView, workspaceId: UUID) {
+        let store = ScrollbackStore()
+        guard let entries = try? store.load(terminalId: terminalId, workspaceId: workspaceId),
+              !entries.isEmpty else { return }
+
+        // 检测旧格式数据（含光标移动等 CSI 序列）：如果发现则跳过恢复
+        // 旧格式是原始 PTY 输出，含 \x1b[...A/B/C/D/G/H/J/K 等光标控制，不可安全回放
+        // 新格式是 translateToString 提取的纯文本行，只含可打印字符
+        let sampleEntries = entries.suffix(min(20, entries.count))
+        let hasCursorMovement = sampleEntries.contains { entry in
+            // CSI 序列以 ESC[ 开头，后跟光标移动命令字符（A-H, J, K, f）
+            entry.text.range(of: "\u{1b}\\[[0-9;]*[ABCDHJKf]", options: .regularExpression) != nil
         }
-        if pendingScrollback.count >= scrollbackFlushThreshold {
-            scrollbackDebounceTask?.cancel()
-            scrollbackDebounceTask = nil
-            Task { await flushScrollback() }
-        } else {
-            if scrollbackDebounceTask == nil {
-                scrollbackDebounceTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(2))
-                    guard !Task.isCancelled else { return }
-                    await self?.flushScrollback()
-                    self?.scrollbackDebounceTask = nil
-                }
+        if hasCursorMovement {
+            logger.debug("Scrollback contains legacy PTY data with cursor sequences, skipping restore for terminal \(self.terminalId.uuidString.prefix(8))")
+            return
+        }
+
+        // 增大 scrollback buffer 以容纳历史记录（默认 500 太小，resize 时会丢失）
+        view.changeScrollback(10000)
+
+        // 取最后 2000 行
+        let maxRestoreLines = 2000
+        let toRestore = entries.count > maxRestoreLines
+            ? Array(entries.suffix(maxRestoreLines))
+            : entries
+
+        // 逐行 feed：每行是从 terminal buffer 提取的已渲染屏幕行（纯文本），
+        // 用 \r\n 结尾模拟终端正常输出。不含光标移动/清屏等序列，resize 安全。
+        let text = toRestore.map { $0.text }.joined(separator: "\r\n")
+        guard !text.isEmpty else { return }
+
+        view.feed(text: text + "\r\n")
+        logger.debug("Scrollback restored: \(toRestore.count) lines for terminal \(self.terminalId.uuidString.prefix(8))")
+    }
+
+    // MARK: - Scrollback 持久化（从 terminal buffer 提取已渲染的屏幕行）
+
+    /// 从 SwiftTerm terminal buffer 提取所有行（scrollback + 可视区），存为 JSONL。
+    /// 每行是 translateToString 的纯文本输出，不含光标移动/清屏等控制序列。
+    /// 恢复时可安全 feed 到任意尺寸的终端而不会错位。
+    func recordOutputForScrollback(_ text: String) {
+        // 标记有新数据到达，触发 debounce 快照保存
+        scrollbackDirty = true
+        if scrollbackDebounceTask == nil {
+            scrollbackDebounceTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { return }
+                await self?.flushScrollback()
+                self?.scrollbackDebounceTask = nil
             }
         }
     }
 
+    /// 是否有新数据需要快照
+    private var scrollbackDirty = false
+
+    /// 从 terminal buffer 提取所有行并持久化
     func flushScrollback() async {
-        guard !pendingScrollback.isEmpty, let wsId = workspaceId else { return }
-        let toFlush = pendingScrollback
-        pendingScrollback.removeAll()
-        try? await scrollbackStore.append(lines: toFlush, terminalId: terminalId, workspaceId: wsId)
+        guard scrollbackDirty, let wsId = workspaceId, let view = terminalView else { return }
+        scrollbackDirty = false
+
+        // 通过 SwiftTerm public API 获取整个 buffer 内容（含 scrollback + 可视区域）
+        // getBufferAsData 内部遍历 buffer.lines，对每行调用 translateToString(trimRight: true)
+        // 结果是纯文本（无光标移动序列），每行以 \n 分隔
+        let terminal = view.getTerminal()
+        let data = terminal.getBufferAsData()
+        guard !data.isEmpty else { return }
+
+        let fullText = String(decoding: data, as: UTF8.self)
+        var lines = fullText.components(separatedBy: "\n")
+
+        // 去掉尾部空行
+        while let last = lines.last, last.isEmpty {
+            lines.removeLast()
+        }
+
+        guard !lines.isEmpty else { return }
+
+        // 转为 ScrollbackEntry 并持久化
+        let maxLines = 5000
+        let toKeep = lines.count > maxLines ? Array(lines.suffix(maxLines)) : lines
+        let entries = toKeep.map { ScrollbackEntry(attributes: [], text: $0) }
+        try? await scrollbackStore.save(entries: entries, terminalId: terminalId, workspaceId: wsId)
     }
 
     func flushScrollbackNow() {
