@@ -285,12 +285,21 @@ final class SkillInjector {
     omaestri role create "Code Reviewer" "You are a meticulous code reviewer. Focus on correctness, security, and readability. Always cite the specific line or pattern you are commenting on."
     ```
 
+    ### `omaestri role show "RoleName"`
+
+    Show the full details (name and prompt) of a role.
+
+    ```
+    omaestri role show "Code Reviewer"
+    ```
+
     ### `omaestri role edit "RoleName" --prompt "new instructions"`
 
-    Update an existing role's instructions.
+    Update an existing role's instructions. `write` is an alias for `edit`.
 
     ```
     omaestri role edit "Code Reviewer" --prompt "You are a strict code reviewer focused on security vulnerabilities and performance."
+    omaestri role write "Code Reviewer" --prompt "Updated instructions here."
     ```
 
     ### `omaestri role assign "AgentName" "RoleName"`

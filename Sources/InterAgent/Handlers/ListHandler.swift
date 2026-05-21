@@ -17,16 +17,9 @@ final class ListHandler {
         let cm = ConnectionManager.shared
         let tm = TerminalManager.shared
 
-        var lines: [String] = []
+        var sections: [String] = []
 
-        // 自身信息（显示 agentName 或 command，以及 roleName）
-        if let self_ = tm.terminals[tid] {
-            let name = self_.agentName ?? (self_.command.isEmpty ? "Shell" : self_.command)
-            let roleStr = self_.roleName.map { " (role: \($0))" } ?? ""
-            lines.append("You: \(name)\(roleStr)")
-        }
-
-        // 按类型分组连接
+        // 按类型分组连接（对标 Maestri 输出格式）
         var agents:  [String] = []
         var notes:   [String] = []
         var portals: [String] = []
@@ -36,41 +29,41 @@ final class ListHandler {
             switch conn.type {
             case .terminalToTerminal:
                 if let session = tm.terminals[otherId] {
-                    let roleStr = session.roleName.map { " (role: \($0))" } ?? ""
-                    let cmd = session.command.isEmpty ? "Shell" : session.command
-                    agents.append("  - \(cmd)\(roleStr) [\(otherId.uuidString.prefix(8))]")
+                    let name = session.agentName ?? (session.command.isEmpty ? "Shell" : session.command)
+                    agents.append("  - name: \"\(name)\"")
                 } else {
-                    agents.append("  - unknown [\(otherId.uuidString.prefix(8))]")
+                    agents.append("  - name: \"unknown\"")
                 }
             case .terminalToNote:
                 let noteName = resolveNoteName(nodeId: otherId)
-                notes.append("  - \(noteName) [\(otherId.uuidString.prefix(8))]")
+                notes.append("  - name: \"\(noteName)\"")
             case .terminalToPortal:
-                let portalName = resolvePortalName(nodeId: otherId)
-                portals.append("  - \(portalName) [\(otherId.uuidString.prefix(8))]")
+                let (portalName, portalURL) = resolvePortalInfo(nodeId: otherId)
+                if let url = portalURL {
+                    portals.append("  - name: \"\(portalName)\" - url: \(url)")
+                } else {
+                    portals.append("  - name: \"\(portalName)\"")
+                }
             default:
                 break
             }
         }
 
         if agents.isEmpty && notes.isEmpty && portals.isEmpty {
-            return lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n") + "No connections."
+            return "No connections."
         }
 
         if !agents.isEmpty {
-            lines.append("Agents:")
-            lines.append(contentsOf: agents)
-        }
-        if !notes.isEmpty {
-            lines.append("Notes:")
-            lines.append(contentsOf: notes)
+            sections.append("Connected agents:\n" + agents.joined(separator: "\n"))
         }
         if !portals.isEmpty {
-            lines.append("Portals:")
-            lines.append(contentsOf: portals)
+            sections.append("Connected portals (use `omaestri portal snapshot`):\n" + portals.joined(separator: "\n"))
+        }
+        if !notes.isEmpty {
+            sections.append("Connected notes (use `omaestri note read/write/edit`):\n" + notes.joined(separator: "\n"))
         }
 
-        return lines.joined(separator: "\n")
+        return sections.joined(separator: "\n\n")
     }
 
     // MARK: - 名称解析
@@ -81,8 +74,13 @@ final class ListHandler {
     }
 
     @MainActor
-    private func resolvePortalName(nodeId: UUID) -> String {
-        "Portal"
+    private func resolvePortalInfo(nodeId: UUID) -> (name: String, url: String?) {
+        if let wv = PortalWebViewStore.shared.webView(for: nodeId) {
+            let name = wv.title ?? "Portal"
+            let url = wv.url?.absoluteString
+            return (name.isEmpty ? "Portal" : name, url)
+        }
+        return ("Portal", nil)
     }
 
     private func runOnMain(_ block: @escaping () async -> String) -> String {

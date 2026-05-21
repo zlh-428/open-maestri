@@ -16,7 +16,7 @@ func printHelp() {
       recruit "Name" [--preset x]       Recruit a new agent (Maestro only)
       dismiss "Name"                    Dismiss a recruited agent
       connect "From" "To"               Connect two agents
-      role <list|create|edit|assign>    Manage agent roles
+      role <list|create|show|edit|write|assign>  Manage agent roles
       preset list                       List available agent presets
       debug                             Diagnose connection issues
 

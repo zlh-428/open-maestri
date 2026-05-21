@@ -139,10 +139,13 @@ final class MaestroHandlers {
         let tm = TerminalManager.shared
         let cm = ConnectionManager.shared
         let connectedIds = cm.connectedNodeIds(for: maestroId)
+        let lower = targetName.lowercased()
         guard let target = tm.terminals.values.first(where: {
             connectedIds.contains($0.id) &&
-            ($0.command.lowercased().contains(targetName.lowercased()) ||
-             ($0.roleName ?? "").lowercased().contains(targetName.lowercased()))
+            ($0.agentName?.lowercased().contains(lower) == true ||
+             $0.command.lowercased().contains(lower) ||
+             ($0.roleName ?? "").lowercased().contains(lower) ||
+             $0.id.uuidString.prefix(8) == targetName.prefix(8))
         }) else { return "error: agent '\(targetName)' not found among connected agents" }
         cm.disconnectAll(involvedNode: target.id)
         tm.removeTerminal(id: target.id)
@@ -174,7 +177,7 @@ final class MaestroHandlers {
     @MainActor
     private func handleRoleAsync(args: [String], fromTerminalId: UUID?) async -> String {
         guard args.count >= 2 else {
-            return "error: usage: omaestri role <list|create|edit|assign> [args...]"
+            return "error: usage: omaestri role <list|create|show|edit|write|assign> [args...]"
         }
         switch args[1] {
         case "list":
@@ -195,9 +198,20 @@ final class MaestroHandlers {
             try? PersistenceManager.shared.savePreferences(prefs)
             return "Role '\(roleName)' created"
 
-        case "edit":
+        case "show":
+            guard args.count >= 3 else {
+                return "error: usage: omaestri role show \"RoleName\""
+            }
+            let roleName = args[2]
+            let prefs = PersistenceManager.shared.loadPreferencesSync()
+            guard let role = prefs.rolePresets.first(where: { $0.name.lowercased() == roleName.lowercased() }) else {
+                return "error: role '\(roleName)' not found"
+            }
+            return "Name: \(role.name)\nPrompt: \(role.prompt)"
+
+        case "edit", "write":
             guard args.count >= 4 else {
-                return "error: usage: omaestri role edit \"RoleName\" --prompt \"...\""
+                return "error: usage: omaestri role \(args[1]) \"RoleName\" --prompt \"...\""
             }
             let roleName = args[2]
             var prefs = PersistenceManager.shared.loadPreferencesSync()
@@ -242,7 +256,7 @@ final class MaestroHandlers {
             return "Role '\(roleName)' assigned to '\(agentName)' (takes effect on next restart)"
 
         default:
-            return "error: unknown role subcommand '\(args[1])'. Valid: list|create|edit|assign"
+            return "error: unknown role subcommand '\(args[1])'. Valid: list|create|show|edit|write|assign"
         }
     }
 
