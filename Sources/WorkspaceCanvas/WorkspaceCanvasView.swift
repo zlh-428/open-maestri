@@ -659,8 +659,8 @@ struct WorkspaceCanvasView: View {
 
     // MARK: - 终端预初始化
 
-    /// 进入工作区时异步分批预初始化终端 session（不启动 PTY）
-    /// PTY 真正启动延迟到 TerminalEmbeddedView.makeNSView，避免集中阻塞主线程
+    /// 进入工作区时立即并行初始化所有终端（PTY 同时 fork）
+    /// 对标 Maestri：所有终端并行启动，5s 内全部就绪
     @MainActor
     private func preInitializeAllTerminals() {
         let nodes = workspace.nodes
@@ -675,32 +675,22 @@ struct WorkspaceCanvasView: View {
         }
         guard !pending.isEmpty else { return }
 
-        // 每批最多 3 个，每批之间间隔 80ms，避免瞬间大量 PTY fork 阻塞主线程
-        let batchSize = 3
-        for (batchIndex, batchStart) in stride(from: 0, to: pending.count, by: batchSize).enumerated() {
-            let batch = Array(pending[batchStart..<min(batchStart + batchSize, pending.count)])
-            let delay = Double(batchIndex) * 0.08
+        // 并行启动所有终端（PTY fork 本身很轻量，不阻塞 UI 线程）
+        for node in pending {
+            guard case .terminal(let tc) = node.content else { continue }
+            guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
+            guard TerminalManager.shared.providers[tc.id] == nil else { continue }
 
-            Task { @MainActor in
-                if delay > 0 { try? await Task.sleep(for: .milliseconds(Int(delay * 1000))) }
-                for node in batch {
-                    guard case .terminal(let tc) = node.content else { continue }
-                    // 二次检查，避免 delay 期间重复创建
-                    guard TerminalManager.shared.terminals[tc.id] == nil else { continue }
-                    guard TerminalManager.shared.providers[tc.id] == nil else { continue }
-
-                    let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
-                        rolePresets.first { $0.id == roleId }
-                    }
-                    _ = TerminalManager.shared.createTerminal(
-                        id: tc.id,
-                        command: tc.command,
-                        workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
-                        workspaceId: wsId,
-                        roleName: role?.name
-                    )
-                }
+            let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
+                rolePresets.first { $0.id == roleId }
             }
+            _ = TerminalManager.shared.createTerminal(
+                id: tc.id,
+                command: tc.command,
+                workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
+                workspaceId: wsId,
+                roleName: role?.name
+            )
         }
     }
 
