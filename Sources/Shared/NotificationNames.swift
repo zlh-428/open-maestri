@@ -53,4 +53,8 @@ extension Notification.Name {
     static let canvasNodeLockChanged     = Notification.Name("OpenMaestri.canvasNodeLockChanged")
     /// 节点 content 变更：userInfo 含 "nodeId" UUID, "content" NodeContent
     static let canvasNodeContentChanged  = Notification.Name("OpenMaestri.canvasNodeContentChanged")
+    /// TerminalManager 已创建 provider，MaestroTerminalView 可 attach
+    static let terminalProviderReady     = Notification.Name("OpenMaestri.terminalProviderReady")
+    /// shell 初始化完成，MaestroTerminalView 可加载 scrollback
+    static let terminalShellReady        = Notification.Name("OpenMaestri.terminalShellReady")
 }

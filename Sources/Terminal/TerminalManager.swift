@@ -1,8 +1,10 @@
+import AppKit
 import Foundation
 import OSLog
 
 /// 终端生命周期管理器
 /// - 为每个 Terminal 节点创建/销毁 PTY 会话
+/// - 串行启动队列保证 PTY 按顺序启动，对标 Maestri 快速无卡顿启动
 /// - 所有 PTY 写入操作必须通过此类（架构约束）
 @MainActor
 final class TerminalManager {
@@ -13,6 +15,21 @@ final class TerminalManager {
     private(set) var terminals: [UUID: TerminalSession] = [:]
     /// 终端 UUID → 所属工作区 ID（用于按工作区查询）
     private(set) var terminalWorkspaceMap: [UUID: UUID] = [:]
+    /// 终端 UUID → SwiftTermProvider（取代旧的 TerminalProviderRegistry）
+    private(set) var providers: [UUID: SwiftTermProvider] = [:]
+    /// 已完成 shell 初始化的终端 ID 集合
+    private(set) var completedProviders: Set<UUID> = []
+
+    private struct StartItem {
+        let id: UUID
+        let command: String
+        let workingDirectory: String
+        let workspaceId: UUID?
+        let roleName: String?
+    }
+    private var startQueue: [StartItem] = []
+    private var isDrainingStartQueue = false
+    private(set) var isShuttingDown = false
 
     private init() {}
 
@@ -20,34 +37,20 @@ final class TerminalManager {
 
     func createTerminal(
         id: UUID,
+        command: String,
         workingDirectory: String,
-        preset: AgentPreset,
-        role: RolePreset? = nil,
-        workspaceId: UUID? = nil
+        workspaceId: UUID? = nil,
+        roleName: String? = nil
     ) -> TerminalSession {
-        // 如果有角色，注入到专属目录下启动
-        let startDirectory: String
-        if let role {
-            startDirectory = RoleInjector.shared.prepareRoleDirectory(
-                roleId: role.id,
-                rolePrompt: role.prompt,
-                workingDirectory: workingDirectory
-            )
-        } else {
-            startDirectory = workingDirectory
-        }
-
         let session = TerminalSession(
             id: id,
-            command: preset.command,
-            workingDirectory: startDirectory,
-            roleName: role?.name
+            command: command,
+            workingDirectory: workingDirectory,
+            roleName: roleName
         )
         terminals[id] = session
         if let wsId = workspaceId {
             terminalWorkspaceMap[id] = wsId
-            // 加载历史 scrollback 到 outputBuffer（供 omaestri check 使用）
-            // 使用 bulkLoadHistory 批量注入，避免逐行触发 activityMonitor 和 NotificationCenter
             Task.detached(priority: .background) {
                 let store = ScrollbackStore()
                 let entries = (try? store.load(terminalId: id, workspaceId: wsId)) ?? []
@@ -58,7 +61,18 @@ final class TerminalManager {
                 }
             }
         }
-        logger.debug("Terminal \(id) created with preset \(preset.name)\(role.map { ", role: \($0.name)" } ?? "")")
+
+        let item = StartItem(
+            id: id,
+            command: command,
+            workingDirectory: workingDirectory,
+            workspaceId: workspaceId,
+            roleName: roleName
+        )
+        startQueue.append(item)
+        drainStartQueueIfNeeded()
+
+        logger.debug("Terminal \(id) enqueued, command: \(command)")
         return session
     }
 
@@ -68,10 +82,23 @@ final class TerminalManager {
     }
 
     func removeTerminal(id: UUID) {
+        providers[id]?.stop()
+        providers.removeValue(forKey: id)
+        completedProviders.remove(id)
+        startQueue.removeAll { $0.id == id }
         terminals[id]?.terminate()
         terminals.removeValue(forKey: id)
         terminalWorkspaceMap.removeValue(forKey: id)
         logger.debug("Terminal \(id) removed")
+    }
+
+    func shutdown() {
+        isShuttingDown = true
+        startQueue.removeAll()
+        providers.values.forEach { $0.stop() }
+        providers.removeAll()
+        completedProviders.removeAll()
+        terminals.removeAll()
     }
 
     // MARK: - PTY 写入（所有写入的唯一入口）
@@ -87,9 +114,81 @@ final class TerminalManager {
     func writeLine(to terminalId: UUID, text: String) {
         write(to: terminalId, text: text + "\n")
     }
+
+    // MARK: - 串行启动队列
+
+    private func drainStartQueueIfNeeded() {
+        guard !isDrainingStartQueue, !startQueue.isEmpty else { return }
+        isDrainingStartQueue = true
+        Task { await drainNext() }
+    }
+
+    private func drainNext() async {
+        guard !startQueue.isEmpty else {
+            isDrainingStartQueue = false
+            return
+        }
+        let item = startQueue.removeFirst()
+        guard terminals[item.id] != nil else {
+            // 已删除的终端跳过，继续消费下一个
+            await drainNext()
+            return
+        }
+
+        let provider = SwiftTermProvider(
+            terminalId: item.id,
+            command: item.command,
+            workingDirectory: item.workingDirectory
+        )
+        provider.serverPort = InterAgentServer.shared.port
+        provider.workspaceId = item.workspaceId
+        if let prefs = try? PersistenceManager.shared.loadPreferences() {
+            provider.preferredFont = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
+                ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
+        }
+        providers[item.id] = provider
+
+        // shellReadyCallback：shell 初始化完成 → 标记 → 发通知 → 推进队列
+        provider.shellReadyCallback = { [weak self] in
+            guard let self else { return }
+            self.completedProviders.insert(item.id)
+            if let wsId = item.workspaceId {
+                NotificationCenter.default.post(
+                    name: .terminalShellReady,
+                    object: nil,
+                    userInfo: ["terminalId": item.id, "workspaceId": wsId]
+                )
+            }
+            // 释放队列锁再通过有保护的入口推进（避免直接调用 drainNext 重入）
+            self.isDrainingStartQueue = false
+            self.drainStartQueueIfNeeded()
+        }
+
+        // 绑定 PTY 输出 → session.recordOutput，并建立 session 写入通道
+        if let session = terminals[item.id] {
+            provider.onDataReceived = { [weak session] text in
+                Task { @MainActor in session?.recordOutput(text) }
+            }
+            // 建立 session → provider 写入路径（PTY 启动后 pendingWrites 需要能发送）
+            session.onOutput = { [weak provider] text in provider?.write(text) }
+        }
+
+        // 直接启动 PTY（不依赖 TerminalEmbeddedView 是否已 attach）。
+        // 对标 Maestri：终端创建时立刻启动 PTY 进程，无 viewport culling 延迟。
+        // TerminalEmbeddedView 随后 attach 时走 re-attach 分支（已有 terminalView）。
+        provider.start(in: NSRect(x: 0, y: 0, width: 600, height: 400))
+
+        // 通知 TerminalEmbeddedView（如已存在）可以 attach provider 的 terminalView
+        NotificationCenter.default.post(
+            name: .terminalProviderReady,
+            object: nil,
+            userInfo: ["terminalId": item.id]
+        )
+    }
 }
 
 /// 单个终端会话状态
+@MainActor
 final class TerminalSession {
     let id: UUID
     let command: String
