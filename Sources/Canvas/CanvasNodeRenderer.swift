@@ -33,6 +33,7 @@ final class CanvasNodeRenderer {
         setupActivationObserver()
         setupSelectionObserver()
         setupDropTargetObserver()
+        setupNodeStateObservers()
         setupPhysicsCallbacks()
         // 画布 pan/zoom 变化时直接刷新连线屏幕坐标（绕过 SwiftUI 时序问题）
         canvas.onViewportPanned = { [weak self] in
@@ -144,7 +145,7 @@ final class CanvasNodeRenderer {
                 userInfo: ["nodeId": id]
             )
         }
-        // 节点层级变更：同步到 workspace 持久化
+        // 节点层级变更：同步到 workspace 持久化（canvas.currentNodes 已由 bringNodesToFront 更新）
         canvas.onNodeZIndexChanged = { [weak self] nodeId, newZIndex in
             guard let ws = self?.currentWorkspace,
                   let idx = ws.nodes.firstIndex(where: { $0.id == nodeId }) else { return }
@@ -303,22 +304,27 @@ final class CanvasNodeRenderer {
     private func handleRename(id: UUID, newName: String) {
         guard let ws = currentWorkspace,
               let idx = ws.nodes.firstIndex(where: { $0.id == id }) else { return }
+        let newContent: NodeContent?
         switch ws.nodes[idx].content {
         case .terminal(var tc):
             tc.name = newName
-            ws.nodes[idx].content = .terminal(tc)
+            newContent = .terminal(tc)
         case .stickyNote(var nc):
             nc.hasCustomName = true
             nc.fileName = newName.hasSuffix(".md") ? newName : "\(newName).md"
-            ws.nodes[idx].content = .stickyNote(nc)
+            newContent = .stickyNote(nc)
         case .portal(var pc):
             pc.name = newName
-            ws.nodes[idx].content = .portal(pc)
+            newContent = .portal(pc)
         case .fileTree(var fc):
             fc.name = newName
-            ws.nodes[idx].content = .fileTree(fc)
+            newContent = .fileTree(fc)
         default:
-            break
+            newContent = nil
+        }
+        if let content = newContent {
+            ws.nodes[idx].content = content
+            canvas?.updateNodeContentInPlace(id: id, content: content)
         }
         saveWorkspace()
     }
@@ -343,6 +349,7 @@ final class CanvasNodeRenderer {
         guard let ws = currentWorkspace,
               let idx = ws.nodes.firstIndex(where: { $0.id == id }) else { return }
         ws.nodes[idx].isLocked = locked
+        canvas?.updateNodeLockedInPlace(id: id, isLocked: locked)
         saveWorkspace()
     }
 
@@ -368,8 +375,9 @@ final class CanvasNodeRenderer {
             guard let self,
                   let canvas = self.canvas,
                   let ids = notif.userInfo?["selectedIds"] as? Set<UUID> else { return }
-            guard let current = self.nodesHostingView?.rootView,
-                  current.selectedNodeIds != ids else { return }
+            guard let current = self.nodesHostingView?.rootView else { return }
+            // 注意：不能仅凭 selectedNodeIds 不变就跳过——zIndex 变化时节点排序已更新，
+            // 必须用最新的 viewportCulledNodes() 重建 rootView 才能让渲染层反映新层级顺序
             let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
             self.nodesHostingView?.rootView = CanvasNodesSwiftUIView(
                 nodes: canvas.viewportCulledNodes(),
@@ -414,6 +422,28 @@ final class CanvasNodeRenderer {
             )
         }
         notificationObservers.append(obs)
+    }
+
+    private func setupNodeStateObservers() {
+        // 节点 isLocked 变更：同步到 canvas.currentNodes（WorkspaceCanvasView 直接改 ws.nodes 不经过 renderer）
+        let lockObs = NotificationCenter.default.addObserver(
+            forName: .canvasNodeLockChanged, object: nil, queue: .main
+        ) { [weak self] notif in
+            guard let id = notif.userInfo?["nodeId"] as? UUID,
+                  let locked = notif.userInfo?["isLocked"] as? Bool else { return }
+            self?.canvas?.updateNodeLockedInPlace(id: id, isLocked: locked)
+        }
+        notificationObservers.append(lockObs)
+
+        // 节点 content 变更：同步到 canvas.currentNodes
+        let contentObs = NotificationCenter.default.addObserver(
+            forName: .canvasNodeContentChanged, object: nil, queue: .main
+        ) { [weak self] notif in
+            guard let id = notif.userInfo?["nodeId"] as? UUID,
+                  let content = notif.userInfo?["content"] as? NodeContent else { return }
+            self?.canvas?.updateNodeContentInPlace(id: id, content: content)
+        }
+        notificationObservers.append(contentObs)
     }
 
     // MARK: - 连线物理同步

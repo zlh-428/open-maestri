@@ -697,7 +697,13 @@ struct WorkspaceCanvasView: View {
     private func lockSelectedNodes() {
         for id in selectedNodeIds {
             if let idx = workspace.nodes.firstIndex(where: { $0.id == id }) {
-                workspace.nodes[idx].isLocked.toggle()
+                let newLocked = !workspace.nodes[idx].isLocked
+                workspace.nodes[idx].isLocked = newLocked
+                NotificationCenter.default.post(
+                    name: .canvasNodeLockChanged,
+                    object: nil,
+                    userInfo: ["nodeId": id, "isLocked": newLocked]
+                )
             }
         }
         Task { try? await workspace.save() }
@@ -723,7 +729,13 @@ struct WorkspaceCanvasView: View {
               let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
               case .terminal(var tc) = workspace.nodes[idx].content else { return }
         tc.isManager = !tc.isManager
-        workspace.nodes[idx].content = .terminal(tc)
+        let newContent = NodeContent.terminal(tc)
+        workspace.nodes[idx].content = newContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "content": newContent]
+        )
         Task { try? await workspace.save() }
     }
 
@@ -743,7 +755,13 @@ struct WorkspaceCanvasView: View {
         tc.assignedRoleId = role.id
         tc.color = role.color
         tc.icon = role.icon
-        workspace.nodes[idx].content = .terminal(tc)
+        let newContent = NodeContent.terminal(tc)
+        workspace.nodes[idx].content = newContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "content": newContent]
+        )
 
         // 写入 CLAUDE.md / AGENTS.md 到角色目录
         let workDir = tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory
@@ -769,7 +787,13 @@ struct WorkspaceCanvasView: View {
         // 恢复默认颜色和图标
         tc.color = "#007AFF"
         tc.icon = "terminal"
-        workspace.nodes[idx].content = .terminal(tc)
+        let unassignedContent = NodeContent.terminal(tc)
+        workspace.nodes[idx].content = unassignedContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "content": unassignedContent]
+        )
 
         // 清理角色目录（如果没有其他终端使用该角色）
         if let roleId = oldRoleId {
@@ -879,7 +903,13 @@ struct WorkspaceCanvasView: View {
         var content = fc
         content.rootPath = newPath
         content.name = url.lastPathComponent
-        workspace.nodes[idx].content = .fileTree(content)
+        let newContent = NodeContent.fileTree(content)
+        workspace.nodes[idx].content = newContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": firstId, "content": newContent]
+        )
 
         // 通知 CanvasNodeRenderer 刷新视图（通过 save + reload）
         Task { try? await workspace.save() }

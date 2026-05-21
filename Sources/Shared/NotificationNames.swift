@@ -49,4 +49,8 @@ extension Notification.Name {
     static let terminalAppearanceChanged = Notification.Name("OpenMaestri.terminalAppearanceChanged")
     /// 终端当前工作目录变化：userInfo 含 "terminalId" UUID, "directory" String
     static let terminalDirectoryChanged  = Notification.Name("OpenMaestri.terminalDirectoryChanged")
+    /// 节点 isLocked 状态变更：userInfo 含 "nodeId" UUID, "isLocked" Bool
+    static let canvasNodeLockChanged     = Notification.Name("OpenMaestri.canvasNodeLockChanged")
+    /// 节点 content 变更：userInfo 含 "nodeId" UUID, "content" NodeContent
+    static let canvasNodeContentChanged  = Notification.Name("OpenMaestri.canvasNodeContentChanged")
 }

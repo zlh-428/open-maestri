@@ -164,6 +164,44 @@ final class CanvasViewportView: NSView {
         }
     }
 
+    /// 原地更新指定节点的 isLocked（不触发全量 sort，同步排序缓存 + 视口缓存）
+    func updateNodeLockedInPlace(id: UUID, isLocked: Bool) {
+        _skipSortOnDidSet = true
+        for i in currentNodes.indices where currentNodes[i].id == id {
+            currentNodes[i].isLocked = isLocked
+            break
+        }
+        _skipSortOnDidSet = false
+        for i in sortedNodesByZIndex.indices where sortedNodesByZIndex[i].id == id {
+            sortedNodesByZIndex[i].isLocked = isLocked
+            break
+        }
+        for i in sortedNodesByZIndexDesc.indices where sortedNodesByZIndexDesc[i].id == id {
+            sortedNodesByZIndexDesc[i].isLocked = isLocked
+            break
+        }
+        _viewportCacheDirty = true
+    }
+
+    /// 原地更新指定节点的 content（不触发全量 sort，同步排序缓存 + 视口缓存）
+    func updateNodeContentInPlace(id: UUID, content: NodeContent) {
+        _skipSortOnDidSet = true
+        for i in currentNodes.indices where currentNodes[i].id == id {
+            currentNodes[i].content = content
+            break
+        }
+        _skipSortOnDidSet = false
+        for i in sortedNodesByZIndex.indices where sortedNodesByZIndex[i].id == id {
+            sortedNodesByZIndex[i].content = content
+            break
+        }
+        for i in sortedNodesByZIndexDesc.indices where sortedNodesByZIndexDesc[i].id == id {
+            sortedNodesByZIndexDesc[i].content = content
+            break
+        }
+        _viewportCacheDirty = true
+    }
+
     /// 批量更新多个节点的 frame（不触发全量 sort）
     func updateNodeFramesInPlace(frames: [UUID: CGRect]) {
         _skipSortOnDidSet = true
@@ -249,8 +287,10 @@ final class CanvasViewportView: NSView {
                 changed = true
             }
         }
-        // 层级变化后通知渲染层刷新节点绘制顺序
+        // 层级变化后重建排序缓存（下标赋值不触发 didSet，必须手动刷新）
         if changed {
+            invalidateSortedNodesCache()
+            _viewportCacheDirty = true
             NotificationCenter.default.post(
                 name: .canvasSelectionChanged,
                 object: nil,
@@ -553,14 +593,11 @@ final class CanvasViewportView: NSView {
             }
 
             if isDragging {
-                // 将 sortedNodesByZIndex 中已更新的 frame 写回 _cachedViewportNodes
-                // 避免 SwiftUI 层看到旧坐标导致节点原地不动
-                let liveFrames = Dictionary(uniqueKeysWithValues: sortedNodesByZIndex.map { ($0.id, $0.frame) })
-                for i in _cachedViewportNodes.indices {
-                    if let liveFrame = liveFrames[_cachedViewportNodes[i].id] {
-                        _cachedViewportNodes[i].frame = liveFrame
-                    }
-                }
+                // 拖动中以 sortedNodesByZIndex 为权威来源重建 _cachedViewportNodes：
+                // 1. 排序顺序跟随最新 zIndex（bringNodesToFront 已更新 sortedNodesByZIndex）
+                // 2. frame 取实时值（updateNodeFrameInPlace 已同步到 sortedNodesByZIndex）
+                let cachedIds = Set(_cachedViewportNodes.map { $0.id })
+                _cachedViewportNodes = sortedNodesByZIndex.filter { cachedIds.contains($0.id) }
             } else {
                 // 仅在视口参数大幅变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
                 // 容差策略：origin 微小变化（< 50 画布单位 ≈ 亚节点级平移）不触发重算
