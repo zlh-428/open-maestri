@@ -3,44 +3,61 @@ import OSLog
 import SwiftTerm
 import AppKit
 
-/// SwiftTerm PTY 适配层
-/// - 为每个 Terminal 节点管理一个 LocalProcessTerminalView
-/// - 实现 VT100/xterm-256color 完整支持
-/// - 启动时注入 MAESTRI_* 环境变量，使 CLI 可用
+/// SwiftTerm PTY 适配层 — 只负责 PTY 进程管理
+/// - 通过子类化 LocalProcessTerminalView（OmLocalProcessTerminalView）的 dataReceived 检测输出
+/// - shellReadyCallback：shell 就绪（300ms 静默）后触发一次
 @MainActor
 final class SwiftTermProvider: NSObject {
     private let logger = Logger.make(category: "SwiftTermProvider")
 
-    let terminalId: UUID
-    let workingDirectory: String
-    let command: String
+    // MARK: - 基础属性
 
-    /// InterAgentServer 端口；始终从 InterAgentServer.shared.port 读取最新值
+    let terminalId: UUID
+    let command: String
+    let workingDirectory: String
+
+    private(set) var terminalView: LocalProcessTerminalView?
+    private(set) var isRunning: Bool = false
+
+    // MARK: - 回调（外部设置，不由 SwiftTerm 自动触发）
+
+    var onDataReceived: ((String) -> Void)?
+    var onTitleChange: ((String) -> Void)?
+    var onBell: (() -> Void)?
+    var onProcessExit: ((Int32?) -> Void)?
+
+    /// shell 就绪后触发一次（300ms 静默检测）
+    var shellReadyCallback: (() -> Void)?
+
+    // MARK: - 配置
+
     var serverPort: UInt16 {
         get { _serverPort > 0 ? _serverPort : InterAgentServer.shared.port }
         set { _serverPort = newValue }
     }
     private var _serverPort: UInt16 = 0
-    /// 所属工作区 ID（用于 ScrollbackStore 路径）
-    var workspaceId: UUID?
 
-    private(set) var terminalView: LocalProcessTerminalView?
-    var onOutput: ((String) -> Void)?
-    var onTitleChange: ((String) -> Void)?
-    private(set) var isRunning: Bool = false
+    var workspaceId: UUID?
+    var preferredFont: NSFont?
+    var metalRendererEnabled: Bool = false
+
+    /// cd + 自定义命令，由 start() 注入，shell 就绪后统一发送
+    var pendingStartupCommands: [String] = []
+
+    // MARK: - Shell 就绪检测（内部）
+
+    private var lastOutputTime: ContinuousClock.Instant = .now
+    private var shellReadyScheduled = false
+    private(set) var shellReadyCalled = false
+
+    // MARK: - Scrollback
 
     private let scrollbackStore = ScrollbackStore()
     private var pendingScrollback: [ScrollbackEntry] = []
     private let scrollbackFlushThreshold = 50
-    /// 时间防抖：距上次 flush 不满 2 秒时延迟执行（减少高频小量输出的 I/O 次数）
     private var scrollbackDebounceTask: Task<Void, Never>?
-    private var lastFlushTime: ContinuousClock.Instant = .now
-    /// 无法直接 execve 的命令（alias/函数等），shell 启动后延迟发送
-    private var pendingCommand: String? = nil
-    /// shell 就绪后需要发送的 cd + pendingCommand（等待首次 PTY 输出触发）
-    private var pendingStartupCommands: [String] = []
-    /// 标记是否已经消费了 startup commands（仅触发一次）；外部只读，用于 scrollback feed 时机检测
-    private(set) var startupCommandsSent: Bool = false
+
+    // MARK: - Init
 
     init(terminalId: UUID, command: String, workingDirectory: String) {
         self.terminalId = terminalId
@@ -50,39 +67,40 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - 启动
 
+    @discardableResult
     func start(in frame: NSRect) -> LocalProcessTerminalView {
-        // 使用合理的默认尺寸避免 PTY cols/rows 为 0
+        // 重置 shell 就绪状态，确保每次 start() 都能正确触发就绪检测流程。
+        shellReadyCalled = false
+        shellReadyScheduled = false
+
         let effectiveFrame = frame == .zero
             ? NSRect(x: 0, y: 0, width: 600, height: 400)
             : frame
-        let view = LocalProcessTerminalView(frame: effectiveFrame)
+        let view = OmLocalProcessTerminalView(frame: effectiveFrame)
         view.processDelegate = self
 
-        // 统一读取一次偏好，避免 applyCurrentTheme/applyCurrentFont/enableMetalIfNeeded 各读一次磁盘
-        let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
+        // 通过子类回调获取 PTY 输出（不覆盖 terminalDelegate，保持 send 链路完整）
+        view.onDataReceived = { [weak self] text in
+            Task { @MainActor in self?.handleDataReceived(text) }
+        }
 
-        // 应用终端主题
+        let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
         applyThemeWithPrefs(to: view, prefs: prefs)
-        // 应用终端字体
         applyFontWithPrefs(to: view, prefs: prefs)
 
         terminalView = view
         isRunning = true
 
-        // 启用 Metal GPU 渲染器（如果偏好中开启）
         enableMetalIfNeeded(view: view, metalEnabled: prefs.metalRendererEnabled)
 
-        // 构建环境变量：保留系统环境 + 注入 MAESTRI_* + 扩展 PATH
+        // 构建环境变量
         var env = ProcessInfo.processInfo.environment
-        // Maestri 兼容变量
         env["MAESTRI_TERMINAL_ID"] = terminalId.uuidString
-        env["OMAESTRI_TERMINAL_ID"] = terminalId.uuidString  // 向后兼容
-        // Unix socket 路径
+        env["OMAESTRI_TERMINAL_ID"] = terminalId.uuidString
         if let socketPath = InterAgentServer.shared.currentSocketPath {
             env["MAESTRI_SOCKET"] = socketPath
         }
         env["TERM"] = "xterm-256color"
-        // 确保 PATH 包含常用工具目录（解决 "claude" 等命令无法被 execve 找到的问题）
         let existingPath = env["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin"
         let extraPaths = [
             "\(NSHomeDirectory())/.local/bin",
@@ -90,7 +108,6 @@ final class SwiftTermProvider: NSObject {
             "/opt/homebrew/bin",
             "/usr/local/bin",
         ].filter { FileManager.default.fileExists(atPath: $0) }
-        // CLI 二进制路径 + PATH 注入（resourcePath 放最前面）
         if let resourcePath = Bundle.main.resourcePath {
             env["MAESTRI_CLI"] = "\(resourcePath)/omaestri"
             env["PATH"] = ([resourcePath] + extraPaths + [existingPath]).joined(separator: ":")
@@ -107,107 +124,79 @@ final class SwiftTermProvider: NSObject {
             args = ["/bin/bash", "--login"]
             execName = "bash"
         } else {
-            // 先尝试在 PATH 里找到可执行文件
-            let resolved = resolveCommandPath(command, env: env)
-            if FileManager.default.isExecutableFile(atPath: resolved) {
-                // 找到可执行文件，直接执行
-                args = [resolved]
-                execName = command
-            } else {
-                // 找不到可执行文件（可能是 alias、shell 函数、多词命令等）
-                // 启动交互式 login shell，稍后通过 write() 发送命令字符串
-                // 交互式 shell 会加载 .zshrc，alias 在其中定义，可以正常展开
-                args = ["/bin/zsh", "--login"]
-                execName = "zsh"
-                pendingCommand = command
-            }
+            // 非 shell 命令（如 claude, codex 等）：始终在 login shell 中运行。
+            // 这样命令退出后 shell 仍然存活，用户回到 prompt 可继续交互。
+            // 对标 Maestri 行为：终端节点是持久 shell session，agent 命令在其中运行。
+            args = ["/bin/zsh", "--login"]
+            execName = "zsh"
+            pendingStartupCommands.append(command)
         }
+
+        // 通过 startProcess(currentDirectory:) 原生设置工作目录，
+        // 避免 shell 中出现可见的 cd 命令（PTY 子进程直接在目标目录启动）
+        let startDir: String? = (!workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory))
+            ? workingDirectory : nil
 
         view.startProcess(
             executable: args[0],
             args: Array(args.dropFirst()),
             environment: env.map { "\($0.key)=\($0.value)" },
-            execName: execName
+            execName: execName,
+            currentDirectory: startDir
         )
         logger.debug("PTY started: \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
 
-        // SwiftTerm 的 startProcess 不直接支持 cwd，通过 cd 命令切换到工作目录
-        // 将 cd + pendingCommand 暂存，等首次 PTY 输出（shell prompt 就绪）后再发送
-        let hasCd = !workingDirectory.isEmpty && FileManager.default.fileExists(atPath: workingDirectory)
-        if hasCd {
-            let escapedPath = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
-            pendingStartupCommands.append("cd '\(escapedPath)'")
-        }
-        if let cmd = pendingCommand {
-            pendingStartupCommands.append(cmd)
-        }
-        startupCommandsSent = pendingStartupCommands.isEmpty
         return view
-    }
-
-    // MARK: - 命令路径解析
-
-    private func resolveCommandPath(_ cmd: String, env: [String: String]) -> String {
-        // 已是绝对路径
-        if cmd.hasPrefix("/") { return cmd }
-        // 通过 PATH 搜索
-        let searchPaths = (env["PATH"] ?? "").components(separatedBy: ":")
-        for dir in searchPaths {
-            let full = "\(dir)/\(cmd)"
-            if FileManager.default.isExecutableFile(atPath: full) { return full }
-        }
-        return cmd  // fallback：让系统自己查找
     }
 
     // MARK: - Shell 就绪检测
 
-    /// 最近一次接收到 PTY 输出的时间戳（用于 prompt 静默检测）
-    private var lastOutputTime: ContinuousClock.Instant = .now
-    /// 已接收的 PTY 输出累计字节数（用于判断初始化进度）
-    private var receivedOutputCount: Int = 0
-    /// 是否已调度了 startup 命令发送任务
-    private var startupScheduled: Bool = false
-
-    /// 当 PTY 产生输出时调用
-    /// 策略：不在首次输出立即发送，而是检测"shell 静默"（300ms 无新输出）再发送
-    /// 这样能可靠跳过 .zshrc sourcing 期间的大量输出，等 prompt 真正就绪
-    func handleFirstOutput() {
-        guard !startupCommandsSent, !pendingStartupCommands.isEmpty else { return }
+    /// 收到 PTY 输出后的统一处理入口（由 OmLocalProcessTerminalView.dataReceived 回调触发）
+    private func handleDataReceived(_ text: String) {
+        // 转发到外部回调（session.recordOutput 等）
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            onDataReceived?(text)
+            recordOutputForScrollback(text)
+        }
+        // Shell 就绪检测
         lastOutputTime = .now
-        receivedOutputCount += 1
-
-        // 调度一次静默检测（只调度一次，后续不断刷新 lastOutputTime）
-        guard !startupScheduled else { return }
-        startupScheduled = true
-
+        guard !shellReadyCalled, !shellReadyScheduled else { return }
+        guard !pendingStartupCommands.isEmpty || shellReadyCallback != nil else {
+            shellReadyCalled = true
+            return
+        }
+        shellReadyScheduled = true
         Task { @MainActor [weak self] in
-            // 等待直到检测到连续 300ms 无新输出（shell prompt 就绪的可靠信号）
-            for _ in 0..<30 {  // 最多等待 3s
+            for _ in 0..<30 {
                 try? await Task.sleep(for: .milliseconds(300))
-                guard let self else { return }
-                guard !self.startupCommandsSent else { return }
-                let elapsed = ContinuousClock.now - self.lastOutputTime
-                if elapsed >= .milliseconds(280) {
-                    // shell 已静默 300ms，认为 prompt 就绪
-                    self.sendStartupCommands()
+                guard let self, !self.shellReadyCalled else { return }
+                if ContinuousClock.now - self.lastOutputTime >= .milliseconds(280) {
+                    self.fireShellReady()
                     return
                 }
             }
-            // 超时兜底：3s 后强制发送
-            guard let self else { return }
-            if !self.startupCommandsSent {
-                self.sendStartupCommands()
-            }
+            self?.fireShellReady()
         }
     }
 
-    private func sendStartupCommands() {
-        guard !startupCommandsSent else { return }
-        startupCommandsSent = true
-        guard !pendingStartupCommands.isEmpty else { return }
-        let combined = pendingStartupCommands.joined(separator: " && ")
+    private func fireShellReady() {
+        guard !shellReadyCalled else { return }
+        shellReadyCalled = true
+        if !pendingStartupCommands.isEmpty {
+            let combined = pendingStartupCommands.joined(separator: " && ")
+            pendingStartupCommands.removeAll()
+            write(combined + "\n")
+        }
+        shellReadyCallback?()
+        shellReadyCallback = nil
+    }
+
+    /// 外部强制标记 shell 已就绪（供 TerminalManager 超时路径调用）
+    /// 防止 processTerminated 在超时后再次触发 drainNext
+    func forceMarkShellReady() {
+        shellReadyCalled = true
+        shellReadyCallback = nil
         pendingStartupCommands.removeAll()
-        write(combined + "\n")
     }
 
     // MARK: - PTY 写入
@@ -221,31 +210,30 @@ final class SwiftTermProvider: NSObject {
         write(text + "\n")
     }
 
+    // MARK: - 停止
+
+    func stop() {
+        guard isRunning else { return }
+        isRunning = false
+        terminalView?.terminate()
+        terminalView = nil
+    }
+
     // MARK: - 滚动锁定
 
-    /// 是否锁定自动滚动（⌘⇧B 切换）
     private(set) var isAutoScrollLocked: Bool = false
 
-    /// 设置自动滚动锁定状态（由 CanvasViewportView 的 ⌘⇧B 处理器调用）
     func setAutoScrollLocked(_ locked: Bool) {
         isAutoScrollLocked = locked
-        // LocalProcessTerminalView 暂无直接 API 控制 auto-scroll，
-        // 此处通过 SwiftTerm 的 terminal.getTerminal().setAutoScroll 未来可接入；
-        // 目前仅保存状态标记，节点视图负责显示指示器。
         logger.debug("Terminal \(self.terminalId.uuidString.prefix(8)) autoScrollLocked=\(locked)")
     }
 
-    // MARK: - 进程重启（用于 Assign Role 后立即重启）
+    // MARK: - 进程重启
 
-    /// 向当前 PTY 发送 `exit` 并在新目录重新启动进程
-    /// - Parameters:
-    ///   - command: 新命令（通常与当前相同）
-    ///   - workingDirectory: 新工作目录（role 子目录或原始目录）
     func restartProcess(command: String, workingDirectory: String) {
-        // 先发送 exit 终止当前进程
         write("exit\n")
-        // 延迟 0.5s 等进程退出，然后重新 cd 到新目录并启动命令
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(500))
             guard let self else { return }
             let escapedPath = workingDirectory.replacingOccurrences(of: "'", with: "'\\''")
             let launchCmd = command.isEmpty ? "zsh --login" : command
@@ -256,7 +244,6 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - Metal 渲染器
 
-    /// 根据偏好启用或禁用 Metal GPU 渲染（接受已加载的 metalEnabled 值，避免重复磁盘读取）
     private func enableMetalIfNeeded(view: LocalProcessTerminalView, metalEnabled: Bool) {
         guard metalEnabled else { return }
         Task { @MainActor in
@@ -269,7 +256,6 @@ final class SwiftTermProvider: NSObject {
         }
     }
 
-    /// 动态切换 Metal 渲染状态（设置变更时调用）
     func applyMetalRenderer(enabled: Bool) {
         guard let view = terminalView else { return }
         do {
@@ -282,13 +268,11 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - 主题应用
 
-    /// 应用当前主题到终端视图（内部使用已加载的 prefs，避免重复磁盘读取）
     private func applyThemeWithPrefs(to view: LocalProcessTerminalView, prefs: Preferences) {
         let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)
         TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
     }
 
-    /// 应用当前主题到终端视图（公开接口，供外部设置变更时调用）
     func applyCurrentTheme(to view: LocalProcessTerminalView) {
         let preference: String
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
@@ -300,7 +284,6 @@ final class SwiftTermProvider: NSObject {
         TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
     }
 
-    /// 即时切换主题
     func applyTheme(_ themeId: String) {
         guard let view = terminalView else { return }
         TerminalThemeRegistry.shared.apply(themeId: themeId, to: view)
@@ -308,14 +291,12 @@ final class SwiftTermProvider: NSObject {
 
     // MARK: - 字体应用
 
-    /// 应用当前字体到终端视图（内部使用已加载的 prefs，避免重复磁盘读取）
     private func applyFontWithPrefs(to view: LocalProcessTerminalView, prefs: Preferences) {
         let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
             ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
         view.font = font
     }
 
-    /// 应用当前字体到终端视图（公开接口，供外部设置变更时调用）
     func applyCurrentFont(to view: LocalProcessTerminalView) {
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
             let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
@@ -324,7 +305,6 @@ final class SwiftTermProvider: NSObject {
         }
     }
 
-    /// 即时更新字体（无需重启终端）
     func applyFont(family: String, size: CGFloat) {
         guard let view = terminalView else { return }
         let font = NSFont(name: family, size: size)
@@ -333,13 +313,38 @@ final class SwiftTermProvider: NSObject {
         logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
-    // MARK: - 停止
+    // MARK: - Scrollback 持久化
 
-    func stop() {
-        guard isRunning else { return }
-        isRunning = false
-        terminalView?.terminate()
-        terminalView = nil
+    func recordOutputForScrollback(_ text: String) {
+        let lines = text.components(separatedBy: "\n")
+        for line in lines where !line.isEmpty {
+            pendingScrollback.append(ScrollbackEntry(attributes: [], text: line))
+        }
+        if pendingScrollback.count >= scrollbackFlushThreshold {
+            scrollbackDebounceTask?.cancel()
+            scrollbackDebounceTask = nil
+            Task { await flushScrollback() }
+        } else {
+            if scrollbackDebounceTask == nil {
+                scrollbackDebounceTask = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard !Task.isCancelled else { return }
+                    await self?.flushScrollback()
+                    self?.scrollbackDebounceTask = nil
+                }
+            }
+        }
+    }
+
+    func flushScrollback() async {
+        guard !pendingScrollback.isEmpty, let wsId = workspaceId else { return }
+        let toFlush = pendingScrollback
+        pendingScrollback.removeAll()
+        try? await scrollbackStore.append(lines: toFlush, terminalId: terminalId, workspaceId: wsId)
+    }
+
+    func flushScrollbackNow() {
+        Task { await flushScrollback() }
     }
 }
 
@@ -369,41 +374,32 @@ extension SwiftTermProvider: LocalProcessTerminalViewDelegate {
     nonisolated func processTerminated(source: TerminalView, exitCode: Int32?) {
         Task { @MainActor in
             self.isRunning = false
-            // 终止时 flush 剩余 scrollback
             await self.flushScrollback()
+            self.onProcessExit?(exitCode)
             Logger.make(category: "SwiftTermProvider").info("Terminal \(self.terminalId.uuidString.prefix(8)) terminated with code \(exitCode ?? -1)")
-        }
-    }
-
-    // MARK: - Scrollback 持久化
-
-    func recordOutputForScrollback(_ text: String) {
-        let lines = text.components(separatedBy: "\n")
-        for line in lines where !line.isEmpty {
-            pendingScrollback.append(ScrollbackEntry(attributes: [], text: line))
-        }
-        if pendingScrollback.count >= scrollbackFlushThreshold {
-            // 行数阈值达到：立即 flush
-            scrollbackDebounceTask?.cancel()
-            scrollbackDebounceTask = nil
-            Task { await flushScrollback() }
-        } else {
-            // 时间防抖：2 秒内的小量输出合并为一次写入
-            if scrollbackDebounceTask == nil {
-                scrollbackDebounceTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(2))
-                    guard !Task.isCancelled else { return }
-                    await self?.flushScrollback()
-                    self?.scrollbackDebounceTask = nil
-                }
+            // PTY 退出时若 shell 从未就绪（如命令不存在），强制触发以推进串行启动队列
+            if !self.shellReadyCalled {
+                self.fireShellReady()
             }
         }
     }
+}
 
-    private func flushScrollback() async {
-        guard !pendingScrollback.isEmpty, let wsId = workspaceId else { return }
-        let toFlush = pendingScrollback
-        pendingScrollback.removeAll()
-        try? await scrollbackStore.append(lines: toFlush, terminalId: terminalId, workspaceId: wsId)
+// MARK: - OmLocalProcessTerminalView（子类化以获取 PTY 输出，不破坏 send 链路）
+
+/// 子类化 LocalProcessTerminalView，覆盖 dataReceived 获取 PTY 输出文本。
+/// 保持 terminalDelegate = self 不变（LocalProcessTerminalView 在 setup 中设置），
+/// 从而 send(source:data:) 仍然由 LocalProcessTerminalView 自身处理 → process.send。
+final class OmLocalProcessTerminalView: LocalProcessTerminalView {
+    /// PTY 有新输出时回调（原始文本）
+    var onDataReceived: ((String) -> Void)?
+
+    override func dataReceived(slice: ArraySlice<UInt8>) {
+        // 先调用 super 让 SwiftTerm 正常 feed 数据到终端 buffer
+        super.dataReceived(slice: slice)
+        // 将原始字节转为 UTF-8 文本，回调给 provider
+        if let text = String(bytes: slice, encoding: .utf8) {
+            onDataReceived?(text)
+        }
     }
 }
