@@ -232,10 +232,15 @@ extension CanvasViewportView {
                let provider = TerminalManager.shared.providers[id],
                let terminalView = provider.terminalView {
                 interaction = .contentInteraction(id, contentTarget: terminalView)
-                // 转发原始 mouseDown 事件给终端视图（SwiftTerm 自行做坐标转换）
+                // 坐标修正：SwiftUI 的 .scaleEffect(zoom) 通过 CALayer transform 缩放节点，
+                // 但 NSView.convert(_:from:) 不考虑 layer transform，导致 SwiftTerm 的
+                // calculateMouseHit 计算出错误的行列位置。
+                // 修正方案：自行计算终端视图内部的正确本地坐标，然后合成一个
+                // 让 SwiftTerm convert 能得到正确结果的 locationInWindow。
+                let correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: terminalView)
                 if let syntheticEvent = NSEvent.mouseEvent(
                     with: .leftMouseDown,
-                    location: event.locationInWindow,
+                    location: correctedLocation,
                     modifierFlags: event.modifierFlags,
                     timestamp: event.timestamp,
                     windowNumber: event.windowNumber,
@@ -465,8 +470,21 @@ extension CanvasViewportView {
             needsDisplay = true
 
         // --- 内容区交互（终端文字选中等）---
-        case .contentInteraction(_, let contentTarget):
-            contentTarget.mouseDragged(with: event)
+        case .contentInteraction(let id, let contentTarget):
+            let correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            if let syntheticEvent = NSEvent.mouseEvent(
+                with: .leftMouseDragged,
+                location: correctedLocation,
+                modifierFlags: event.modifierFlags,
+                timestamp: event.timestamp,
+                windowNumber: event.windowNumber,
+                context: nil,
+                eventNumber: event.eventNumber,
+                clickCount: event.clickCount,
+                pressure: event.pressure
+            ) {
+                contentTarget.mouseDragged(with: syntheticEvent)
+            }
 
         // --- idle（连线工具跟踪）---
         case .idle:
@@ -691,8 +709,21 @@ extension CanvasViewportView {
             snapGuideView?.drawingRect = nil
             needsDisplay = true
 
-        case .contentInteraction(_, let contentTarget):
-            contentTarget.mouseUp(with: event)
+        case .contentInteraction(let id, let contentTarget):
+            let correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            if let syntheticEvent = NSEvent.mouseEvent(
+                with: .leftMouseUp,
+                location: correctedLocation,
+                modifierFlags: event.modifierFlags,
+                timestamp: event.timestamp,
+                windowNumber: event.windowNumber,
+                context: nil,
+                eventNumber: event.eventNumber,
+                clickCount: event.clickCount,
+                pressure: event.pressure
+            ) {
+                contentTarget.mouseUp(with: syntheticEvent)
+            }
 
         case .panCanvas:
             if isSpaceHeld { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
@@ -724,5 +755,47 @@ extension CanvasViewportView {
         case .nodeHeader, .nodeFooter, .nodeContent, .canvas:
             NSCursor.arrow.set()
         }
+    }
+
+    // MARK: - 终端鼠标坐标修正
+
+    /// 修正转发给终端视图的鼠标事件坐标。
+    ///
+    /// 问题背景：节点通过 SwiftUI `.scaleEffect(zoom)` 缩放，这是 CALayer transform，
+    /// 不影响 NSView 的 frame/bounds。因此 SwiftTerm 内部的
+    /// `convert(event.locationInWindow, from: nil)` 基于 NSView 层级计算坐标时
+    /// 不考虑 layer transform，导致映射到错误的终端行列位置。
+    ///
+    /// 修正方案：
+    /// 1. 从画布屏幕坐标计算鼠标在终端内容区的相对位置（已缩放）
+    /// 2. 除以 zoom 得到终端视图的本地坐标（未缩放）
+    /// 3. 用 terminalView 自身的 convert(to: nil) 反向合成正确的窗口坐标
+    ///    使 SwiftTerm 的 convert(from: nil) 能正确还原到本地坐标
+    private func correctedWindowLocation(for event: NSEvent, nodeId: UUID, terminalView: NSView) -> CGPoint {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        guard let node = currentNodes.first(where: { $0.id == nodeId }) else {
+            return event.locationInWindow
+        }
+
+        let screenFrame = canvasRectToScreen(node.frame)
+        let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
+
+        // 终端节点有 footer，需要减去；加上 divider（约 1pt 缩放后）
+        let scaledDividerHeight: CGFloat = 1.0 * zoom
+
+        // 鼠标在节点内容区中的相对位置（屏幕坐标，已乘以 zoom）
+        let relX = loc.x - screenFrame.minX
+        let relY = loc.y - screenFrame.minY - scaledHeaderHeight - scaledDividerHeight
+
+        // 转为终端视图本地坐标（未缩放）
+        // SwiftTerm TerminalView 是非 flipped 的（y 从底部向上），需要翻转 y 轴
+        let tvHeight = terminalView.bounds.height
+        let localX = relX / zoom
+        let localY = tvHeight - (relY / zoom)
+
+        // 用 terminalView 自身的坐标系统转回窗口坐标
+        // 这样 SwiftTerm 调用 convert(locationInWindow, from: nil) 时得到 (localX, localY)
+        return terminalView.convert(CGPoint(x: localX, y: localY), to: nil)
     }
 }
