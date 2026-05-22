@@ -80,14 +80,6 @@ final class CLIRouter {
     // MARK: - debug
 
     private func buildDebugInfo(terminalId: UUID?) -> String {
-        var lines = ["open-maestri inter-agent server debug:"]
-        lines.append("  Server port: \(InterAgentServer.shared.port)")
-        if let tid = terminalId {
-            lines.append("  Terminal ID: \(tid.uuidString)")
-        } else {
-            lines.append("  Terminal ID: unknown (missing X-Terminal-ID header)")
-        }
-        lines.append("  Commands: list ask check note portal recruit dismiss connect role preset debug")
-        return lines.joined(separator: "\n")
+        return ""
     }
 }
