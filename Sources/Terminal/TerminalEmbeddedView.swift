@@ -10,6 +10,10 @@ struct TerminalEmbeddedView: NSViewRepresentable {
     let workingDirectory: String
     var serverPort: UInt16 = 0
     var workspaceId: UUID?
+    /// 节点级主题/字体覆盖（nil 表示跟随全局 Preferences）
+    var nodeThemeId: String?
+    var nodeFontFamily: String?
+    var nodeFontSize: CGFloat?
 
     // MARK: - Coordinator
     @MainActor
@@ -86,18 +90,23 @@ struct TerminalEmbeddedView: NSViewRepresentable {
     func updateNSView(_ nsView: MaestroTerminalView, context: Context) {
         // 只做主题/字体差量更新（resize 由 MaestroTerminalView.layout() 处理）
         guard context.coordinator.isAttached, let tv = nsView.terminalView else { return }
-        if let prefs = try? PersistenceManager.shared.loadPreferences() {
-            let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)
-            if context.coordinator.lastTheme != themeId {
-                TerminalThemeRegistry.shared.apply(themeId: themeId, to: tv)
-                context.coordinator.lastTheme = themeId
-            }
-            if context.coordinator.lastFontName != prefs.terminalFontFamily
-                || context.coordinator.lastFontSize != prefs.terminalFontSize {
-                tv.font = resolveTerminalFont(family: prefs.terminalFontFamily, size: prefs.terminalFontSize)
-                context.coordinator.lastFontName = prefs.terminalFontFamily
-                context.coordinator.lastFontSize = prefs.terminalFontSize
-            }
+        let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
+
+        // 优先用节点自身设置，回退到全局 Preferences
+        let effectiveThemePref = nodeThemeId ?? prefs.terminalTheme
+        let themeId = TerminalThemeRegistry.resolveThemeId(from: effectiveThemePref)
+        if context.coordinator.lastTheme != themeId {
+            TerminalThemeRegistry.shared.apply(themeId: themeId, to: tv)
+            context.coordinator.lastTheme = themeId
+        }
+
+        let effectiveFamily = nodeFontFamily ?? prefs.terminalFontFamily
+        let effectiveSize = nodeFontSize ?? prefs.terminalFontSize
+        if context.coordinator.lastFontName != effectiveFamily
+            || context.coordinator.lastFontSize != effectiveSize {
+            tv.font = resolveTerminalFont(family: effectiveFamily, size: effectiveSize)
+            context.coordinator.lastFontName = effectiveFamily
+            context.coordinator.lastFontSize = effectiveSize
         }
     }
 

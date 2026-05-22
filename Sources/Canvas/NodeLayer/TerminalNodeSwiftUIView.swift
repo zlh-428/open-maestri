@@ -44,7 +44,10 @@ struct TerminalNodeSwiftUIView: View {
                 command: content.command,
                 workingDirectory: content.workingDirectory,
                 serverPort: InterAgentServer.shared.port,
-                workspaceId: workspace?.id
+                workspaceId: workspace?.id,
+                nodeThemeId: content.themeId,
+                nodeFontFamily: content.fontFamily,
+                nodeFontSize: content.fontSize
             )
         }
         .onAppear {

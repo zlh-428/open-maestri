@@ -273,6 +273,14 @@ final class CanvasViewportView: NSView {
     var onContextMenuAssignRole: ((UUID) -> Void)?
     /// 右键菜单：切换 Maestro 模式（Terminal 专属）
     var onContextMenuToggleMaestro: ((UUID) -> Void)?
+    /// 右键菜单：清除缓冲区（Terminal 专属）
+    var onContextMenuClearBuffer: ((UUID) -> Void)?
+    /// 右键菜单：重新加载终端（Terminal 专属）
+    var onContextMenuReloadTerminal: ((UUID) -> Void)?
+    /// 右键菜单：拷贝终端内容（Terminal 专属）
+    var onContextMenuCopyTerminal: ((UUID) -> Void)?
+    /// 右键菜单：切换监控活动（Terminal 专属）
+    var onContextMenuToggleMonitor: ((UUID) -> Void)?
 
     // MARK: - 画布空白区域右键菜单回调
 
@@ -869,16 +877,29 @@ extension CanvasViewportView {
 
         switch node.content {
         case .terminal(let tc):
-            menu.addItem(menuItem("canvas.context.duplicate".localized, action: #selector(contextMenuDuplicate(_:)), id: id))
-            menu.addItem(menuItem("canvas.context.edit_terminal".localized, action: #selector(contextMenuEditTerminal(_:)), id: id))
+            // 编辑
+            menu.addItem(menuItem("canvas.context.edit_terminal".localized, action: #selector(contextMenuEditTerminal(_:)), id: id, icon: "slider.horizontal.3"))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("canvas.context.assign_role".localized, action: #selector(contextMenuAssignRole(_:)), id: id))
-            let maestroTitle = tc.isManager ? "menu.disable_maestro".localized : "menu.enable_maestro".localized
-            menu.addItem(menuItem(maestroTitle, action: #selector(contextMenuToggleMaestro(_:)), id: id))
+            // 清除缓冲区
+            menu.addItem(menuItem("canvas.context.clear_buffer".localized, action: #selector(contextMenuClearBuffer(_:)), id: id, icon: "xmark.circle", keyEquivalent: "k"))
+            // 重新加载
+            menu.addItem(menuItem("canvas.context.reload_terminal".localized, action: #selector(contextMenuReloadTerminal(_:)), id: id, icon: "arrow.clockwise"))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(menuItem("canvas.context.connect".localized, action: #selector(contextMenuConnect(_:)), id: id))
+            // 拷贝
+            menu.addItem(menuItem("canvas.context.copy_terminal".localized, action: #selector(contextMenuCopyTerminal(_:)), id: id, icon: "doc.on.doc", keyEquivalent: "c"))
+            // 监控活动
+            let monitorTitle = tc.monitorWithOmbro ? "canvas.context.disable_monitor".localized : "canvas.context.enable_monitor".localized
+            menu.addItem(menuItem(monitorTitle, action: #selector(contextMenuToggleMonitor(_:)), id: id, icon: "eye"))
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(destructiveItem("canvas.context.delete".localized, action: #selector(contextMenuClose(_:)), id: id))
+            // 复制（节点复制）
+            menu.addItem(menuItem("canvas.context.duplicate".localized, action: #selector(contextMenuDuplicate(_:)), id: id, icon: "plus.square.on.square"))
+            // 锁定
+            let lockTitle = node.isLocked ? "menu.unlock".localized : "menu.lock".localized
+            let lockIcon = node.isLocked ? "lock.open" : "lock"
+            menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id, icon: lockIcon))
+            menu.addItem(NSMenuItem.separator())
+            // 删除
+            menu.addItem(destructiveItem("canvas.context.delete".localized, action: #selector(contextMenuClose(_:)), id: id, icon: "trash"))
 
         case .stickyNote:
             menu.addItem(menuItem("canvas.context.duplicate".localized, action: #selector(contextMenuDuplicate(_:)), id: id))
@@ -1073,22 +1094,24 @@ extension CanvasViewportView {
 
     // MARK: - Menu Item Helpers
 
-    private func menuItem(_ title: String, action: Selector, id: UUID) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+    private func menuItem(_ title: String, action: Selector, id: UUID, icon: String? = nil, keyEquivalent: String = "", modifiers: NSEvent.ModifierFlags = []) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: action, keyEquivalent: keyEquivalent)
+        item.keyEquivalentModifierMask = modifiers.isEmpty && !keyEquivalent.isEmpty ? [.command] : modifiers
         item.representedObject = id
         item.target = self
+        if let icon, let img = NSImage(systemSymbolName: icon, accessibilityDescription: nil) {
+            item.image = img
+        }
         return item
     }
 
-    private func destructiveItem(_ title: String, action: Selector, id: UUID) -> NSMenuItem {
+    private func destructiveItem(_ title: String, action: Selector, id: UUID, icon: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
         item.representedObject = id
         item.target = self
-        // 危险操作红色标记（macOS 标准做法：设置 attributedTitle）
-        item.attributedTitle = NSAttributedString(
-            string: title,
-            attributes: [.foregroundColor: NSColor.systemRed]
-        )
+        if let icon, let img = NSImage(systemSymbolName: icon, accessibilityDescription: nil) {
+            item.image = img
+        }
         return item
     }
 
@@ -1132,6 +1155,26 @@ extension CanvasViewportView {
     @objc private func contextMenuToggleMaestro(_ sender: NSMenuItem) {
         guard let id = sender.representedObject as? UUID else { return }
         onContextMenuToggleMaestro?(id)
+    }
+
+    @objc private func contextMenuClearBuffer(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuClearBuffer?(id)
+    }
+
+    @objc private func contextMenuReloadTerminal(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuReloadTerminal?(id)
+    }
+
+    @objc private func contextMenuCopyTerminal(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuCopyTerminal?(id)
+    }
+
+    @objc private func contextMenuToggleMonitor(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID else { return }
+        onContextMenuToggleMonitor?(id)
     }
 }
 

@@ -1741,6 +1741,150 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除" } }
       }
     },
+    "canvas.context.clear_buffer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear Buffer" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除缓冲区" } }
+      }
+    },
+    "canvas.context.reload_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reload" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新加载" } }
+      }
+    },
+    "canvas.context.copy_terminal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Copy" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拷贝" } }
+      }
+    },
+    "canvas.context.enable_monitor" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Monitor Activity" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "监控活动" } }
+      }
+    },
+    "canvas.context.disable_monitor" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Disable Monitor" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "关闭监控活动" } }
+      }
+    },
+    "terminal.edit.tab.details" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Details" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "详细信息" } }
+      }
+    },
+    "terminal.edit.tab.appearance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Appearance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "外观" } }
+      }
+    },
+    "terminal.edit.tab.role" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色" } }
+      }
+    },
+    "terminal.edit.icon" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标" } }
+      }
+    },
+    "terminal.edit.color" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Color" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "颜色" } }
+      }
+    },
+    "terminal.edit.theme" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Theme" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主题" } }
+      }
+    },
+    "terminal.edit.font" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Font" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "字体" } }
+      }
+    },
+    "terminal.edit.font_choose" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Choose..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择..." } }
+      }
+    },
+    "terminal.edit.monitor_help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Notify when terminal activity is detected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "当终端有活动时发送通知" } }
+      }
+    },
+    "terminal.edit.role_placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Role configuration coming soon" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色配置即将推出" } }
+      }
+    },
+    "terminal.shortcut" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shortcut" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快捷键" } }
+      }
+    },
+    "terminal.shortcut.automatic" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Automatic" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动" } }
+      }
+    },
+    "terminal.shortcut.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "None" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无" } }
+      }
+    },
+    "terminal.working_directory" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Working Directory" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "工作目录" } }
+      }
+    },
+    "terminal.browse" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Browse..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浏览..." } }
+      }
+    },
+    "terminal.theme.system" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统" } }
+      }
+    },
+    "terminal.theme.dark" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Dark" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "深色" } }
+      }
+    },
+    "terminal.theme.light" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Light" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "浅色" } }
+      }
+    },
+    "terminal.theme.custom" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自定义" } }
+      }
+    },
     "floor.hooks_title" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Hooks — %@" } },

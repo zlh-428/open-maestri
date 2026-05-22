@@ -99,6 +99,9 @@ struct TerminalContent: Codable, Equatable {
     var scrollbackFile: String?
     var scrollbackLineCount: Int
     var lastActiveAt: Date?
+    var themeId: String?            // nil 表示跟随全局设置
+    var fontFamily: String?         // nil 表示跟随全局设置
+    var fontSize: CGFloat?          // nil 表示跟随全局设置
 
     init(name: String, agentType: String = "generic_shell", command: String = "", workingDirectory: String = "") {
         self.agentType = agentType
@@ -118,17 +121,47 @@ struct TerminalContent: Codable, Equatable {
         self.scrollbackFile = nil
         self.scrollbackLineCount = 0
         self.lastActiveAt = nil
+        self.themeId = nil
+        self.fontFamily = nil
+        self.fontSize = nil
     }
 }
 
 struct ShortcutMode: Codable, Equatable {
-    enum Kind: String, Codable {
+    enum Kind: String, Codable, CaseIterable {
         case automatic
-        case manual
+        case none
+        case cmd1
+        case cmd2
+        case cmd3
+        case cmd4
+        case cmd5
+        case cmd6
+        case cmd7
+        case cmd8
+        case cmd9
     }
     var kind: Kind
 
     static let automatic = ShortcutMode(kind: .automatic)
+    static let none = ShortcutMode(kind: .none)
+
+    /// 获取显示名称
+    @MainActor var displayName: String {
+        switch kind {
+        case .automatic: return "terminal.shortcut.automatic".localized
+        case .none: return "terminal.shortcut.none".localized
+        case .cmd1: return "⌘1"
+        case .cmd2: return "⌘2"
+        case .cmd3: return "⌘3"
+        case .cmd4: return "⌘4"
+        case .cmd5: return "⌘5"
+        case .cmd6: return "⌘6"
+        case .cmd7: return "⌘7"
+        case .cmd8: return "⌘8"
+        case .cmd9: return "⌘9"
+        }
+    }
 
     private enum CodingKeys: String, CodingKey { case kind }
 }
