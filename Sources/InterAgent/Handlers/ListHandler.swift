@@ -19,6 +19,12 @@ final class ListHandler {
 
         var sections: [String] = []
 
+        // "You:" 段：当前终端自身名称
+        if let selfSession = tm.terminals[tid] {
+            let selfName = selfSession.agentName ?? selfSession.displayName ?? (selfSession.command.isEmpty ? "Shell" : selfSession.command)
+            sections.append("You:\n  - name: \"\(selfName)\"")
+        }
+
         // 按类型分组连接（对标 Maestri 输出格式）
         var agents:  [String] = []
         var notes:   [String] = []
@@ -50,7 +56,7 @@ final class ListHandler {
         }
 
         if agents.isEmpty && notes.isEmpty && portals.isEmpty {
-            return "No connections."
+            return sections.isEmpty ? "No connections." : sections.joined(separator: "\n\n") + "\n\nNo connections."
         }
 
         if !agents.isEmpty {

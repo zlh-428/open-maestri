@@ -4,10 +4,7 @@ import OSLog
 final class AskHandler {
     static let shared = AskHandler()
     private let logger = Logger.make(category: "AskHandler")
-    /// 最长等待响应时间（秒）
     private let responseTimeout: TimeInterval = 30
-    /// 空闲判定：PTY 输出静止超过此时间视为响应完成
-    private let idleThreshold: TimeInterval = 2.0
     private init() {}
 
     func handle(args: [String], terminalId: UUID?) -> String {
@@ -30,7 +27,7 @@ final class AskHandler {
         let tm = TerminalManager.shared
         let cm = ConnectionManager.shared
         let connectedIds = cm.connectedNodeIds(for: callerTid)
-        // 匹配优先级：agentName（Maestro 招募设置）> command 名称 > UUID 前缀
+        // 匹配优先级：agentName（Maestro 招募设置）> displayName > command 名称 > UUID 前缀
         guard let targetSession = tm.terminals.values.first(where: { session in
             guard connectedIds.contains(session.id) else { return false }
             let lower = targetName.lowercased()
@@ -51,42 +48,80 @@ final class AskHandler {
         // 标记目标终端有活跃任务（使任务完成后能触发红点通知）
         targetSession.markActiveTask()
 
-        // 注入 prompt（FR33）
-        let injectedPrompt = prompt.hasSuffix("\n") ? prompt : prompt + "\n"
-        tm.writeLine(to: targetSession.id, text: injectedPrompt)
+        // 将 prompt 写入目标终端，用 \r 触发 readline 提交（\n 只输入不提交）
+        let injectedPrompt = prompt.hasSuffix("\r") ? prompt : prompt.trimmingCharacters(in: .newlines) + "\r"
+        tm.write(to: targetSession.id, text: injectedPrompt)
         logger.debug("Prompt injected to \(targetSession.id.uuidString.prefix(8)): \(prompt.prefix(50))")
 
-        return await waitForResponse(from: targetSession)
+        // 等待目标终端执行完成，然后返回其屏幕内容
+        return await waitForIdleThenSnapshot(session: targetSession, in: tm)
     }
 
-    // MARK: - 响应等待
+    // MARK: - 等待回复完成后取屏幕快照
 
     @MainActor
-    private func waitForResponse(from session: TerminalSession) async -> String {
+    private func waitForIdleThenSnapshot(session: TerminalSession, in tm: TerminalManager) async -> String {
+        // 短暂延迟确保命令已开始执行
+        try? await Task.sleep(for: .milliseconds(300))
+
         let deadline = Date().addingTimeInterval(responseTimeout)
-        var lastOutputCount = session.recentOutput().components(separatedBy: "\n").count
-        var idleStart: Date? = nil
+        let injectedAt = Date()
 
         while Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(200))
-            let currentOutput = session.recentOutput()
-            let currentCount = currentOutput.components(separatedBy: "\n").count
-
-            if currentCount > lastOutputCount {
-                // 有新输出，重置空闲计时
-                lastOutputCount = currentCount
-                idleStart = nil
-            } else {
-                // 输出静止
-                if idleStart == nil { idleStart = Date() }
-                if let idleStart, Date().timeIntervalSince(idleStart) >= idleThreshold {
-                    // 达到空闲阈值，认为响应完成
-                    break
-                }
-            }
+            try? await Task.sleep(for: .milliseconds(300))
+            // 检测提示符是否重新出现（shell 提示符 / Claude Code ❯ 提示符）
+            // 这比 isIdle 更可靠：spinner 动画会持续刷新 PTY 输出导致 isIdle 永远不翻转
+            if hasPromptReturned(session: session, injectedAt: injectedAt, in: tm) { break }
         }
 
-        let output = session.recentOutput(lines: 50)
-        return output.isEmpty ? "(no response)" : output
+        return snapshot(session: session, in: tm)
+    }
+
+    /// 判断目标终端的提示符是否已在注入时间点之后重新出现
+    @MainActor
+    private func hasPromptReturned(session: TerminalSession, injectedAt: Date, in tm: TerminalManager) -> Bool {
+        // 至少等注入后 500ms 再开始检测，避免误判注入前的提示符
+        guard Date().timeIntervalSince(injectedAt) > 0.5 else { return false }
+
+        guard let provider = tm.providers[session.id],
+              let termView = provider.terminalView else {
+            // 没有 provider 时 fallback：用 isIdle
+            return session.isIdle
+        }
+
+        let data = termView.getTerminal().getBufferAsData()
+        guard !data.isEmpty else { return false }
+
+        let text = String(decoding: data, as: UTF8.self)
+        var lines = text.components(separatedBy: "\n")
+        // 去掉尾部空行，找最后一个非空行
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            lines.removeLast()
+        }
+        guard let lastLine = lines.last else { return false }
+        let trimmed = lastLine.trimmingCharacters(in: .whitespaces)
+
+        // 匹配常见 shell 提示符尾部：% / $ / > / ❯（zsh/bash/fish/Claude Code）
+        return trimmed.hasSuffix("%") || trimmed.hasSuffix("$") ||
+               trimmed.hasSuffix(">") || trimmed.hasSuffix("❯") ||
+               trimmed.hasSuffix("% ") || trimmed.hasSuffix("$ ")
+    }
+
+    /// 从 SwiftTerm buffer 取纯文本快照
+    @MainActor
+    private func snapshot(session: TerminalSession, in tm: TerminalManager) -> String {
+        guard let provider = tm.providers[session.id],
+              let termView = provider.terminalView else {
+            return session.recentOutput(lines: 50)
+        }
+        let data = termView.getTerminal().getBufferAsData()
+        guard !data.isEmpty else { return session.recentOutput(lines: 50) }
+
+        let fullText = String(decoding: data, as: UTF8.self)
+        var lines = fullText.components(separatedBy: "\n")
+        while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            lines.removeLast()
+        }
+        return lines.joined(separator: "\n")
     }
 }
