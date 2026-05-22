@@ -48,12 +48,12 @@ final class AppState {
         workspaces.first(where: { $0.id == workspaceId })?.unreadActivityCount = 0
     }
 
-    /// 激活指定工作区：更新 activeWorkspaceId、清零未读计数，并通知 InterAgentServer 切换 Unix socket
+    /// 激活指定工作区：更新 activeWorkspaceId、清零未读计数
+    /// Unix socket 为全局固定路径，不随 workspace 切换重建
     func selectWorkspace(id: UUID?) {
         activeWorkspaceId = id
         if let id {
             clearUnread(workspaceId: id)
-            InterAgentServer.shared.switchWorkspace(to: id)
         }
     }
 
@@ -90,10 +90,8 @@ final class AppState {
             await MainActor.run {
                 workspaces = loadedWorkspaces
                 loadErrors = errors
-                // 启动时若有活跃工作区，初始化 Unix socket
-                if let activeId = activeWorkspaceId {
-                    InterAgentServer.shared.switchWorkspace(to: activeId)
-                }
+                // 启动全局 Unix socket（应用生命周期内只创建一次）
+                InterAgentServer.shared.startUnixSocketIfNeeded()
             }
 
             // 标记本次为未完成关闭

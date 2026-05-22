@@ -17,13 +17,31 @@ for arg in "$@"; do
   [[ "$arg" == "--launch" ]] && LAUNCH=true
 done
 
-echo "🔨 Building open-maestri app + omaestri CLI..."
+echo "🔨 Building open-maestri app (host arch) + omaestri CLI (Universal Binary)..."
 cd "$PROJECT_DIR"
+
+# 主 app 使用 host 架构构建（依赖 Sparkle/SwiftTerm 的 dylib 不易做 universal）
 swift build -c release 2>&1
 
 if [ ! -f "$EXEC" ]; then
   echo "✗ Build failed: executable not found at $EXEC"
   exit 1
+fi
+
+# CLI (omaestri) 编译为 Universal Binary（x86_64 + arm64），对标 Maestri 279KB universal binary
+echo "▶ Building omaestri CLI as Universal Binary..."
+CLI_ARM64="$PROJECT_DIR/.build/arm64-apple-macosx/release/omaestri"
+CLI_X86="$PROJECT_DIR/.build/x86_64-apple-macosx/release/omaestri"
+
+swift build -c release --product omaestri --triple arm64-apple-macosx 2>&1
+swift build -c release --product omaestri --triple x86_64-apple-macosx 2>&1
+
+if [ -f "$CLI_ARM64" ] && [ -f "$CLI_X86" ]; then
+  lipo -create "$CLI_ARM64" "$CLI_X86" -output "$BUILD_DIR/omaestri-universal"
+  mv "$BUILD_DIR/omaestri-universal" "$BUILD_DIR/omaestri"
+  echo "✅ omaestri Universal Binary created ($(file "$BUILD_DIR/omaestri" | grep -o 'universal.*'))"
+else
+  echo "⚠️  Universal build partial — using host-only CLI binary"
 fi
 
 echo "▶ Assembling .app bundle..."

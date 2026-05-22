@@ -16,16 +16,15 @@ final class InterAgentServer {
     // MARK: - Unix Socket 支持
     private var unixSocketFd: Int32 = -1
     private var unixSocketSource: DispatchSourceRead?
-    private var activeWorkspaceId: UUID?
 
     /// 当前活跃的 Unix socket 路径（供 SwiftTermProvider 注入 MAESTRI_SOCKET）
     private(set) var currentSocketPath: String?
 
-    /// 计算 workspace 对应的 socket 文件路径
-    static func socketPath(for workspaceId: UUID) -> String {
+    /// 全局固定 socket 路径（不再绑定 workspace UUID，避免切换工作区后旧终端 CLI 断联）
+    static var globalSocketPath: String {
         let runDir = PersistenceManager.shared.appDataURL
             .appendingPathComponent("run").path
-        return "\(runDir)/\(workspaceId.uuidString).sock"
+        return "\(runDir)/agent.sock"
     }
 
     private init() {}
@@ -71,18 +70,19 @@ final class InterAgentServer {
 
     // MARK: - Unix Socket 生命周期
 
-    func switchWorkspace(to workspaceId: UUID) {
-        stopUnixSocket()
+    /// 启动全局 Unix socket（应用生命周期内只调用一次）
+    /// 不再随 workspace 切换重建，终端通过 X-Terminal-ID 标识身份
+    func startUnixSocketIfNeeded() {
+        guard unixSocketFd < 0 else { return }  // 已在运行
         do {
-            try startUnixSocket(workspaceId: workspaceId)
+            try startUnixSocket()
         } catch {
             logger.error("InterAgentServer: Unix socket start failed: \(error)")
         }
     }
 
-    private func startUnixSocket(workspaceId: UUID) throws {
-        activeWorkspaceId = workspaceId
-        let path = Self.socketPath(for: workspaceId)
+    private func startUnixSocket() throws {
+        let path = Self.globalSocketPath
         currentSocketPath = path
 
         // 创建 run/ 目录
@@ -150,7 +150,6 @@ final class InterAgentServer {
             unlink(path)
         }
         currentSocketPath = nil
-        activeWorkspaceId = nil
     }
 
     private func acceptUnixConnection(serverFd: Int32) {
@@ -179,8 +178,8 @@ final class InterAgentServer {
             }
         }
         guard !accumulated.isEmpty else { return }
-        let responseBody = processHTTPRequest(accumulated)
-        let responseData = buildHTTPResponse(body: responseBody)
+        let parsed = parseHTTPRequest(accumulated)
+        let responseData = buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion)
         responseData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
     }
 
@@ -252,8 +251,8 @@ final class InterAgentServer {
                 let bodyReceived = total.count - bodyStart
                 if contentLength <= 0 || bodyReceived >= contentLength {
                     // 请求完整
-                    if let response = self?.processHTTPRequest(total) {
-                        let responseData = self?.buildHTTPResponse(body: response) ?? Data()
+                    if let parsed = self?.parseHTTPRequest(total) {
+                        let responseData = self?.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion) ?? Data()
                         connection.send(content: responseData, completion: .idempotent)
                     }
                     connection.cancel()
@@ -265,8 +264,8 @@ final class InterAgentServer {
                 self?.receiveData(on: connection, accumulated: total)
             } else {
                 // 连接提前关闭
-                if let response = self?.processHTTPRequest(total) {
-                    let responseData = self?.buildHTTPResponse(body: response) ?? Data()
+                if let parsed = self?.parseHTTPRequest(total) {
+                    let responseData = self?.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion) ?? Data()
                     connection.send(content: responseData, completion: .idempotent)
                 }
                 connection.cancel()
@@ -285,19 +284,36 @@ final class InterAgentServer {
         return 0
     }
 
-    private func processHTTPRequest(_ data: Data) -> String {
-        // 解析 HTTP 请求，提取 JSON body 和 X-Terminal-ID header
+    /// 解析结果：响应体 + 请求的 HTTP 版本
+    private struct ParsedRequest {
+        let responseBody: String
+        let httpVersion: String  // "1.0" 或 "1.1"
+    }
+
+    private func parseHTTPRequest(_ data: Data) -> ParsedRequest {
+        // 解析 HTTP 请求，提取 JSON body、X-Terminal-ID header 和 HTTP 版本
         let raw = String(decoding: data, as: UTF8.self)
         var terminalId: UUID?
         var args: [String] = []
+        var httpVersion = "1.1"  // 默认 HTTP/1.1（TCP 通道常见）
 
         // 简单解析：找到空行后的 JSON body
         let parts = raw.components(separatedBy: "\r\n\r\n")
         let headers = parts[0]
         let body = parts.count > 1 ? parts[1] : ""
 
+        // 从请求行提取 HTTP 版本（如 "POST /cli HTTP/1.0"）
+        let headerLines = headers.components(separatedBy: "\r\n")
+        if let requestLine = headerLines.first {
+            if requestLine.contains("HTTP/1.0") {
+                httpVersion = "1.0"
+            } else if requestLine.contains("HTTP/1.1") {
+                httpVersion = "1.1"
+            }
+        }
+
         // 提取 X-Terminal-ID
-        for line in headers.components(separatedBy: "\r\n") {
+        for line in headerLines {
             let lower = line.lowercased()
             if lower.hasPrefix("x-terminal-id:") {
                 let idStr = line.dropFirst("x-terminal-id:".count).trimmingCharacters(in: .whitespaces)
@@ -312,14 +328,17 @@ final class InterAgentServer {
             args = rawArgs
         }
 
-        guard !args.isEmpty else { return "error: missing args" }
-        return CLIRouter.shared.route(args: args, terminalId: terminalId)
+        guard !args.isEmpty else {
+            return ParsedRequest(responseBody: "error: missing args", httpVersion: httpVersion)
+        }
+        let responseBody = CLIRouter.shared.route(args: args, terminalId: terminalId)
+        return ParsedRequest(responseBody: responseBody, httpVersion: httpVersion)
     }
 
-    private func buildHTTPResponse(body: String) -> Data {
+    private func buildHTTPResponse(body: String, httpVersion: String = "1.1") -> Data {
         let bodyData = body.data(using: .utf8) ?? Data()
-        // 返回 text/plain：omaestri CLI 用 curl 直接打印输出，无需 JSON 解析
-        let header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(bodyData.count)\r\nConnection: close\r\n\r\n"
+        // 返回与请求匹配的 HTTP 版本（CLI 使用 HTTP/1.0，SSH/curl 使用 HTTP/1.1）
+        let header = "HTTP/\(httpVersion) 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(bodyData.count)\r\nConnection: close\r\n\r\n"
         return (header.data(using: .utf8) ?? Data()) + bodyData
     }
 }

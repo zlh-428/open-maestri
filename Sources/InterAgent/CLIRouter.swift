@@ -44,8 +44,9 @@ final class CLIRouter {
             }
             semaphore.signal()
         }
-        // 超时 30s 防止退出时 @MainActor 不可达导致永久挂起
-        let waitResult = semaphore.wait(timeout: .now() + 30.0)
+        // 超时 300s（5分钟）：给长时间命令（如 ask agent）足够执行时间
+        // 仍保留超时以防止退出时 @MainActor 不可达导致永久挂起
+        let waitResult = semaphore.wait(timeout: .now() + 300.0)
         if waitResult == .timedOut {
             logger.warning("CLIRouter.routeAsync timed out for command: \(command)")
             return "error: command timed out"

@@ -14,7 +14,8 @@ enum Transport {
         defer { close(fd) }
 
         // 2. 设置超时（对标逆向：SO_SNDTIMEO=0x1006, SO_RCVTIMEO=0x1005, SOL_SOCKET=0xffff）
-        var tv = timeval(tv_sec: 30, tv_usec: 0)
+        // Maestri 原版设置 {0, 0} = 无超时（无限阻塞），适用于长时间 ask 等命令
+        var tv = timeval(tv_sec: 0, tv_usec: 0)
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
 
