@@ -192,6 +192,9 @@ final class TerminalSession {
     private(set) var currentDirectory: String?
     private(set) var isRunning: Bool = false
     private(set) var isIdle: Bool = true
+    /// 是否有通过 IPC（omaestri ask 等）触发的任务正在执行中
+    /// 只有此标志为 true 时，任务完成后才会触发红点通知
+    private(set) var hasActiveTask: Bool = false
 
     /// PTY 写入回调（TerminalEmbeddedView.makeNSView 后设置）
     var onOutput: ((String) -> Void)? {
@@ -289,11 +292,18 @@ final class TerminalSession {
         }
     }
 
+    /// 标记存在通过 IPC 触发的活跃任务（由 AskHandler 在注入 prompt 前调用）
+    func markActiveTask() {
+        hasActiveTask = true
+    }
+
     /// 标记空闲（由 activityMonitor 回调触发）
-    /// 仅当从非空闲切换到空闲时才发出通知（避免重复触发）
+    /// 仅当从非空闲切换到空闲，且有活跃 IPC 任务时才发出通知（避免普通 shell 输出误触发红点）
     func markIdle() {
         guard !isIdle else { return }
         isIdle = true
+        guard hasActiveTask else { return }
+        hasActiveTask = false
         NotificationCenter.default.post(
             name: .terminalBecameIdle,
             object: nil,

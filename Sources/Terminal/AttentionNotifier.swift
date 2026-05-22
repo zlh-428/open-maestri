@@ -55,12 +55,8 @@ final class AttentionNotifier {
 
     // MARK: - 标记需要注意力
 
-    /// 标记终端需要注意力（当后台终端 Agent 完成输出时触发）
-    /// 仅当终端不是当前选中节点，且 shell 已初始化完成时才标记
+    /// 标记终端需要注意力（仅由 IPC 任务完成后的 terminalBecameIdle 通知触发）
     func markNeedsAttention(terminalId: UUID) {
-        // shell 未就绪时不标记（避免启动阶段的初始化输出触发红点）
-        guard TerminalManager.shared.completedProviders.contains(terminalId) else { return }
-
         // 当前选中的终端不标记
         if selectedNodeIds.contains(terminalId) { return }
 

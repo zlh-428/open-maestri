@@ -47,6 +47,9 @@ final class AskHandler {
             ($0.nodeIdA == targetSession.id && $0.nodeIdB == callerTid)
         }) { cm.markCommunicating(conn.id) }
 
+        // 标记目标终端有活跃任务（使任务完成后能触发红点通知）
+        targetSession.markActiveTask()
+
         // 注入 prompt（FR33）
         let injectedPrompt = prompt.hasSuffix("\n") ? prompt : prompt + "\n"
         tm.writeLine(to: targetSession.id, text: injectedPrompt)
