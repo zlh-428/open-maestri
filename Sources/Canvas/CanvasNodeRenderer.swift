@@ -327,31 +327,12 @@ final class CanvasNodeRenderer {
         }
         if let content = newContent {
             ws.nodes[idx].content = content
-            canvas?.updateNodeContentInPlace(id: id, content: content)
-            // terminal rename: 同步到 TerminalSession.displayName
-            if case .terminal = content {
-                Task { @MainActor in
-                    TerminalManager.shared.terminals[id]?.displayName = newName
-                }
-            }
-            // 刷新 SwiftUI 节点层，确保 header title 实时更新
-            if let canvas, let current = nodesHostingView?.rootView {
-                let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
-                nodesHostingView?.rootView = CanvasNodesSwiftUIView(
-                    nodes: canvas.viewportCulledNodes(),
-                    canvasOrigin: canvas.canvasOrigin,
-                    zoom: canvas.zoom,
-                    selectedNodeIds: canvas.selectedNodeIds,
-                    lockedNodeIds: lockedIds,
-                    workspace: current.workspace,
-                    dropTargetNodeId: current.dropTargetNodeId,
-                    onActivated: current.onActivated,
-                    onClose: current.onClose,
-                    onRename: current.onRename,
-                    onDuplicate: current.onDuplicate,
-                    onLockToggle: current.onLockToggle
-                )
-            }
+            // canvasNodeContentChanged observer 统一处理：updateNodeContentInPlace + displayName + rootView 刷新
+            NotificationCenter.default.post(
+                name: .canvasNodeContentChanged,
+                object: nil,
+                userInfo: ["nodeId": id, "content": content]
+            )
         }
         saveWorkspace()
     }
@@ -466,9 +447,31 @@ final class CanvasNodeRenderer {
         let contentObs = NotificationCenter.default.addObserver(
             forName: .canvasNodeContentChanged, object: nil, queue: .main
         ) { [weak self] notif in
-            guard let id = notif.userInfo?["nodeId"] as? UUID,
+            guard let self,
+                  let id = notif.userInfo?["nodeId"] as? UUID,
                   let content = notif.userInfo?["content"] as? NodeContent else { return }
-            self?.canvas?.updateNodeContentInPlace(id: id, content: content)
+            canvas?.updateNodeContentInPlace(id: id, content: content)
+            // displayName 同步
+            if case .terminal(let tc) = content {
+                TerminalManager.shared.terminals[id]?.displayName = tc.name
+            }
+            // 刷新 SwiftUI 节点层
+            guard let canvas, let current = nodesHostingView?.rootView else { return }
+            let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
+            nodesHostingView?.rootView = CanvasNodesSwiftUIView(
+                nodes: canvas.viewportCulledNodes(),
+                canvasOrigin: canvas.canvasOrigin,
+                zoom: canvas.zoom,
+                selectedNodeIds: canvas.selectedNodeIds,
+                lockedNodeIds: lockedIds,
+                workspace: current.workspace,
+                dropTargetNodeId: current.dropTargetNodeId,
+                onActivated: current.onActivated,
+                onClose: current.onClose,
+                onRename: current.onRename,
+                onDuplicate: current.onDuplicate,
+                onLockToggle: current.onLockToggle
+            )
         }
         notificationObservers.append(contentObs)
     }

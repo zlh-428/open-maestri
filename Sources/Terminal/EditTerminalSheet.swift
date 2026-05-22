@@ -64,7 +64,13 @@ struct EditTerminalSheet: View {
         tc.name = name
         tc.command = command
         tc.isManager = isManager
-        workspace.nodes[idx].content = .terminal(tc)
+        let newContent = NodeContent.terminal(tc)
+        workspace.nodes[idx].content = newContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "content": newContent]
+        )
         Task { try? await workspace.save() }
     }
 }

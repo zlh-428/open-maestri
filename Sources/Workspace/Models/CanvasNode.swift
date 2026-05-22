@@ -64,11 +64,12 @@ struct CanvasNode: Codable, Identifiable, Equatable {
         try container.encode(lastModifiedAt, forKey: .lastModifiedAt)
     }
 
-    // MARK: - Equatable（仅比较布局相关字段，供 SwiftUI ForEach diff 使用）
+    // MARK: - Equatable（布局字段 + content，供 SwiftUI ForEach diff 使用）
     static func == (lhs: CanvasNode, rhs: CanvasNode) -> Bool {
         lhs.id == rhs.id &&
         lhs.frame == rhs.frame &&
         lhs.zIndex == rhs.zIndex &&
-        lhs.isLocked == rhs.isLocked
+        lhs.isLocked == rhs.isLocked &&
+        lhs.content == rhs.content
     }
 }

@@ -2,7 +2,7 @@ import Foundation
 
 /// 节点内容枚举，与 Maestri v0.25.4 数据格式完全兼容
 /// Maestri 格式：{ "terminal": { "_0": {...} } }
-enum NodeContent: Codable {
+enum NodeContent: Codable, Equatable {
     case terminal(TerminalContent)
     case stickyNote(StickyNoteContent)
     case portal(PortalContent)
@@ -81,7 +81,7 @@ enum NodeContent: Codable {
 
 // MARK: - Terminal Content
 
-struct TerminalContent: Codable {
+struct TerminalContent: Codable, Equatable {
     var agentType: String       // "claude_code" | "codex" | "gemini_cli" | "open_code" | "generic_shell"
     var command: String
     var name: String
@@ -135,7 +135,7 @@ struct ShortcutMode: Codable, Equatable {
 
 // MARK: - StickyNote Content
 
-struct StickyNoteContent: Codable {
+struct StickyNoteContent: Codable, Equatable {
     var color: String           // hex, e.g. "#FEFDE8" 或 Maestri 颜色名 "yellow"
     var fileName: String?       // .md 文件名（仅文件名，不含路径）
     var fontSize: Int
@@ -186,7 +186,7 @@ enum StorageMode: Codable, Equatable {
 
 // MARK: - Portal Content
 
-struct PortalContent: Codable {
+struct PortalContent: Codable, Equatable {
     var id: UUID
     var name: String
     var currentURL: String
@@ -237,7 +237,7 @@ enum PortalSource: Codable, Equatable {
 
 // MARK: - FileTree Content
 
-struct FileTreeContent: Codable {
+struct FileTreeContent: Codable, Equatable {
     var name: String
     var rootPath: String
     var viewMode: String        // "list" | "grid"
@@ -252,7 +252,7 @@ struct FileTreeContent: Codable {
 // MARK: - Text Content
 
 /// 画布文本标签节点（轻量级，无 header，直接编辑）
-struct TextContent: Codable {
+struct TextContent: Codable, Equatable {
     var text: String
     var fontSize: CGFloat
     var fontWeight: String      // "regular" | "medium" | "bold"
@@ -271,7 +271,7 @@ struct TextContent: Codable {
 // MARK: - Drawing Content
 
 /// 画布手绘区域节点
-struct DrawingContent: Codable {
+struct DrawingContent: Codable, Equatable {
     var strokes: [DrawingStroke]
     var backgroundColor: String // hex, 默认透明
 
@@ -282,7 +282,7 @@ struct DrawingContent: Codable {
 }
 
 /// 单条笔画
-struct DrawingStroke: Codable {
+struct DrawingStroke: Codable, Equatable {
     var points: [[CGFloat]]     // [[x, y], [x, y], ...]
     var color: String           // hex
     var width: CGFloat
