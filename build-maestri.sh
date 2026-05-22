@@ -6,8 +6,9 @@
 set -euo pipefail
 
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOST_BUILD_DIR="$(cd "$PROJECT_DIR" && swift build --show-bin-path -c release 2>/dev/null)"
 BUILD_DIR="$PROJECT_DIR/.build/release"
-EXEC="$BUILD_DIR/open-maestri"
+EXEC="$HOST_BUILD_DIR/open-maestri"
 OUTPUT_DIR="$PROJECT_DIR/build"
 APP_BUNDLE="$OUTPUT_DIR/open-maestri.app"
 SPARKLE="$PROJECT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
