@@ -1833,8 +1833,8 @@
     },
     "filetree.delete.confirm_title" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete "%@"?" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除"%@"？" } }
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete \"%@\"?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除\"%@\"？" } }
       }
     },
     "filetree.delete.confirm_message" : {
