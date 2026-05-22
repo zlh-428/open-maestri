@@ -854,6 +854,13 @@ extension CanvasViewportView {
         }
 
         guard let id = nodeId else {
+            // 检查是否右键点击了连接线（连接线层在节点层下方，需在此处手动检测）
+            if let overlay = connectionOverlayView {
+                let overlayPoint = overlay.convert(event.locationInWindow, from: nil)
+                if let connId = overlay.connectionId(at: overlayPoint) {
+                    return buildConnectionMenu(connectionId: connId)
+                }
+            }
             return buildCanvasBlankMenu(at: loc)
         }
         guard let node = currentNodes.first(where: { $0.id == id }) else { return super.menu(for: event) }
@@ -906,6 +913,26 @@ extension CanvasViewportView {
         }
 
         return menu
+    }
+
+    // MARK: - Connection Context Menu
+
+    /// 构建连接线右键菜单（删除连接）
+    private func buildConnectionMenu(connectionId: UUID) -> NSMenu {
+        let menu = NSMenu()
+        let deleteTitle = "connection.delete".localized
+        let deleteItem = NSMenuItem(title: deleteTitle, action: #selector(contextMenuDeleteConnection(_:)), keyEquivalent: "")
+        let attrs: [NSAttributedString.Key: Any] = [.foregroundColor: NSColor.systemRed]
+        deleteItem.attributedTitle = NSAttributedString(string: deleteTitle, attributes: attrs)
+        deleteItem.target = self
+        deleteItem.representedObject = connectionId
+        menu.addItem(deleteItem)
+        return menu
+    }
+
+    @objc private func contextMenuDeleteConnection(_ sender: NSMenuItem) {
+        guard let connectionId = sender.representedObject as? UUID else { return }
+        connectionOverlayView?.onDeleteConnection?(connectionId)
     }
 
     // MARK: - Canvas Blank Area Context Menu

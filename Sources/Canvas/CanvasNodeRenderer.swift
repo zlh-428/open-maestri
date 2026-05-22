@@ -177,7 +177,12 @@ final class CanvasNodeRenderer {
     private func setupOverlay(canvas: CanvasViewportView) {
         let overlay = ConnectionOverlayView(frame: canvas.bounds)
         overlay.autoresizingMask = [.width, .height]
-        canvas.addSubview(overlay)
+        // 连接线层插在节点层之下，节点重叠时节点始终显示在连接线上方
+        if let nodesView = canvas.nodesHostingView {
+            canvas.addSubview(overlay, positioned: .below, relativeTo: nodesView)
+        } else {
+            canvas.addSubview(overlay)
+        }
         overlayView = overlay
         // 注册 overlay 引用到画布（供临时连线同步使用）
         canvas.connectionOverlayView = overlay
@@ -252,11 +257,14 @@ final class CanvasNodeRenderer {
             }
         )
 
-        if let overlay = overlayView {
+        // 确保连接线层始终在节点层之下（节点重叠时节点遮挡连接线）
+        if let overlay = overlayView, let nodesView = nodesHostingView {
+            canvas.addSubview(overlay, positioned: .below, relativeTo: nodesView)
+        } else if let overlay = overlayView {
             canvas.addSubview(overlay)
         }
 
-        // drawingOverlayView 在连接线层上方
+        // drawingOverlayView 在节点层上方（用于 drawing 选中边框）
         if let drawingOverlay = canvas.drawingOverlayView {
             canvas.addSubview(drawingOverlay)
         }
@@ -474,6 +482,15 @@ final class CanvasNodeRenderer {
             )
         }
         notificationObservers.append(contentObs)
+
+        // 连接状态变化（ask 通信开始/结束）：立即重建状态缓存并重渲染连接线
+        let connStatusObs = NotificationCenter.default.addObserver(
+            forName: .connectionStatusChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            self?.rebuildConnectionStatusCache()
+            self?.rerenderConnections()
+        }
+        notificationObservers.append(connStatusObs)
     }
 
     // MARK: - 连线物理同步

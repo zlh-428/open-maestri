@@ -153,7 +153,9 @@ final class ConnectionOverlayView: NSView {
     // MARK: - 连线命中检测
 
     /// 查找距离指定点最近的连线（在容差范围内）
-    private func connectionId(at point: CGPoint) -> UUID? {
+    /// - Parameter point: 本视图坐标系中的点
+    /// - Returns: 命中的连线 UUID，nil 表示未命中
+    func connectionId(at point: CGPoint) -> UUID? {
         var bestId: UUID?
         var bestDist: CGFloat = Self.hitTolerance
 

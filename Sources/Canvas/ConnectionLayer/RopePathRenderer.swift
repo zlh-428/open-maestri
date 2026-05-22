@@ -18,11 +18,11 @@ struct RopePathRenderer {
     }
 
     static func lineWidth(for status: ConnectionStatus) -> CGFloat {
-        status == .communicating ? 2.5 : 1.5
+        1.5
     }
 
     static func isDashed(for status: ConnectionStatus) -> Bool {
-        status == .idle || status == .disconnected
+        true
     }
 
     // MARK: - 路径生成
@@ -67,16 +67,6 @@ struct RopePathRenderer {
     static func draw(points: [CGPoint], status: ConnectionStatus, isHighlighted: Bool = false) {
         guard !points.isEmpty else { return }
         let path = bezierPath(from: points)
-
-        // 通信中绘制绿色 glow 底层（hover 时不绘制 glow）
-        if status == .communicating && !isHighlighted {
-            let glowPath = bezierPath(from: points)
-            NSColor.systemGreen.withAlphaComponent(0.3).setStroke()
-            glowPath.lineWidth = lineWidth(for: status) + 4
-            glowPath.lineCapStyle = .round
-            glowPath.lineJoinStyle = .round
-            glowPath.stroke()
-        }
 
         // 主线条
         let color = isHighlighted ? NSColor.systemBlue : strokeColor(for: status)

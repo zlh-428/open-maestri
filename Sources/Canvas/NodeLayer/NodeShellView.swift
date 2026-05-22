@@ -7,6 +7,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
     let title: String
     let isSelected: Bool
     let isLocked: Bool
+    let isCommunicating: Bool
     let zoom: CGFloat
     let headerIcon: String?
     let headerColor: Color?
@@ -23,6 +24,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         title: String,
         isSelected: Bool,
         isLocked: Bool,
+        isCommunicating: Bool = false,
         zoom: CGFloat,
         headerIcon: String?,
         headerColor: Color?,
@@ -38,6 +40,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         self.title = title
         self.isSelected = isSelected
         self.isLocked = isLocked
+        self.isCommunicating = isCommunicating
         self.zoom = zoom
         self.headerIcon = headerIcon
         self.headerColor = headerColor
@@ -111,6 +114,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
                     .strokeBorder(Color.blue.opacity(0.8), lineWidth: 2)
                     .allowsHitTesting(false)
             }
+
         }
         // 右键菜单由 AppKit 层 CanvasViewportView.menu(for:) 统一处理
         // （SwiftUI .contextMenu 因 allowsHitTesting(false) 永远不会触发）

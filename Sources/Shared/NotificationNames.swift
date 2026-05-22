@@ -45,6 +45,8 @@ extension Notification.Name {
     static let canvasDropTargetChanged   = Notification.Name("OpenMaestri.canvasDropTargetChanged")
     /// 终端注意力状态变化：userInfo 含 "terminalId" UUID, "needsAttention" Bool
     static let terminalAttentionChanged  = Notification.Name("OpenMaestri.terminalAttentionChanged")
+    /// 连接状态变化（ask 通信开始/结束）：触发画布重建状态缓存并重渲染
+    static let connectionStatusChanged   = Notification.Name("OpenMaestri.connectionStatusChanged")
     /// 终端主题/字体变更（立即应用到所有已打开终端）
     static let terminalAppearanceChanged = Notification.Name("OpenMaestri.terminalAppearanceChanged")
     /// 终端当前工作目录变化：userInfo 含 "terminalId" UUID, "directory" String

@@ -16,6 +16,7 @@ struct TerminalNodeSwiftUIView: View {
 
     @State private var needsAttention: Bool = false
     @State private var currentDirectory: String = ""
+    @State private var isCommunicating: Bool = false
 
     var body: some View {
         NodeShellView(
@@ -23,6 +24,7 @@ struct TerminalNodeSwiftUIView: View {
             title: content.name,
             isSelected: isSelected,
             isLocked: isLocked,
+            isCommunicating: isCommunicating,
             zoom: zoom,
             headerIcon: content.icon,
             headerColor: Color(hex: content.color),
@@ -66,6 +68,11 @@ struct TerminalNodeSwiftUIView: View {
                   terminalId == content.id,
                   let directory = notification.userInfo?["directory"] as? String else { return }
             currentDirectory = directory
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .connectionStatusChanged)) { _ in
+            isCommunicating = ConnectionManager.shared.connections.values.contains {
+                ($0.nodeIdA == content.id || $0.nodeIdB == content.id) && $0.status == .communicating
+            }
         }
         .onChange(of: isSelected) { _, selected in
             if selected {

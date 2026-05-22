@@ -39,11 +39,15 @@ final class AskHandler {
             return "error: agent '\(targetName)' not found. Use 'omaestri list' to see connected agents."
         }
 
-        // 标记通信中
-        if let conn = cm.connections.values.first(where: {
+        // 找到连接 ID，ask 全程保持 communicating 状态，收到回复后再恢复 idle
+        let connectionId = cm.connections.values.first(where: {
             ($0.nodeIdA == callerTid && $0.nodeIdB == targetSession.id) ||
             ($0.nodeIdA == targetSession.id && $0.nodeIdB == callerTid)
-        }) { cm.markCommunicating(conn.id) }
+        })?.id
+        if let cid = connectionId {
+            cm.updateStatus(.communicating, for: cid)
+            NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)
+        }
 
         // 标记目标终端有活跃任务（使任务完成后能触发红点通知）
         targetSession.markActiveTask()
@@ -53,39 +57,43 @@ final class AskHandler {
         tm.write(to: targetSession.id, text: injectedPrompt)
         logger.debug("Prompt injected to \(targetSession.id.uuidString.prefix(8)): \(prompt.prefix(50))")
 
+        // 记录注入前的 buffer 行数，用于过滤注入前的提示符（避免误判）
+        let baselineLineCount = bufferLineCount(session: targetSession, in: tm)
+
         // 等待目标终端执行完成，然后返回其屏幕内容
-        return await waitForIdleThenSnapshot(session: targetSession, in: tm)
+        let result = await waitForIdleThenSnapshot(session: targetSession, in: tm, baselineLineCount: baselineLineCount)
+
+        // 收到回复后恢复连接线为 idle
+        if let cid = connectionId {
+            cm.updateStatus(.idle, for: cid)
+            NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)
+        }
+        return result
     }
 
     // MARK: - 等待回复完成后取屏幕快照
 
     @MainActor
-    private func waitForIdleThenSnapshot(session: TerminalSession, in tm: TerminalManager) async -> String {
+    private func waitForIdleThenSnapshot(session: TerminalSession, in tm: TerminalManager, baselineLineCount: Int) async -> String {
         // 短暂延迟确保命令已开始执行
         try? await Task.sleep(for: .milliseconds(300))
 
         let deadline = Date().addingTimeInterval(responseTimeout)
-        let injectedAt = Date()
 
         while Date() < deadline {
             try? await Task.sleep(for: .milliseconds(300))
-            // 检测提示符是否重新出现（shell 提示符 / Claude Code ❯ 提示符）
-            // 这比 isIdle 更可靠：spinner 动画会持续刷新 PTY 输出导致 isIdle 永远不翻转
-            if hasPromptReturned(session: session, injectedAt: injectedAt, in: tm) { break }
+            if hasPromptReturned(session: session, in: tm, baselineLineCount: baselineLineCount) { break }
         }
 
         return snapshot(session: session, in: tm)
     }
 
-    /// 判断目标终端的提示符是否已在注入时间点之后重新出现
+    /// 判断目标终端是否已回到提示符（命令执行完毕）
+    /// baselineLineCount：注入前的 buffer 行数，必须有新增行才开始检测，避免误判输入回显中的 ❯
     @MainActor
-    private func hasPromptReturned(session: TerminalSession, injectedAt: Date, in tm: TerminalManager) -> Bool {
-        // 至少等注入后 500ms 再开始检测，避免误判注入前的提示符
-        guard Date().timeIntervalSince(injectedAt) > 0.5 else { return false }
-
+    private func hasPromptReturned(session: TerminalSession, in tm: TerminalManager, baselineLineCount: Int) -> Bool {
         guard let provider = tm.providers[session.id],
               let termView = provider.terminalView else {
-            // 没有 provider 时 fallback：用 isIdle
             return session.isIdle
         }
 
@@ -94,6 +102,11 @@ final class AskHandler {
 
         let text = String(decoding: data, as: UTF8.self)
         var lines = text.components(separatedBy: "\n")
+
+        // 必须有新增行，才说明命令真正开始执行并产生了输出
+        // （避免误判：注入后 buffer 行数未增加时，末行的 ❯ 只是输入回显）
+        guard lines.count > baselineLineCount + 2 else { return false }
+
         // 去掉尾部空行，找最后一个非空行
         while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
             lines.removeLast()
@@ -105,6 +118,16 @@ final class AskHandler {
         return trimmed.hasSuffix("%") || trimmed.hasSuffix("$") ||
                trimmed.hasSuffix(">") || trimmed.hasSuffix("❯") ||
                trimmed.hasSuffix("% ") || trimmed.hasSuffix("$ ")
+    }
+
+    /// 注入前获取 buffer 当前行数（作为 baseline）
+    @MainActor
+    private func bufferLineCount(session: TerminalSession, in tm: TerminalManager) -> Int {
+        guard let provider = tm.providers[session.id],
+              let termView = provider.terminalView else { return 0 }
+        let data = termView.getTerminal().getBufferAsData()
+        guard !data.isEmpty else { return 0 }
+        return String(decoding: data, as: UTF8.self).components(separatedBy: "\n").count
     }
 
     /// 从 SwiftTerm buffer 取纯文本快照
