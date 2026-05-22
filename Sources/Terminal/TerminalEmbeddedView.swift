@@ -94,9 +94,7 @@ struct TerminalEmbeddedView: NSViewRepresentable {
             }
             if context.coordinator.lastFontName != prefs.terminalFontFamily
                 || context.coordinator.lastFontSize != prefs.terminalFontSize {
-                let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
-                    ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
-                tv.font = font
+                tv.font = resolveTerminalFont(family: prefs.terminalFontFamily, size: prefs.terminalFontSize)
                 context.coordinator.lastFontName = prefs.terminalFontFamily
                 context.coordinator.lastFontSize = prefs.terminalFontSize
             }

@@ -184,6 +184,83 @@ final class ConnectionManager {
         connections(for: nodeId).map { $0.nodeIdA == nodeId ? $0.nodeIdB : $0.nodeIdA }
     }
 
+    // MARK: - 工作区恢复
+
+    /// 从持久化的工作区数据重建所有运行时连接（应用启动 / 工作区切换时调用）
+    /// 不重新生成连接 ID，直接复用持久化的 UUID，保证 CLI 查询结果稳定
+    func restoreConnections(from workspace: WorkspaceManager, serverPort: UInt16) {
+        let host = "\(Constants.interAgentServerHost):\(serverPort)"
+
+        // 删除与此工作区节点相关的旧连接（避免多工作区污染）
+        let wsNodeIds = Set(workspace.nodes.map { $0.id })
+        let toRemove = connections.values.filter {
+            wsNodeIds.contains($0.nodeIdA) || wsNodeIds.contains($0.nodeIdB)
+        }
+        toRemove.forEach { connections.removeValue(forKey: $0.id) }
+
+        for conn in workspace.connections {
+            guard connections[conn.id] == nil else { continue }
+            let active = ActiveConnection(
+                id: conn.id,
+                nodeIdA: conn.terminalIdA,
+                nodeIdB: conn.terminalIdB,
+                type: .terminalToTerminal
+            )
+            connections[conn.id] = active
+            SkillInjector.shared.inject(to: conn.terminalIdA, host: host)
+            SkillInjector.shared.inject(to: conn.terminalIdB, host: host)
+            logger.info("Restored T↔T: \(conn.terminalIdA.uuidString.prefix(8)) ↔ \(conn.terminalIdB.uuidString.prefix(8))")
+        }
+
+        for conn in workspace.noteConnections {
+            guard connections[conn.id] == nil else { continue }
+            let active = ActiveConnection(
+                id: conn.id,
+                nodeIdA: conn.terminalId,
+                nodeIdB: conn.noteNodeId,
+                type: .terminalToNote
+            )
+            connections[conn.id] = active
+            SkillInjector.shared.inject(to: conn.terminalId, host: host)
+            logger.info("Restored T↔Note: \(conn.terminalId.uuidString.prefix(8)) → \(conn.noteNodeId.uuidString.prefix(8))")
+        }
+
+        for conn in workspace.portalConnections {
+            guard connections[conn.id] == nil else { continue }
+            let active = ActiveConnection(
+                id: conn.id,
+                nodeIdA: conn.terminalId,
+                nodeIdB: conn.portalNodeId,
+                type: .terminalToPortal
+            )
+            connections[conn.id] = active
+            SkillInjector.shared.inject(to: conn.terminalId, host: host)
+            logger.info("Restored T↔Portal: \(conn.terminalId.uuidString.prefix(8)) → \(conn.portalNodeId.uuidString.prefix(8))")
+        }
+
+        for conn in workspace.noteToNoteConnections {
+            guard connections[conn.id] == nil else { continue }
+            let active = ActiveConnection(
+                id: conn.id,
+                nodeIdA: conn.noteNodeIdA,
+                nodeIdB: conn.noteNodeIdB,
+                type: .noteToNote
+            )
+            connections[conn.id] = active
+        }
+
+        for conn in workspace.portalToPortalConnections {
+            guard connections[conn.id] == nil else { continue }
+            let active = ActiveConnection(
+                id: conn.id,
+                nodeIdA: conn.portalIdA,
+                nodeIdB: conn.portalIdB,
+                type: .portalToPortal
+            )
+            connections[conn.id] = active
+        }
+    }
+
     // MARK: - 工具
 
     private func buildDefaultRopePoints() -> [[Double]] {

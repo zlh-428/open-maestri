@@ -7,7 +7,7 @@ enum Constants {
     static let schemaVersion = 2
     static let appDataDirectoryName = ".open-maestri"
     static let defaultFontSize: CGFloat = 13
-    static let defaultFontFamily = "SF Mono"
+    static let defaultFontFamily = "system"
     static let autosaveInterval: TimeInterval = 30
     static let backupInterval: TimeInterval = 3600
     static let canvasInitialOrigin = CGPoint(x: 9800, y: 8500)

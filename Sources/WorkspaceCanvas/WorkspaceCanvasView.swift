@@ -273,6 +273,10 @@ struct WorkspaceCanvasView: View {
             canvasOrigin = workspace.canvasOrigin
             zoom = workspace.canvasZoom
             preInitializeAllTerminals()
+            ConnectionManager.shared.restoreConnections(
+                from: workspace,
+                serverPort: InterAgentServer.shared.port
+            )
         }
         .onReceive(NotificationCenter.default.publisher(for: .showFloorOverview)) { _ in
             showFloorOverview = true
@@ -451,7 +455,8 @@ struct WorkspaceCanvasView: View {
                 command: preset.command,
                 workingDirectory: tc.workingDirectory,
                 workspaceId: wsId,
-                roleName: role?.name
+                roleName: role?.name,
+                displayName: tc.name
             )
         }
         Task { try? await workspace.save() }
@@ -689,7 +694,8 @@ struct WorkspaceCanvasView: View {
                 command: tc.command,
                 workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
                 workspaceId: wsId,
-                roleName: role?.name
+                roleName: role?.name,
+                displayName: tc.name
             )
         }
     }
@@ -858,7 +864,8 @@ struct WorkspaceCanvasView: View {
             command: tc.command,
             workingDirectory: workingDirectory,
             workspaceId: workspace.id,
-            roleName: role.name
+            roleName: role.name,
+            displayName: tc.name
         )
     }
 
@@ -878,7 +885,8 @@ struct WorkspaceCanvasView: View {
             command: tc.command,
             workingDirectory: dir,
             workspaceId: workspace.id,
-            roleName: nil
+            roleName: nil,
+            displayName: tc.name
         )
     }
 

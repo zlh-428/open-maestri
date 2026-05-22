@@ -29,7 +29,7 @@ final class ListHandler {
             switch conn.type {
             case .terminalToTerminal:
                 if let session = tm.terminals[otherId] {
-                    let name = session.agentName ?? (session.command.isEmpty ? "Shell" : session.command)
+                    let name = session.agentName ?? session.displayName ?? (session.command.isEmpty ? "Shell" : session.command)
                     agents.append("  - name: \"\(name)\"")
                 } else {
                     agents.append("  - name: \"unknown\"")

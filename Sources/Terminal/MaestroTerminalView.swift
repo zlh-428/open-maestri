@@ -55,7 +55,7 @@ extension MaestroTerminalView {
         tv.autoresizingMask = [.width, .height]
         addSubview(tv)
         terminalView = tv
-        isRunning = true
+        isRunning = false  // PTY 在 firePendingStart() 之后才真正启动
 
         provider.onTitleChange = { [weak self] title in
             self?.onTitleChange?(title)
@@ -116,8 +116,9 @@ extension MaestroTerminalView {
         // 此时合成树尚未提交，用户不会看到 reflow 过程。
         if isInitialLayout {
             isInitialLayout = false
-            TerminalManager.shared.providers[terminalId]?.snapshotScrollbackBeforeResize()
             tv.frame = newBounds
+            // PTY 启动延迟到此处，确保 terminal.cols 基于真实 frame 计算
+            TerminalManager.shared.providers[terminalId]?.firePendingStart()
             return
         }
 

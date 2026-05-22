@@ -31,7 +31,8 @@ final class TerminalManager {
         command: String,
         workingDirectory: String,
         workspaceId: UUID? = nil,
-        roleName: String? = nil
+        roleName: String? = nil,
+        displayName: String? = nil
     ) -> TerminalSession {
         let session = TerminalSession(
             id: id,
@@ -39,6 +40,7 @@ final class TerminalManager {
             workingDirectory: workingDirectory,
             roleName: roleName
         )
+        session.displayName = displayName
         terminals[id] = session
         if let wsId = workspaceId {
             terminalWorkspaceMap[id] = wsId
@@ -186,6 +188,8 @@ final class TerminalSession {
     let command: String
     let workingDirectory: String
     let roleName: String?
+    /// 用户在 UI 中为此节点设置的显示名称（来自 TerminalContent.name）
+    var displayName: String?
     /// Agent 实际分配的名称（来自 OMAESTRI_AGENT_NAME 环境变量，由 MaestroHandlers.recruit 注入）
     var agentName: String?
     /// 终端当前工作目录（由 PTY OSC 7 回调实时更新）

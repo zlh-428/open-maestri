@@ -35,6 +35,7 @@ final class AskHandler {
             guard connectedIds.contains(session.id) else { return false }
             let lower = targetName.lowercased()
             return session.agentName?.lowercased().contains(lower) == true ||
+                   session.displayName?.lowercased().contains(lower) == true ||
                    session.command.lowercased().contains(lower) ||
                    session.id.uuidString.prefix(8) == targetName.prefix(8)
         }) else {

@@ -3,6 +3,16 @@ import OSLog
 import SwiftTerm
 import AppKit
 
+/// 解析终端字体。"system" 标识符（对标 Maestri 默认值）映射到 monospacedSystemFont，
+/// 其他值按 PostScript 字体名查找，找不到时 fallback 到 monospacedSystemFont。
+func resolveTerminalFont(family: String, size: CGFloat) -> NSFont {
+    if family == "system" || family.isEmpty {
+        return NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+    return NSFont(name: family, size: size)
+        ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+}
+
 /// SwiftTerm PTY 适配层 — 只负责 PTY 进程管理
 /// - 通过子类化 LocalProcessTerminalView（OmLocalProcessTerminalView）的 dataReceived 检测输出
 /// - shellReadyCallback：shell 就绪（100ms 静默）后触发一次
@@ -43,6 +53,17 @@ final class SwiftTermProvider: NSObject {
 
     /// cd + 自定义命令，由 start() 注入，shell 就绪后统一发送
     var pendingStartupCommands: [String] = []
+
+    // startProcess 参数暂存：start() 创建视图后不立即启动进程，
+    // 等 MaestroTerminalView.layout() 首次确定正确 bounds 后再由 firePendingStart() 触发。
+    private struct PendingStart {
+        let executable: String
+        let args: [String]
+        let environment: [String]
+        let execName: String
+        let currentDirectory: String?
+    }
+    private var pendingStart: PendingStart?
 
     // MARK: - Shell 就绪检测（内部）
 
@@ -87,7 +108,7 @@ final class SwiftTermProvider: NSObject {
         applyFontWithPrefs(to: view, prefs: prefs)
 
         terminalView = view
-        isRunning = true
+        // isRunning 延迟到 firePendingStart() 实际启动进程后再设置
 
         enableMetalIfNeeded(view: view, metalEnabled: prefs.metalRendererEnabled)
 
@@ -138,23 +159,35 @@ final class SwiftTermProvider: NSObject {
         // 增大 scrollback buffer（默认 500 行太小，长会话 resize 时会截断历史）
         view.getTerminal().changeScrollback(10000)
 
-        // TODO: Scrollback 恢复暂时禁用——feed 纯文本行到 SwiftTerm buffer 后，
-        // resize 触发 reflow 会导致 UI 错乱（行缺少 isWrapped 标记）。
-        // 需要找到一种 resize-safe 的历史恢复方案后再启用。
-        // if let wsId = workspaceId {
-        //     feedScrollbackBeforeStart(view: view, workspaceId: wsId)
-        // }
-
-        view.startProcess(
+        // 暂存启动参数，等 MaestroTerminalView.layout() 首次完成后再调用 startProcess。
+        // 这样 zsh 启动时拿到的是正确的内容区尺寸（不是 fallback 的 600x400），
+        // terminal.cols 从一开始就基于真实 frame 计算，避免光标水平偏移。
+        pendingStart = PendingStart(
             executable: args[0],
             args: Array(args.dropFirst()),
             environment: env.map { "\($0.key)=\($0.value)" },
             execName: execName,
             currentDirectory: startDir
         )
-        logger.debug("PTY started: \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
+        logger.debug("PTY view ready (pending layout): \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
 
         return view
+    }
+
+    /// 由 MaestroTerminalView.layout() 在首次确定正确 bounds 后调用，触发真正的 PTY 启动。
+    func firePendingStart() {
+        guard let ps = pendingStart else { return }
+        pendingStart = nil
+        guard let view = terminalView else { return }
+        isRunning = true
+        view.startProcess(
+            executable: ps.executable,
+            args: ps.args,
+            environment: ps.environment,
+            execName: ps.execName,
+            currentDirectory: ps.currentDirectory
+        )
+        logger.debug("PTY started (after layout): \(self.command) in \(self.workingDirectory), terminalId=\(self.terminalId.uuidString.prefix(8))")
     }
 
     // MARK: - Shell 就绪检测
@@ -319,24 +352,19 @@ final class SwiftTermProvider: NSObject {
     // MARK: - 字体应用
 
     private func applyFontWithPrefs(to view: LocalProcessTerminalView, prefs: Preferences) {
-        let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
-            ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
-        view.font = font
+        view.font = resolveTerminalFont(family: prefs.terminalFontFamily, size: prefs.terminalFontSize)
     }
 
     func applyCurrentFont(to view: LocalProcessTerminalView) {
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
-            let font = NSFont(name: prefs.terminalFontFamily, size: prefs.terminalFontSize)
-                ?? NSFont.monospacedSystemFont(ofSize: prefs.terminalFontSize, weight: .regular)
-            view.font = font
+            view.font = resolveTerminalFont(family: prefs.terminalFontFamily, size: prefs.terminalFontSize)
         }
     }
 
     func applyFont(family: String, size: CGFloat) {
         guard let view = terminalView else { return }
-        let font = NSFont(name: family, size: size)
-            ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
-        view.font = font
+        view.font = resolveTerminalFont(family: family, size: size)
+        logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
         logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
@@ -527,4 +555,5 @@ final class OmLocalProcessTerminalView: LocalProcessTerminalView {
             onDataReceived?(text)
         }
     }
+
 }

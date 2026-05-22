@@ -26,6 +26,7 @@ final class CheckHandler {
         let targetSession = tm.terminals.values.first { session in
             guard connectedIds.contains(session.id) else { return false }
             return session.agentName?.lowercased().contains(lower) == true ||
+                   session.displayName?.lowercased().contains(lower) == true ||
                    session.command.lowercased().contains(lower) ||
                    session.id.uuidString.hasPrefix(targetName)
         }

@@ -175,7 +175,8 @@ struct CanvasToolbar: View {
                 command: preset.command,
                 workingDirectory: startDir,
                 workspaceId: wsId,
-                roleName: role?.name
+                roleName: role?.name,
+                displayName: tc.name
             )
         }
     }

@@ -328,6 +328,30 @@ final class CanvasNodeRenderer {
         if let content = newContent {
             ws.nodes[idx].content = content
             canvas?.updateNodeContentInPlace(id: id, content: content)
+            // terminal rename: 同步到 TerminalSession.displayName
+            if case .terminal = content {
+                Task { @MainActor in
+                    TerminalManager.shared.terminals[id]?.displayName = newName
+                }
+            }
+            // 刷新 SwiftUI 节点层，确保 header title 实时更新
+            if let canvas, let current = nodesHostingView?.rootView {
+                let lockedIds = Set(canvas.currentNodes.filter { $0.isLocked }.map { $0.id })
+                nodesHostingView?.rootView = CanvasNodesSwiftUIView(
+                    nodes: canvas.viewportCulledNodes(),
+                    canvasOrigin: canvas.canvasOrigin,
+                    zoom: canvas.zoom,
+                    selectedNodeIds: canvas.selectedNodeIds,
+                    lockedNodeIds: lockedIds,
+                    workspace: current.workspace,
+                    dropTargetNodeId: current.dropTargetNodeId,
+                    onActivated: current.onActivated,
+                    onClose: current.onClose,
+                    onRename: current.onRename,
+                    onDuplicate: current.onDuplicate,
+                    onLockToggle: current.onLockToggle
+                )
+            }
         }
         saveWorkspace()
     }

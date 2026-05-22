@@ -4,7 +4,7 @@ import SwiftTerm
 struct TerminalSettingsView: View {
     @Environment(AppState.self) private var appState
 
-    private let fontFamilies = ["SF Mono", "Menlo", "Monaco", "Courier New", "JetBrains Mono", "Fira Code"]
+    private let fontFamilies = ["system", "Menlo", "Monaco", "Courier New", "JetBrains Mono", "Fira Code"]
     private let fontSizes: [CGFloat] = [11, 12, 13, 14, 15, 16, 18, 20]
 
     var body: some View {
@@ -12,7 +12,9 @@ struct TerminalSettingsView: View {
         Form {
             Section("settings.terminal.font") {
                 Picker("settings.terminal.font", selection: $state.preferences.terminalFontFamily) {
-                    ForEach(fontFamilies, id: \.self) { Text($0).tag($0) }
+                    ForEach(fontFamilies, id: \.self) { family in
+                        Text(family == "system" ? "System Default" : family).tag(family)
+                    }
                 }
                 Picker("settings.terminal.font_size", selection: $state.preferences.terminalFontSize) {
                     ForEach(fontSizes, id: \.self) { Text("\(Int($0))pt").tag($0) }
