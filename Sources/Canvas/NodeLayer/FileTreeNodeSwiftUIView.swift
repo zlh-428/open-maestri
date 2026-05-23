@@ -93,13 +93,17 @@ struct FileTreeNodeSwiftUIView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // 背景
+            // 背景：vibrancy 毛玻璃 + 半透明叠加 + 阴影
             RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.75))
+                .background {
+                    VibrancyBackground(material: .popover, blendingMode: .behindWindow)
+                        .clipShape(RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius))
+                }
+                .shadow(color: .black.opacity(0.15), radius: 10, y: 3)
                 .overlay {
                     RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
-                        .stroke(Color(white: 0.85), lineWidth: 0.5)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5)
                 }
 
             VStack(spacing: 0) {

@@ -117,7 +117,9 @@ struct PortalNavBarView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color(white: 0.95).opacity(0.6))
+        .background {
+            VibrancyBackground(material: .sidebar, blendingMode: .behindWindow)
+        }
     }
 }
 
