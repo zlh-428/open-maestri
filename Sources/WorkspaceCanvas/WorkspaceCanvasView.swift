@@ -290,6 +290,9 @@ struct WorkspaceCanvasView: View {
         .onReceive(NotificationCenter.default.publisher(for: .portalOpenedNewWindow)) { notif in
             handlePortalOpenedNewWindow(notif: notif)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .portalURLDidChange)) { notif in
+            handlePortalURLDidChange(notif: notif)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .editTerminalRequested)) { notif in
             if let nodeId = notif.userInfo?["nodeId"] as? UUID,
                let tc = notif.userInfo?["terminalContent"] as? TerminalContent {
@@ -760,6 +763,18 @@ struct WorkspaceCanvasView: View {
         let conn = ConnectionManager.shared.connectPortalToPortal(portalIdA: openerPortalId, portalIdB: newNode.id)
         workspace.addPortalToPortalConnection(conn)
 
+        Task { try? await workspace.save() }
+    }
+
+    private func handlePortalURLDidChange(notif: Notification) {
+        guard let info = notif.userInfo,
+              let portalId = info["portalId"] as? UUID,
+              let url = info["url"] as? String,
+              let idx = workspace.nodes.firstIndex(where: { $0.id == portalId }),
+              case .portal(var pc) = workspace.nodes[idx].content else { return }
+        guard pc.currentURL != url else { return }
+        pc.currentURL = url
+        workspace.nodes[idx].content = .portal(pc)
         Task { try? await workspace.save() }
     }
 

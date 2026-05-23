@@ -63,4 +63,6 @@ extension Notification.Name {
     static let portalCreatedViaCLI       = Notification.Name("OpenMaestri.portalCreatedViaCLI")
     /// Portal 内 _blank 链接触发新建 Portal：userInfo 含 "url" String, "openerPortalId" UUID
     static let portalOpenedNewWindow     = Notification.Name("OpenMaestri.portalOpenedNewWindow")
+    /// Portal 导航完成，URL 已变更：userInfo 含 "portalId" UUID, "url" String
+    static let portalURLDidChange        = Notification.Name("OpenMaestri.portalURLDidChange")
 }

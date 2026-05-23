@@ -409,7 +409,8 @@ struct PortalWebViewRepresentable: NSViewRepresentable {
 
 extension PortalWebViewRepresentable: Equatable {
     static func == (lhs: PortalWebViewRepresentable, rhs: PortalWebViewRepresentable) -> Bool {
-        // 仅在 nodeId 或 initialURL 真正变化时才重建
-        lhs.nodeId == rhs.nodeId && lhs.initialURL == rhs.initialURL
+        // 只用 nodeId 区分身份；initialURL 仅在 makeNSView 首次加载时使用，
+        // 后续 currentURL 持久化写回 content 时不应触发 WebView 重建
+        lhs.nodeId == rhs.nodeId
     }
 }

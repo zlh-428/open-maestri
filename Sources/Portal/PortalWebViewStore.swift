@@ -133,6 +133,14 @@ final class PortalWebViewStore {
 
     func navigationDidFinish(for portalId: UUID) {
         loadingContinuations.removeValue(forKey: portalId)?.resume()
+        // 将最终落地 URL 写回模型，保证关闭重开后能恢复
+        if let url = webViews[portalId]?.url?.absoluteString, !url.isEmpty {
+            NotificationCenter.default.post(
+                name: .portalURLDidChange,
+                object: nil,
+                userInfo: ["portalId": portalId, "url": url]
+            )
+        }
     }
 
     func navigationDidFail(for portalId: UUID, error: Error) {
