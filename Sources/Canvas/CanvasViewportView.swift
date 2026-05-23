@@ -830,11 +830,9 @@ final class CanvasViewportView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        // 连线模式下需要 mouseMoved 事件来跟踪鼠标位置
-        if isInConnectingMode || connectingFromNodeId != nil {
-            for ta in trackingAreas { removeTrackingArea(ta) }
-            addTrackingArea(makeTrackingArea())
-        }
+        // 始终注册全画布 tracking area，保证 mouseMoved 持续触发以更新光标
+        for ta in trackingAreas { removeTrackingArea(ta) }
+        addTrackingArea(makeTrackingArea())
     }
 }
 

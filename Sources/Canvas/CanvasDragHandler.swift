@@ -61,7 +61,7 @@ extension CanvasViewportView {
     func makeTrackingArea() -> NSTrackingArea {
         NSTrackingArea(
             rect: bounds,
-            options: [.activeInKeyWindow, .mouseMoved],
+            options: [.activeInKeyWindow, .mouseMoved, .cursorUpdate],
             owner: self,
             userInfo: nil
         )
