@@ -10,7 +10,32 @@ final class PortalWebViewStore {
     private let logger = Logger.make(category: "PortalWebViewStore")
     private var webViews: [UUID: WKWebView] = [:]
     private var navigationDelegates: [UUID: PortalNavigationDelegate] = [:]
+    private var uiDelegates: [UUID: PortalUIDelegate] = [:]
+    private var loadingContinuations: [UUID: CheckedContinuation<Void, Error>] = [:]
+    /// Portal URL 输入框引用（用于 AppKit 层聚焦）
+    private var urlTextFields: [UUID: NSTextField] = [:]
     private init() {}
+
+    // MARK: - URL TextField 管理
+
+    func registerURLTextField(_ textField: NSTextField, for portalId: UUID) {
+        urlTextFields[portalId] = textField
+    }
+
+    func unregisterURLTextField(for portalId: UUID) {
+        urlTextFields.removeValue(forKey: portalId)
+    }
+
+    /// 通过 NSTextField 引用注销（dismantleNSView 场景下 nodeId 不易获取）
+    func unregisterURLTextField(matching textField: NSTextField) {
+        if let key = urlTextFields.first(where: { $0.value === textField })?.key {
+            urlTextFields.removeValue(forKey: key)
+        }
+    }
+
+    func urlTextField(for portalId: UUID) -> NSTextField? {
+        urlTextFields[portalId]
+    }
 
     // MARK: - WebView 生命周期
 
@@ -37,10 +62,14 @@ final class PortalWebViewStore {
         }
         let webView = WKWebView(frame: .zero, configuration: config)
         // 设置 navigationDelegate 处理证书挑战（允许自签名 HTTPS）
-        let delegate = PortalNavigationDelegate()
+        let delegate = PortalNavigationDelegate(portalId: portalId)
         webView.navigationDelegate = delegate
+        // 设置 uiDelegate 处理 target="_blank" / window.open() 新窗口请求
+        let uiDelegate = PortalUIDelegate(portalId: portalId)
+        webView.uiDelegate = uiDelegate
         // 保留 delegate 引用避免被 ARC 释放
         navigationDelegates[portalId] = delegate
+        uiDelegates[portalId] = uiDelegate
         webViews[portalId] = webView
 
         if let urlStr = initialURL, let url = URL(string: urlStr) {
@@ -59,6 +88,8 @@ final class PortalWebViewStore {
         webViews[portalId]?.stopLoading()
         webViews.removeValue(forKey: portalId)
         navigationDelegates.removeValue(forKey: portalId)
+        uiDelegates.removeValue(forKey: portalId)
+        loadingContinuations.removeValue(forKey: portalId)?.resume()
         // 清理共享组（如果是最后一个成员）
         if let groupId = portalGroups.removeValue(forKey: portalId) {
             let remaining = portalGroups.values.filter { $0 == groupId }
@@ -98,14 +129,56 @@ final class PortalWebViewStore {
         logger.info("Session shared: portal \(portalIdA.uuidString.prefix(8)) ↔ \(portalIdB.uuidString.prefix(8)) (group: \(groupId.uuidString.prefix(8)))")
     }
 
+    // MARK: - Navigation 回调（由 PortalNavigationDelegate 调用）
+
+    func navigationDidFinish(for portalId: UUID) {
+        loadingContinuations.removeValue(forKey: portalId)?.resume()
+    }
+
+    func navigationDidFail(for portalId: UUID, error: Error) {
+        loadingContinuations.removeValue(forKey: portalId)?.resume(throwing: error)
+    }
+
     // MARK: - Portal 自动化命令（omaestri portal）
+
+    func goBack(portalId: UUID) async throws {
+        guard let wv = webViews[portalId] else {
+            throw MaestriError.portalCommandFailed("Portal not found: \(portalId)")
+        }
+        await MainActor.run { wv.goBack() }
+    }
+
+    func goForward(portalId: UUID) async throws {
+        guard let wv = webViews[portalId] else {
+            throw MaestriError.portalCommandFailed("Portal not found: \(portalId)")
+        }
+        await MainActor.run { wv.goForward() }
+    }
+
+    func reload(portalId: UUID) async throws {
+        guard let wv = webViews[portalId] else {
+            throw MaestriError.portalCommandFailed("Portal not found: \(portalId)")
+        }
+        await MainActor.run { wv.reload() }
+    }
 
     func navigate(portalId: UUID, to urlString: String) async throws {
         guard let wv = webViews[portalId],
               let url = URL(string: urlString) else {
             throw MaestriError.portalCommandFailed("Invalid URL or portal not found: \(urlString)")
         }
-        await MainActor.run { wv.load(URLRequest(url: url)) }
+        // 取消之前未完成的 navigation（如有）
+        loadingContinuations.removeValue(forKey: portalId)?.resume()
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            loadingContinuations[portalId] = continuation
+            wv.load(URLRequest(url: url))
+            // 15 秒超时保护：超时后不报错，直接继续
+            Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                self?.loadingContinuations.removeValue(forKey: portalId)?.resume()
+            }
+        }
     }
 
     func screenshot(portalId: UUID) async throws -> String {

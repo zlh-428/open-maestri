@@ -284,6 +284,12 @@ struct WorkspaceCanvasView: View {
         .onReceive(NotificationCenter.default.publisher(for: .maestroRecruited)) { notif in
             handleMaestroRecruited(notif: notif)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .portalCreatedViaCLI)) { notif in
+            handlePortalCreatedViaCLI(notif: notif)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .portalOpenedNewWindow)) { notif in
+            handlePortalOpenedNewWindow(notif: notif)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .editTerminalRequested)) { notif in
             if let nodeId = notif.userInfo?["nodeId"] as? UUID,
                let tc = notif.userInfo?["terminalContent"] as? TerminalContent {
@@ -347,8 +353,8 @@ struct WorkspaceCanvasView: View {
             .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showPortalSheetForDrawing) {
-            NewPortalSheet { url in
-                createPortalAtFrame(showPortalDrawnFrame, url: url)
+            NewPortalSheet { name, url in
+                createPortalAtFrame(showPortalDrawnFrame, name: name, url: url)
             }
             .environment(\.locale, LocalizationManager.shared.locale)
         }
@@ -382,7 +388,7 @@ struct WorkspaceCanvasView: View {
     }
 
     private func createNoteAtFrame(_ frame: CGRect) {
-        let name = "Note-\(UUID().uuidString.prefix(6))"
+        let name = nextNodeName(for: "stickyNote")
         let fileName = "\(name).md"
         var nc = StickyNoteContent(name: name)
         nc.fileName = fileName
@@ -462,8 +468,9 @@ struct WorkspaceCanvasView: View {
         Task { try? await workspace.save() }
     }
 
-    private func createPortalAtFrame(_ frame: CGRect, url: String) {
-        let pc = PortalContent(name: "Portal", url: url)
+    private func createPortalAtFrame(_ frame: CGRect, name: String, url: String) {
+        let portalName = name.isEmpty ? nextNodeName(for: "portal") : name
+        let pc = PortalContent(name: portalName, url: url)
         let node = CanvasNode(
             frame: frame,
             content: .portal(pc)
@@ -579,6 +586,33 @@ struct WorkspaceCanvasView: View {
         }
     }
 
+    /// 根据现有同类型节点数量生成递增编号名称（如 "Portal #1", "Note #2"）
+    private func nextNodeName(for nodeType: String) -> String {
+        let prefix: String
+        switch nodeType {
+        case "portal": prefix = "Portal"
+        case "stickyNote": prefix = "Note"
+        case "fileTree": prefix = "File Tree"
+        case "text": prefix = "Text"
+        case "drawing": prefix = "Drawing"
+        default: prefix = "Node"
+        }
+
+        // 统计当前画布上同类型节点数量
+        let existingCount = workspace.nodes.count { node in
+            switch (nodeType, node.content) {
+            case ("portal", .portal): return true
+            case ("stickyNote", .stickyNote): return true
+            case ("fileTree", .fileTree): return true
+            case ("text", .text): return true
+            case ("drawing", .drawing): return true
+            default: return false
+            }
+        }
+
+        return "\(prefix) #\(existingCount + 1)"
+    }
+
     /// 处理从 Finder 拖入的 .md/.markdown/.txt 文件，创建 Note 节点（storageMode = .custom）
     private func handleFilesDropped(paths: [String], at canvasOriginPoint: CGPoint) {
         var offsetY: CGFloat = 0
@@ -659,6 +693,73 @@ struct WorkspaceCanvasView: View {
 
         workspace.addNode(recruitNode)
         workspace.addConnection(conn)
+        Task { try? await workspace.save() }
+    }
+
+    // MARK: - Portal CLI 创建处理
+
+    private func handlePortalCreatedViaCLI(notif: Notification) {
+        guard let info = notif.userInfo,
+              var portalNode = info["portalNode"] as? CanvasNode else { return }
+        let callerTerminalId = info["terminalId"] as? UUID
+
+        let defaultSize = CGSize(width: 700, height: 500)
+        if let tid = callerTerminalId,
+           let callerNode = workspace.nodes.first(where: { $0.id == tid }) {
+            portalNode.frame = CGRect(
+                x: callerNode.frame.maxX + 40,
+                y: callerNode.frame.minY,
+                width: defaultSize.width,
+                height: defaultSize.height
+            )
+        } else {
+            let origin = workspace.canvasOrigin
+            portalNode.frame = CGRect(
+                x: origin.x + 200, y: origin.y + 100,
+                width: defaultSize.width, height: defaultSize.height
+            )
+        }
+
+        workspace.addNode(portalNode)
+
+        if let tid = callerTerminalId {
+            let conn = ConnectionManager.shared.connectTerminalToPortal(terminalId: tid, portalNodeId: portalNode.id)
+            workspace.addPortalConnection(conn)
+        }
+
+        Task { try? await workspace.save() }
+    }
+
+    private func handlePortalOpenedNewWindow(notif: Notification) {
+        guard let info = notif.userInfo,
+              let urlString = info["url"] as? String,
+              let openerPortalId = info["openerPortalId"] as? UUID else { return }
+
+        let defaultSize = CGSize(width: 700, height: 500)
+        let frame: CGRect
+        if let openerNode = workspace.nodes.first(where: { $0.id == openerPortalId }) {
+            frame = CGRect(
+                x: openerNode.frame.maxX + 40,
+                y: openerNode.frame.minY,
+                width: defaultSize.width,
+                height: defaultSize.height
+            )
+        } else {
+            let origin = workspace.canvasOrigin
+            frame = CGRect(
+                x: origin.x + 200, y: origin.y + 100,
+                width: defaultSize.width, height: defaultSize.height
+            )
+        }
+
+        let portalName = nextNodeName(for: "portal")
+        let pc = PortalContent(name: portalName, url: urlString)
+        let newNode = CanvasNode(frame: frame, content: .portal(pc))
+        workspace.addNode(newNode)
+
+        let conn = ConnectionManager.shared.connectPortalToPortal(portalIdA: openerPortalId, portalIdB: newNode.id)
+        workspace.addPortalToPortalConnection(conn)
+
         Task { try? await workspace.save() }
     }
 

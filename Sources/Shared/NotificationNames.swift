@@ -59,4 +59,8 @@ extension Notification.Name {
     static let terminalProviderReady     = Notification.Name("OpenMaestri.terminalProviderReady")
     /// shell 初始化完成，MaestroTerminalView 可加载 scrollback
     static let terminalShellReady        = Notification.Name("OpenMaestri.terminalShellReady")
+    /// Portal 通过 CLI 创建：userInfo 含 "portalNode" CanvasNode, "terminalId" UUID?
+    static let portalCreatedViaCLI       = Notification.Name("OpenMaestri.portalCreatedViaCLI")
+    /// Portal 内 _blank 链接触发新建 Portal：userInfo 含 "url" String, "openerPortalId" UUID
+    static let portalOpenedNewWindow     = Notification.Name("OpenMaestri.portalOpenedNewWindow")
 }
