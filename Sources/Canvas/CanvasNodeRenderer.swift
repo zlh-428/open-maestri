@@ -451,6 +451,7 @@ final class CanvasNodeRenderer {
                let tv = provider.terminalView {
                 tv.window?.makeFirstResponder(tv)
             }
+            // Portal 节点不在此处聚焦——由 CanvasInteractionHandler 根据点击位置精确判断
         }
         notificationObservers.append(obs)
     }

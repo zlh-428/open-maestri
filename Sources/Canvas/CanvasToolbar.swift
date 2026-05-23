@@ -119,8 +119,8 @@ struct CanvasToolbar: View {
             .environment(\.locale, LocalizationManager.shared.locale)
         }
         .sheet(isPresented: $showPortalSheet) {
-            NewPortalSheet { url in
-                createPortal(url: url)
+            NewPortalSheet { name, url in
+                createPortal(name: name, url: url)
             }
             .environment(\.locale, LocalizationManager.shared.locale)
         }
@@ -182,7 +182,7 @@ struct CanvasToolbar: View {
     }
 
     private func createNote() {
-        let name = "Note-\(UUID().uuidString.prefix(6))"
+        let name = nextNodeName(for: "stickyNote")
         let fileName = "\(name).md"
         let nc = StickyNoteContent(name: name)
         var mutableNC = nc
@@ -204,8 +204,9 @@ struct CanvasToolbar: View {
         addNode(node)
     }
 
-    private func createPortal(url: String) {
-        let pc = PortalContent(name: "Portal", url: url)
+    private func createPortal(name: String, url: String) {
+        let portalName = name.isEmpty ? nextNodeName(for: "portal") : name
+        let pc = PortalContent(name: portalName, url: url)
         let origin = nextNodeOrigin(width: 800, height: 600)
         let node = CanvasNode(
             frame: CGRect(origin: origin, size: CGSize(width: 800, height: 600)),
@@ -247,6 +248,32 @@ struct CanvasToolbar: View {
         let stepX = width + 30
         let stepY = height + 60
         return CGPoint(x: baseX + CGFloat(col) * stepX, y: baseY + CGFloat(row) * stepY)
+    }
+
+    /// 根据现有同类型节点数量生成递增编号名称（如 "Portal #1", "Note #2"）
+    private func nextNodeName(for nodeType: String) -> String {
+        let prefix: String
+        switch nodeType {
+        case "portal": prefix = "Portal"
+        case "stickyNote": prefix = "Note"
+        case "fileTree": prefix = "File Tree"
+        case "text": prefix = "Text"
+        case "drawing": prefix = "Drawing"
+        default: prefix = "Node"
+        }
+
+        let existingCount = workspace.nodes.count { node in
+            switch (nodeType, node.content) {
+            case ("portal", .portal): return true
+            case ("stickyNote", .stickyNote): return true
+            case ("fileTree", .fileTree): return true
+            case ("text", .text): return true
+            case ("drawing", .drawing): return true
+            default: return false
+            }
+        }
+
+        return "\(prefix) #\(existingCount + 1)"
     }
 }
 

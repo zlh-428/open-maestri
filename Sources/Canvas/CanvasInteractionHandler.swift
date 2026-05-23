@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 
 // MARK: - 画布命中测试结果
 
@@ -253,6 +254,37 @@ extension CanvasViewportView {
                 }
                 window?.makeFirstResponder(terminalView)
             }
+            // Portal 节点：根据点击位置决定聚焦 URL 输入框还是 WebView
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .portal = node.content {
+                let screenFrame = canvasRectToScreen(node.frame)
+                let localY = loc.y - screenFrame.minY
+                // 导航栏区域（header 之后约 40px * zoom）
+                let navBarBottom = (CanvasNodeConstants.headerHeight + 40) * zoom
+                if localY <= navBarBottom,
+                   let urlField = PortalWebViewStore.shared.urlTextField(for: id) {
+                    window?.makeFirstResponder(urlField)
+                } else if wasAlreadySelected,
+                          let webView = PortalWebViewStore.shared.webView(for: id) {
+                    // WebView 区域：路由鼠标事件给 WKWebView（使链接、按钮、输入框可点击）
+                    interaction = .contentInteraction(id, contentTarget: webView)
+                    let correctedLocation = correctedWindowLocationForWebView(for: event, nodeId: id, webView: webView)
+                    if let syntheticEvent = NSEvent.mouseEvent(
+                        with: .leftMouseDown,
+                        location: correctedLocation,
+                        modifierFlags: event.modifierFlags,
+                        timestamp: event.timestamp,
+                        windowNumber: event.windowNumber,
+                        context: nil,
+                        eventNumber: event.eventNumber,
+                        clickCount: event.clickCount,
+                        pressure: event.pressure
+                    ) {
+                        webView.mouseDown(with: syntheticEvent)
+                    }
+                    window?.makeFirstResponder(webView)
+                }
+            }
             // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
 
         case .nodeResize(let id, let edge):
@@ -469,9 +501,14 @@ extension CanvasViewportView {
             snapGuideView?.drawingRect = screenRect
             needsDisplay = true
 
-        // --- 内容区交互（终端文字选中等）---
+        // --- 内容区交互（终端文字选中 / WebView 点击拖拽等）---
         case .contentInteraction(let id, let contentTarget):
-            let correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            let correctedLocation: CGPoint
+            if contentTarget is WKWebView {
+                correctedLocation = correctedWindowLocationForWebView(for: event, nodeId: id, webView: contentTarget)
+            } else {
+                correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            }
             if let syntheticEvent = NSEvent.mouseEvent(
                 with: .leftMouseDragged,
                 location: correctedLocation,
@@ -710,7 +747,12 @@ extension CanvasViewportView {
             needsDisplay = true
 
         case .contentInteraction(let id, let contentTarget):
-            let correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            let correctedLocation: CGPoint
+            if contentTarget is WKWebView {
+                correctedLocation = correctedWindowLocationForWebView(for: event, nodeId: id, webView: contentTarget)
+            } else {
+                correctedLocation = correctedWindowLocation(for: event, nodeId: id, terminalView: contentTarget)
+            }
             if let syntheticEvent = NSEvent.mouseEvent(
                 with: .leftMouseUp,
                 location: correctedLocation,
@@ -797,5 +839,32 @@ extension CanvasViewportView {
         // 用 terminalView 自身的坐标系统转回窗口坐标
         // 这样 SwiftTerm 调用 convert(locationInWindow, from: nil) 时得到 (localX, localY)
         return terminalView.convert(CGPoint(x: localX, y: localY), to: nil)
+    }
+
+    /// Portal WKWebView 坐标修正
+    /// WKWebView 是 flipped 坐标系（y 从上到下），且 Portal 节点有 header + navBar + divider 偏移
+    private func correctedWindowLocationForWebView(for event: NSEvent, nodeId: UUID, webView: NSView) -> CGPoint {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        guard let node = currentNodes.first(where: { $0.id == nodeId }) else {
+            return event.locationInWindow
+        }
+
+        let screenFrame = canvasRectToScreen(node.frame)
+        // Portal 内容区偏移：header(32) + navBar padding(6) + navBar height(28) + padding(6) + divider(1) = 73
+        let contentTopOffset: CGFloat = 73.0
+        let scaledContentTop = contentTopOffset * zoom
+
+        // 鼠标在 WebView 内容区中的相对位置（屏幕坐标）
+        let relX = loc.x - screenFrame.minX
+        let relY = loc.y - screenFrame.minY - scaledContentTop
+
+        // 转为 WebView 本地坐标（未缩放）
+        // WKWebView 是 flipped（y 从上到下），与屏幕坐标系一致（AppKit 的 y 向下）
+        let localX = relX / zoom
+        let localY = relY / zoom
+
+        // 用 webView 自身坐标系统转回窗口坐标
+        return webView.convert(CGPoint(x: localX, y: localY), to: nil)
     }
 }
