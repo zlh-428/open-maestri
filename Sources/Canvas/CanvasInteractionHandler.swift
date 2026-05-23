@@ -272,6 +272,13 @@ extension CanvasViewportView {
                 }
                 window?.makeFirstResponder(terminalView)
             }
+            // Note 节点：将焦点交给 NSTextView（让用户直接输入）
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .stickyNote = node.content {
+                if let tv = NoteTextViewRegistry.shared.textView(for: id) {
+                    window?.makeFirstResponder(tv)
+                }
+            }
             // Portal 节点：根据点击位置决定聚焦 URL 输入框还是 WebView
             if let node = currentNodes.first(where: { $0.id == id }),
                case .portal = node.content {
@@ -282,9 +289,8 @@ extension CanvasViewportView {
                 if localY <= navBarBottom,
                    let urlField = PortalWebViewStore.shared.urlTextField(for: id) {
                     window?.makeFirstResponder(urlField)
-                } else if wasAlreadySelected,
-                          let webView = PortalWebViewStore.shared.webView(for: id) {
-                    // WebView 区域：路由鼠标事件给 WKWebView（使链接、按钮、输入框可点击）
+                } else if let webView = PortalWebViewStore.shared.webView(for: id) {
+                    // WebView 区域：第一次点击即路由给 WKWebView（无需先选中再二次点击）
                     interaction = .contentInteraction(id, contentTarget: webView)
                     let correctedLocation = correctedWindowLocationForWebView(for: event, nodeId: id, webView: webView)
                     if let syntheticEvent = NSEvent.mouseEvent(
