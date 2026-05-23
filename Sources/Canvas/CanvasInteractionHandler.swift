@@ -272,12 +272,28 @@ extension CanvasViewportView {
                 }
                 window?.makeFirstResponder(terminalView)
             }
-            // Note 节点：将焦点交给 NSTextView（让用户直接输入）
+            // Note 节点：将 NSTextView 设为 first responder 并发送坐标修正的 mouseDown。
+            // 不使用 contentInteraction，让 AppKit 原生响应链处理后续 drag/up 事件，
+            // 避免在 mouseDragged 中手动转发造成递归崩溃。
             if let node = currentNodes.first(where: { $0.id == id }),
-               case .stickyNote = node.content {
-                if let tv = NoteTextViewRegistry.shared.textView(for: id) {
-                    window?.makeFirstResponder(tv)
+               case .stickyNote = node.content,
+               let tv = NoteTextViewRegistry.shared.textView(for: id) {
+                window?.makeFirstResponder(tv)
+                let correctedLocation = correctedWindowLocationForTextView(for: event, nodeId: id, textView: tv)
+                if let syntheticEvent = NSEvent.mouseEvent(
+                    with: .leftMouseDown,
+                    location: correctedLocation,
+                    modifierFlags: event.modifierFlags,
+                    timestamp: event.timestamp,
+                    windowNumber: event.windowNumber,
+                    context: nil,
+                    eventNumber: event.eventNumber,
+                    clickCount: event.clickCount,
+                    pressure: event.pressure
+                ) {
+                    tv.mouseDown(with: syntheticEvent)
                 }
+                // interaction 保持 idle，后续 drag/up 由 AppKit 响应链直接路由给 NSTextView
             }
             // Portal 节点：根据点击位置决定聚焦 URL 输入框还是 WebView
             if let node = currentNodes.first(where: { $0.id == id }),
@@ -890,5 +906,29 @@ extension CanvasViewportView {
 
         // 用 webView 自身坐标系统转回窗口坐标
         return webView.convert(CGPoint(x: localX, y: localY), to: nil)
+    }
+
+    /// NSTextView 坐标修正（Note 节点）
+    /// NSTextView 默认 isFlipped=true（y 从上到下），与屏幕坐标系一致，不需要翻转 y 轴
+    private func correctedWindowLocationForTextView(for event: NSEvent, nodeId: UUID, textView: NSView) -> CGPoint {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        guard let node = currentNodes.first(where: { $0.id == nodeId }) else {
+            return event.locationInWindow
+        }
+
+        let screenFrame = canvasRectToScreen(node.frame)
+        let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
+        let scaledDividerHeight: CGFloat = 1.0 * zoom
+
+        // 鼠标在 NSTextView 内容区中的相对位置（屏幕坐标）
+        let relX = loc.x - screenFrame.minX
+        let relY = loc.y - screenFrame.minY - scaledHeaderHeight - scaledDividerHeight
+
+        // NSTextView 是 flipped（y 从上到下），与屏幕坐标方向一致，直接除以 zoom
+        let localX = relX / zoom
+        let localY = relY / zoom
+
+        return textView.convert(CGPoint(x: localX, y: localY), to: nil)
     }
 }
