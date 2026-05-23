@@ -54,23 +54,32 @@ extension CanvasViewportView {
     // MARK: - 语义化命中测试
 
     /// 将画布坐标 point 映射到语义化命中区域
-    /// 优先级：resize 热区 > header 区域 > 内容区 > 空白
+    /// 优先级：选中节点外扩 resize 热区 > 节点内容区（header/footer/content）> 未选中节点内缩 resize > 空白
     /// 纯几何计算，不依赖 BaseNodeView 或子视图 hitTest（避免无限递归）
     func hitTestCanvas(at loc: CGPoint) -> CanvasHitTestResult {
+        // Pass 1：对已选中节点先检测外扩 resize 热区（在节点边框外侧，不与内容冲突）
+        for node in sortedNodesByZIndexDesc where selectedNodeIds.contains(node.id) {
+            guard !isNodeLocked(node.id) else { continue }
+            let screenFrame = canvasRectToScreen(node.frame)
+            // 外扩热区：以 selectionOutset + resizeHaloWidth 向外膨胀
+            let halo = Self.resizeHaloWidth
+            let expandedFrame = screenFrame.insetBy(dx: -halo, dy: -halo)
+            guard expandedFrame.contains(loc) && !screenFrame.insetBy(dx: Self.resizeInnerDeadZone, dy: Self.resizeInnerDeadZone).contains(loc) else { continue }
+            let localPt = CGPoint(x: loc.x - screenFrame.minX, y: loc.y - screenFrame.minY)
+            if let edge = outerResizeEdge(at: localPt, nodeSize: screenFrame.size, halo: halo) {
+                return .nodeResize(node.id, edge)
+            }
+        }
+
+        // Pass 2：正常节点内部命中测试
         for node in sortedNodesByZIndexDesc {
             let screenFrame = canvasRectToScreen(node.frame)
-            let contains = screenFrame.contains(loc)
-
-            guard contains else { continue }
+            guard screenFrame.contains(loc) else { continue }
 
             let localPt = CGPoint(
                 x: loc.x - screenFrame.minX,
                 y: loc.y - screenFrame.minY
             )
-
-            if let edge = geometricResizeEdge(at: localPt, in: screenFrame.size) {
-                return .nodeResize(node.id, edge)
-            }
 
             // header 在节点顶部（y 向下：minY 是顶边，localPt.y 小 = 顶部）
             let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
@@ -91,29 +100,38 @@ extension CanvasViewportView {
         return .canvas
     }
 
-    private func geometricResizeEdge(at localPt: CGPoint, in size: CGSize) -> ResizeEdge? {
-        // 热区使用固定屏幕像素，不受 zoom 影响（localPt 和 size 已是屏幕坐标）
-        let h = CanvasNodeConstants.resizeHandleSize
-        let w = size.width
-        let ht = size.height
+    // MARK: - Resize 热区常量
 
-        // 确保节点尺寸足够大，不至于整个节点都变成 resize 热区
-        guard w > h * 3 && ht > h * 3 else { return nil }
+    /// 外扩 resize 热区总宽度（屏幕像素，不受 zoom 影响）
+    /// 蓝色虚线框距节点边缘 selectionOutset(3pt)，热区再向内延伸到此宽度
+    private static let resizeHaloWidth: CGFloat = 10
+    /// 节点内部死区：在此范围内的点击不触发外扩 resize，直接进入内容区交互
+    private static let resizeInnerDeadZone: CGFloat = 0
 
-        let onLeft   = localPt.x <= h
-        let onRight  = localPt.x >= w - h
-        // y 向下：top = 小 y 端（顶边），bottom = 大 y 端（底边）
-        let onTop    = localPt.y <= h
-        let onBottom = localPt.y >= ht - h
+    /// 外扩模式：热区在节点边缘 [-halo, +halo] 范围内（以节点 screenFrame 为基准，localPt 允许负值）
+    /// 角点优先，其次四边；仅在靠近边缘的条带内响应
+    private func outerResizeEdge(at localPt: CGPoint, nodeSize: CGSize, halo: CGFloat) -> ResizeEdge? {
+        let w = nodeSize.width
+        let h = nodeSize.height
+        guard w > halo * 4 && h > halo * 4 else { return nil }
 
-        if onTop    && onLeft  { return .topLeft }
-        if onTop    && onRight { return .topRight }
-        if onBottom && onLeft  { return .bottomLeft }
-        if onBottom && onRight { return .bottomRight }
-        if onLeft              { return .left }
-        if onRight             { return .right }
-        if onTop               { return .top }
-        if onBottom            { return .bottom }
+        // 热区条带：距各边缘 halo 范围内（localPt 相对 screenFrame.origin，可为负）
+        let nearLeft   = localPt.x < halo
+        let nearRight  = localPt.x > w - halo
+        let nearTop    = localPt.y < halo
+        let nearBottom = localPt.y > h - halo
+
+        // 至少靠近一条边才响应
+        guard nearLeft || nearRight || nearTop || nearBottom else { return nil }
+
+        if nearTop    && nearLeft  { return .topLeft }
+        if nearTop    && nearRight { return .topRight }
+        if nearBottom && nearLeft  { return .bottomLeft }
+        if nearBottom && nearRight { return .bottomRight }
+        if nearLeft                { return .left }
+        if nearRight               { return .right }
+        if nearTop                 { return .top }
+        if nearBottom              { return .bottom }
         return nil
     }
 
