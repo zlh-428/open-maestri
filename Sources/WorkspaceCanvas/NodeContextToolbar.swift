@@ -11,7 +11,7 @@ struct NodeContextToolbar: View {
     var body: some View {
         HStack(spacing: 2) {
             contextButton(icon: "square.and.pencil", tooltip: "tooltip.node.edit".localized, action: onEdit)
-            contextButton(icon: "point.3.connected.trianglepath.dotted", tooltip: "tooltip.node.connect_terminal".localized, action: onConnect)
+            contextButton(icon: "arrow.trianglehead.branch", tooltip: "tooltip.node.connect_terminal".localized, action: onConnect)
             contextButton(icon: "arrow.triangle.2.circlepath", tooltip: "tooltip.refresh".localized, action: onRefresh)
             contextButton(icon: "trash", tooltip: "tooltip.node.delete".localized, action: onDelete)
         }

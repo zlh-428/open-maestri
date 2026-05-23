@@ -33,7 +33,7 @@ struct CanvasToolbar: View {
 
                 // 2. Terminal 工具
                 FloatingToolButton(
-                    icon: "terminal.fill",
+                    icon: "apple.terminal",
                     tooltip: "canvas.toolbar.terminal".localized,
                     isActive: activeDrawingTool == "terminal"
                 ) {
@@ -42,7 +42,7 @@ struct CanvasToolbar: View {
 
                 // 3. Note 工具
                 FloatingToolButton(
-                    icon: "doc.richtext",
+                    icon: "text.document",
                     tooltip: "canvas.toolbar.note".localized,
                     isActive: activeDrawingTool == "stickyNote"
                 ) {
