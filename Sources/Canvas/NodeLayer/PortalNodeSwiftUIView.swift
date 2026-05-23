@@ -1,18 +1,20 @@
 import SwiftUI
 import WebKit
+import Combine
 
 // MARK: - Portal 导航状态（KVO 桥接 WKWebView → SwiftUI）
 
+// 使用 ObservableObject 而非 @Observable：此类作为视图私有状态由 @StateObject 管理，
+// @StateObject 确保跨 body 重计算时对象实例不被重建，避免 makeNSView 被重复调用。
 @MainActor
-@Observable
-final class PortalNavState {
-    var urlText: String = ""
-    var canGoBack: Bool = false
-    var canGoForward: Bool = false
-    var isLoading: Bool = false
-    var isEditingURL: Bool = false
+final class PortalNavState: ObservableObject {
+    @Published var urlText: String = ""
+    @Published var canGoBack: Bool = false
+    @Published var canGoForward: Bool = false
+    @Published var isLoading: Bool = false
+    @Published var isEditingURL: Bool = false
     /// WebView 是否已导航过至少一个页面（区分真正空状态）
-    var hasNavigated: Bool = false
+    @Published var hasNavigated: Bool = false
 
     private var observations: [NSKeyValueObservation] = []
 
@@ -66,7 +68,7 @@ final class PortalNavState {
 // MARK: - Portal 导航工具栏（双胶囊样式）
 
 struct PortalNavBarView: View {
-    var state: PortalNavState
+    @ObservedObject var state: PortalNavState
     let nodeId: UUID
     let onGoBack: () -> Void
     let onGoForward: () -> Void
@@ -126,7 +128,7 @@ struct PortalNavBarView: View {
 // MARK: - URL 输入框（SwiftUI 胶囊容器 + 内嵌 NSTextField）
 
 struct PortalURLField: View {
-    var state: PortalNavState
+    @ObservedObject var state: PortalNavState
     let nodeId: UUID
     let onNavigate: (String) -> Void
 
@@ -156,7 +158,7 @@ struct PortalURLField: View {
 
 /// 内嵌 NSTextField（仅负责文本输入，不带容器样式）
 struct PortalURLTextFieldRepresentable: NSViewRepresentable {
-    var state: PortalNavState
+    @ObservedObject var state: PortalNavState
     let nodeId: UUID
     let onNavigate: (String) -> Void
 
@@ -286,7 +288,7 @@ struct PortalNodeSwiftUIView: View {
     var onDuplicate: ((UUID) -> Void)?
     var onLockToggle: ((UUID, Bool) -> Void)?
 
-    @State private var navState = PortalNavState()
+    @StateObject private var navState = PortalNavState()
 
     var body: some View {
         NodeShellView(
