@@ -40,19 +40,44 @@ struct NoteEditingView: View {
     }
 }
 
-/// Markdown 预览（AttributedString 渲染）
+/// Markdown 预览（使用 MarkdownRenderer 渲染，保留所有换行）
 struct MarkdownPreviewView: View {
     let markdown: String
+    var fontSize: CGFloat = 14
 
     var body: some View {
-        ScrollView {
-            Text(attributedMarkdown)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(8)
-        }
+        MarkdownPreviewNSView(markdown: markdown, fontSize: fontSize)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct MarkdownPreviewNSView: NSViewRepresentable {
+    let markdown: String
+    let fontSize: CGFloat
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = NSTextView.scrollableTextView()
+        guard let tv = scrollView.documentView as? NSTextView else { return scrollView }
+        tv.isEditable = false
+        tv.isSelectable = true
+        tv.isRichText = true
+        tv.backgroundColor = .clear
+        tv.drawsBackground = false
+        tv.textContainerInset = NSSize(width: 4, height: 8)
+        tv.isHorizontallyResizable = false
+        tv.isVerticallyResizable = true
+        tv.autoresizingMask = [.width]
+        tv.textContainer?.widthTracksTextView = true
+        tv.textContainer?.containerSize = CGSize(
+            width: scrollView.frame.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        return scrollView
     }
 
-    private var attributedMarkdown: AttributedString {
-        (try? AttributedString(markdown: markdown)) ?? AttributedString(markdown)
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let tv = scrollView.documentView as? NSTextView else { return }
+        let attributed = MarkdownRenderer.render(markdown, fontSize: fontSize)
+        tv.textStorage?.setAttributedString(attributed)
     }
 }
