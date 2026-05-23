@@ -10,28 +10,29 @@ final class WindowStateObserver {
     /// 窗口是否处于全屏（最大化）状态
     var isFullScreen: Bool = false
 
+    nonisolated(unsafe) private var notificationObservers: [NSObjectProtocol] = []
+
     private init() {
-        // 监听窗口全屏进入/退出通知
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidEnterFullScreen),
-            name: NSWindow.didEnterFullScreenNotification,
-            object: nil
-        )
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidExitFullScreen),
-            name: NSWindow.didExitFullScreenNotification,
-            object: nil
-        )
+        notificationObservers = [
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didEnterFullScreenNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.isFullScreen = true }
+            },
+            NotificationCenter.default.addObserver(
+                forName: NSWindow.didExitFullScreenNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in self?.isFullScreen = false }
+            },
+        ]
     }
 
-    @objc private func windowDidEnterFullScreen(_ notification: Notification) {
-        isFullScreen = true
-    }
-
-    @objc private func windowDidExitFullScreen(_ notification: Notification) {
-        isFullScreen = false
+    deinit {
+        notificationObservers.forEach { NotificationCenter.default.removeObserver($0) }
     }
 
     /// 配置主窗口样式（透明 title bar、隐藏标题）

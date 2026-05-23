@@ -1,5 +1,8 @@
 import AppKit
+import OSLog
 import SwiftUI
+
+private let noteLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "Note")
 
 // MARK: - Note 编辑器状态（@Observable，避免重建 NSHostingView）
 
@@ -38,7 +41,11 @@ final class NoteNodeViewController: NSViewController {
             nodeId: noteId
         ) { [weak self] newContent in
             guard let self else { return }
-            try? NoteFileManager.shared.write(filePath: filePath, content: newContent)
+            do {
+                try NoteFileManager.shared.write(filePath: filePath, content: newContent)
+            } catch {
+                noteLogger.error("Failed to save note: \(error.localizedDescription)")
+            }
         } onFirstLineChanged: { [weak self] title in
             self?.onTitleChanged?(title)
         }

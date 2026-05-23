@@ -74,8 +74,8 @@ final class Rope {
 /// - 自动睡眠：运动量 < 阈值时停止模拟，节省 CPU
 /// - 唤醒：端点位置变化时重新启动模拟
 ///
-/// 线程模型：所有访问均应在主线程（由 @MainActor CanvasNodeRenderer 保证）。
-/// Timer 的 RunLoop.main 调度也确保 tick() 在主线程执行。
+/// 线程模型：所有访问均在主线程，@MainActor 使编译器可以静态验证此约束。
+@MainActor
 final class RopeSimulation {
     static let controlPointCount = Constants.ropeControlPointCount
 
@@ -98,8 +98,8 @@ final class RopeSimulation {
 
     /// 所有参与物理模拟的绳索
     private(set) var ropes: [UUID: Rope] = [:]
-    /// 物理定时器
-    private var timer: Timer?
+    /// 物理定时器（nonisolated 以便 deinit 访问）
+    nonisolated(unsafe) private var timer: Timer?
     /// 是否处于睡眠状态（所有绳索均静止）
     private(set) var isSleeping: Bool = true
     /// 当前帧总运动量
@@ -119,7 +119,8 @@ final class RopeSimulation {
     // MARK: - 生命周期
 
     deinit {
-        stopTimer()
+        timer?.invalidate()
+        timer = nil
     }
 
     // MARK: - 公开接口

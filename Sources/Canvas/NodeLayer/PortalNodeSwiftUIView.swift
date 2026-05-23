@@ -1,18 +1,18 @@
 import SwiftUI
 import WebKit
-import Combine
 
 // MARK: - Portal 导航状态（KVO 桥接 WKWebView → SwiftUI）
 
 @MainActor
-final class PortalNavState: ObservableObject {
-    @Published var urlText: String = ""
-    @Published var canGoBack: Bool = false
-    @Published var canGoForward: Bool = false
-    @Published var isLoading: Bool = false
-    @Published var isEditingURL: Bool = false
+@Observable
+final class PortalNavState {
+    var urlText: String = ""
+    var canGoBack: Bool = false
+    var canGoForward: Bool = false
+    var isLoading: Bool = false
+    var isEditingURL: Bool = false
     /// WebView 是否已导航过至少一个页面（区分真正空状态）
-    @Published var hasNavigated: Bool = false
+    var hasNavigated: Bool = false
 
     private var observations: [NSKeyValueObservation] = []
 
@@ -66,7 +66,7 @@ final class PortalNavState: ObservableObject {
 // MARK: - Portal 导航工具栏（双胶囊样式）
 
 struct PortalNavBarView: View {
-    @ObservedObject var state: PortalNavState
+    var state: PortalNavState
     let nodeId: UUID
     let onGoBack: () -> Void
     let onGoForward: () -> Void
@@ -126,7 +126,7 @@ struct PortalNavBarView: View {
 // MARK: - URL 输入框（SwiftUI 胶囊容器 + 内嵌 NSTextField）
 
 struct PortalURLField: View {
-    @ObservedObject var state: PortalNavState
+    var state: PortalNavState
     let nodeId: UUID
     let onNavigate: (String) -> Void
 
@@ -156,7 +156,7 @@ struct PortalURLField: View {
 
 /// 内嵌 NSTextField（仅负责文本输入，不带容器样式）
 struct PortalURLTextFieldRepresentable: NSViewRepresentable {
-    @ObservedObject var state: PortalNavState
+    var state: PortalNavState
     let nodeId: UUID
     let onNavigate: (String) -> Void
 
@@ -286,7 +286,7 @@ struct PortalNodeSwiftUIView: View {
     var onDuplicate: ((UUID) -> Void)?
     var onLockToggle: ((UUID, Bool) -> Void)?
 
-    @StateObject private var navState = PortalNavState()
+    @State private var navState = PortalNavState()
 
     var body: some View {
         NodeShellView(

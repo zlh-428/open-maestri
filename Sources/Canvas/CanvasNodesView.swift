@@ -83,7 +83,7 @@ struct CanvasNodesSwiftUIView: View {
     var body: some View {
         GeometryReader { _ in
             ZStack {
-                ForEach(nodes) { node in
+                ForEach(nodes, id: \.id) { node in
                     let posX = (node.frame.midX - canvasOrigin.x) * zoom
                     let posY = (node.frame.midY - canvasOrigin.y) * zoom
                     nodeView(for: node)
