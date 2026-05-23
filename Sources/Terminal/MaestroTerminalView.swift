@@ -106,19 +106,21 @@ extension MaestroTerminalView {
 
         let newBounds = bounds
 
-        // bounds 没变，只同步 origin（平移画布等场景）
-        if tv.frame.size == newBounds.size {
-            tv.frame = newBounds
-            return
-        }
-
-        // 首次 layout（attach 后第一次拿到真实尺寸）：立即同步，不走防抖。
-        // 此时合成树尚未提交，用户不会看到 reflow 过程。
+        // 首次 layout（attach 后第一次拿到真实尺寸）：优先于尺寸相等检查，
+        // 确保 firePendingStart() 不被 "size == .zero 相等" 的情况跳过。
+        // bounds == .zero 说明视图尚未布局完成，跳过以免 PTY 以零尺寸启动。
         if isInitialLayout {
+            guard newBounds.size != .zero else { return }
             isInitialLayout = false
             tv.frame = newBounds
             // PTY 启动延迟到此处，确保 terminal.cols 基于真实 frame 计算
             TerminalManager.shared.providers[terminalId]?.firePendingStart()
+            return
+        }
+
+        // bounds 没变，只同步 origin（平移画布等场景）
+        if tv.frame.size == newBounds.size {
+            tv.frame = newBounds
             return
         }
 
