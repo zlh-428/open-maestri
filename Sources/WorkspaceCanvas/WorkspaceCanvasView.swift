@@ -63,6 +63,8 @@ struct WorkspaceCanvasView: View {
                     NoteContextToolbar(
                         nodeId: noteId,
                         isFormatted: noteIsPreviewing(nodeId: noteId),
+                        fontSize: noteFontSize(nodeId: noteId),
+                        currentColor: noteCurrentColor(nodeId: noteId),
                         onBgColor: { color in setNoteColor(nodeId: noteId, color: color) },
                         onFontSize: { size in setNoteFontSize(nodeId: noteId, size: size) },
                         onConnect: { startConnectionFromSelected() },
@@ -843,6 +845,18 @@ struct WorkspaceCanvasView: View {
         return nc.isPreviewing
     }
 
+    private func noteFontSize(nodeId: UUID) -> Int {
+        guard let node = workspace.nodes.first(where: { $0.id == nodeId }),
+              case .stickyNote(let nc) = node.content else { return 14 }
+        return nc.fontSize
+    }
+
+    private func noteCurrentColor(nodeId: UUID) -> String {
+        guard let node = workspace.nodes.first(where: { $0.id == nodeId }),
+              case .stickyNote(let nc) = node.content else { return "yellow" }
+        return nc.color
+    }
+
     private func toggleNoteFormatted(nodeId: UUID) {
         guard let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
               case .stickyNote(var nc) = workspace.nodes[idx].content else { return }
@@ -875,6 +889,7 @@ struct WorkspaceCanvasView: View {
               case .stickyNote(var nc) = workspace.nodes[idx].content else { return }
         nc.fontSize = size
         workspace.nodes[idx].content = .stickyNote(nc)
+        NoteTextViewRegistry.shared.setFontSize(nodeId: nodeId, size: size)
         Task { try? await workspace.save() }
     }
 

@@ -82,6 +82,12 @@ final class NoteTextViewRegistry {
         }
     }
 
+    /// 更新 NSTextView 的字体大小（等宽字体）
+    @MainActor func setFontSize(nodeId: UUID, size: Int) {
+        guard let tv = textView(for: nodeId) else { return }
+        tv.font = .monospacedSystemFont(ofSize: CGFloat(size), weight: .regular)
+    }
+
     /// 在光标处插入原始文本，并将光标移至末尾
     @MainActor func insertText(nodeId: UUID, text: String, cursorOffset: Int? = nil) {
         guard let tv = textView(for: nodeId) else { return }
@@ -127,6 +133,15 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.delegate = context.coordinator
         textView.string = text
+        // 确保宽度跟随容器，光标可点击任意位置
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = true
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = CGSize(
+            width: scrollView.frame.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         // 设置 coordinator 弱引用到 textView
         context.coordinator.textView = textView
         // 注册 ScrollView 到全局注册表（供画布路由滚动事件）
