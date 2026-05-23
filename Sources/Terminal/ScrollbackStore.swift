@@ -12,7 +12,7 @@ struct ScrollbackEntry: Codable {
 /// - append 只做文件追加（不读取整个文件），大幅降低高频写入时的 I/O 开销
 /// - 原子写入防止数据损坏（NFR11）
 /// - 路径：~/.open-maestri/workspaces/{wsId}/terminals/{terminalId}.scrollback
-final class ScrollbackStore {
+final class ScrollbackStore: Sendable {
     private let logger = Logger.make(category: "ScrollbackStore")
     private let pm = PersistenceManager.shared
 

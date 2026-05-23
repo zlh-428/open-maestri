@@ -59,22 +59,30 @@ final class AppState {
 
     // MARK: - 启动加载（NFR1：冷启动 < 1.5s）
 
+    /// Loads all persisted state on cold launch.
+    /// - The three root JSON files are read concurrently via `async let`.
+    /// - Workspace documents are still loaded sequentially to surface per-workspace errors clearly.
     func loadOnLaunch() async {
         do {
             try pm.ensureDirectoriesExist()
-            let stateData = try pm.loadAppState()
+
+            // Parallel read of the three independent root files
+            async let stateTask = Task.detached(priority: .userInitiated) { try self.pm.loadAppState() }.value
+            async let prefsTask = Task.detached(priority: .userInitiated) { try self.pm.loadPreferences() }.value
+            async let manTask   = Task.detached(priority: .userInitiated) { try self.pm.loadManifest() }.value
+
+            let (stateData, prefs, man) = try await (stateTask, prefsTask, manTask)
+
             await MainActor.run {
                 activeWorkspaceId = stateData.activeWorkspaceId
                 hasCompletedOnboarding = stateData.hasCompletedOnboarding
                 needsRecovery = !stateData.cleanShutdown
                 recentWorkspaceIds = stateData.recentWorkspaceIds
+                preferences = prefs
+                manifest = man
             }
-            let prefs = try pm.loadPreferences()
-            await MainActor.run { preferences = prefs }
-            let man = try pm.loadManifest()
-            await MainActor.run { manifest = man }
 
-            // 加载所有工作区
+            // 加载所有工作区（串行，便于逐一捕获错误）
             var loadedWorkspaces: [WorkspaceManager] = []
             var errors: [String] = []
             for entry in man.workspaces {
