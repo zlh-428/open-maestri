@@ -22,6 +22,7 @@ struct NoteNodeSwiftUIView: View {
             zoom: zoom,
             headerIcon: "note.text",
             headerColor: noteColor(content.color),
+            themeColor: noteColor(content.color),
             onClose: { onClose?(nodeId) },
             onRename: { onRename?(nodeId, $0) },
             onDuplicate: { onDuplicate?(nodeId) },
@@ -35,14 +36,8 @@ struct NoteNodeSwiftUIView: View {
         }
     }
 
-    private func noteColor(_ hex: String) -> Color {
-        switch hex {
-        case "yellow": return .yellow
-        case "pink":   return .pink
-        case "green":  return .green
-        case "blue":   return .blue
-        default:       return .yellow
-        }
+    private func noteColor(_ str: String) -> Color {
+        NoteColorPickerPopover.colorFromString(str)
     }
 }
 

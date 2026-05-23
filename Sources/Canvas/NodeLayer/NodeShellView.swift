@@ -40,6 +40,8 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
     let zoom: CGFloat
     let headerIcon: String?
     let headerColor: Color?
+    /// Note 节点专用：应用到 header 背景和节点整体背景的主题色。其他节点类型保持 nil。
+    let themeColor: Color?
     let headerAccessory: Accessory
     let footer: Footer
     var onClose: (() -> Void)?
@@ -57,6 +59,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         zoom: CGFloat,
         headerIcon: String?,
         headerColor: Color?,
+        themeColor: Color? = nil,
         @ViewBuilder headerAccessory: () -> Accessory = { EmptyView() },
         @ViewBuilder footer: () -> Footer = { EmptyView() },
         onClose: (() -> Void)? = nil,
@@ -73,6 +76,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         self.zoom = zoom
         self.headerIcon = headerIcon
         self.headerColor = headerColor
+        self.themeColor = themeColor
         self.headerAccessory = headerAccessory()
         self.footer = footer()
         self.onClose = onClose
@@ -99,6 +103,13 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
                 }
                 .shadow(color: .black.opacity(0.15), radius: 10, y: 3)
                 .overlay {
+                    if let themeColor {
+                        RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
+                            .fill(themeColor.opacity(0.05))
+                            .allowsHitTesting(false)
+                    }
+                }
+                .overlay {
                     RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
                         .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5)
                 }
@@ -109,6 +120,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
                     title: title,
                     icon: headerIcon,
                     color: headerColor,
+                    themeColor: themeColor,
                     isLocked: isLocked,
                     accessory: { headerAccessory }
                 )
@@ -159,6 +171,8 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
     let title: String
     let icon: String?
     let color: Color?
+    /// Note 节点专用：header 背景叠加颜色（其他节点传 nil 保持原样）
+    let themeColor: Color?
     let isLocked: Bool
     let accessory: Accessory
 
@@ -166,12 +180,14 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
         title: String,
         icon: String?,
         color: Color?,
+        themeColor: Color? = nil,
         isLocked: Bool,
         @ViewBuilder accessory: () -> Accessory = { EmptyView() }
     ) {
         self.title = title
         self.icon = icon
         self.color = color
+        self.themeColor = themeColor
         self.isLocked = isLocked
         self.accessory = accessory()
     }
@@ -198,7 +214,12 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            VibrancyBackground(material: .sidebar, blendingMode: .behindWindow)
+            ZStack {
+                VibrancyBackground(material: .sidebar, blendingMode: .behindWindow)
+                if let themeColor {
+                    themeColor.opacity(0.18)
+                }
+            }
         }
     }
 }
