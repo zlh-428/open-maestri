@@ -65,4 +65,6 @@ extension Notification.Name {
     static let portalOpenedNewWindow     = Notification.Name("OpenMaestri.portalOpenedNewWindow")
     /// Portal 导航完成，URL 已变更：userInfo 含 "portalId" UUID, "url" String
     static let portalURLDidChange        = Notification.Name("OpenMaestri.portalURLDidChange")
+    /// Note 格式化模式切换：userInfo 含 "nodeId" UUID, "isPreviewing" Bool
+    static let noteFormattedToggled      = Notification.Name("OpenMaestri.noteFormattedToggled")
 }

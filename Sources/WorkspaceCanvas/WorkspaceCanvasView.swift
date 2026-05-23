@@ -54,7 +54,24 @@ struct WorkspaceCanvasView: View {
                         onDelete: { deleteSelectedNodes() }
                     )
                     .fixedSize()
-                    .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeContentType == "stickyNote",
+                          let noteId = selectedNodeIds.first {
+                    NoteContextToolbar(
+                        nodeId: noteId,
+                        isFormatted: noteIsPreviewing(nodeId: noteId),
+                        onBgColor: { color in setNoteColor(nodeId: noteId, color: color) },
+                        onFontSize: { size in setNoteFontSize(nodeId: noteId, size: size) },
+                        onConnect: { startConnectionFromSelected() },
+                        onToggleFormatted: { toggleNoteFormatted(nodeId: noteId) },
+                        onDelete: { deleteSelectedNodes() },
+                        onSaveAs: { saveNoteAs(nodeId: noteId) }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
                     .contentShape(Rectangle())
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
@@ -66,7 +83,7 @@ struct WorkspaceCanvasView: View {
                         onDelete: { deleteSelectedNodes() }
                     )
                     .fixedSize()
-                    .padding(.bottom, 36) // 为 tooltip 气泡预留空间
+                    .padding(.bottom, 36)
                     .contentShape(Rectangle())
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
@@ -817,6 +834,70 @@ struct WorkspaceCanvasView: View {
     }
 
     // MARK: - 浮动工具栏操作
+
+    // MARK: Note 工具栏辅助方法
+
+    private func noteIsPreviewing(nodeId: UUID) -> Bool {
+        guard let node = workspace.nodes.first(where: { $0.id == nodeId }),
+              case .stickyNote(let nc) = node.content else { return false }
+        return nc.isPreviewing
+    }
+
+    private func toggleNoteFormatted(nodeId: UUID) {
+        guard let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .stickyNote(var nc) = workspace.nodes[idx].content else { return }
+        nc.isPreviewing.toggle()
+        workspace.nodes[idx].content = .stickyNote(nc)
+        NotificationCenter.default.post(
+            name: .noteFormattedToggled,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "isPreviewing": nc.isPreviewing]
+        )
+        Task { try? await workspace.save() }
+    }
+
+    private func setNoteColor(nodeId: UUID, color: String) {
+        guard let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .stickyNote(var nc) = workspace.nodes[idx].content else { return }
+        nc.color = color
+        let newContent = NodeContent.stickyNote(nc)
+        workspace.nodes[idx].content = newContent
+        NotificationCenter.default.post(
+            name: .canvasNodeContentChanged,
+            object: nil,
+            userInfo: ["nodeId": nodeId, "content": newContent]
+        )
+        Task { try? await workspace.save() }
+    }
+
+    private func setNoteFontSize(nodeId: UUID, size: Int) {
+        guard let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+              case .stickyNote(var nc) = workspace.nodes[idx].content else { return }
+        nc.fontSize = size
+        workspace.nodes[idx].content = .stickyNote(nc)
+        Task { try? await workspace.save() }
+    }
+
+    private func saveNoteAs(nodeId: UUID) {
+        guard let node = workspace.nodes.first(where: { $0.id == nodeId }),
+              case .stickyNote(let nc) = node.content else { return }
+        let filePath: String
+        switch nc.storageMode {
+        case .managed:
+            let dir = PersistenceManager.shared.notesDirURL(workspaceId: workspace.id)
+            filePath = dir.appendingPathComponent(nc.fileName ?? "\(nodeId).md").path
+        case .custom(let path):
+            filePath = path
+        }
+        guard let content = try? NoteFileManager.shared.read(filePath: filePath) else { return }
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = nc.fileName ?? "note.md"
+        panel.allowedContentTypes = [.plainText]
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            try? content.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
 
     private func duplicateSelectedNodes() {
         for id in selectedNodeIds {

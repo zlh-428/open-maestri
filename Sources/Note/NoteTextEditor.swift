@@ -27,6 +27,74 @@ final class NoteScrollViewRegistry {
     }
 }
 
+// MARK: - Note NSTextView 注册表（供工具栏格式化操作使用）
+
+/// 全局注册表：nodeId → NSTextView，工具栏按钮通过此注册表获取 NSTextView 并执行格式化插入
+final class NoteTextViewRegistry {
+    static let shared = NoteTextViewRegistry()
+    private var textViews: [UUID: NSTextView] = [:]
+    private let lock = NSLock()
+    private init() {}
+
+    func register(nodeId: UUID, textView: NSTextView) {
+        lock.lock(); defer { lock.unlock() }
+        textViews[nodeId] = textView
+    }
+
+    func unregister(nodeId: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        textViews.removeValue(forKey: nodeId)
+    }
+
+    func textView(for nodeId: UUID) -> NSTextView? {
+        lock.lock(); defer { lock.unlock() }
+        return textViews[nodeId]
+    }
+
+    /// 在选中范围插入 markdown 包裹语法（如 **text**）；无选中则插入后将光标置于中间
+    @MainActor func insertWrapping(nodeId: UUID, prefix: String, suffix: String) {
+        guard let tv = textView(for: nodeId) else { return }
+        let range = tv.selectedRange()
+        let selectedText = (tv.string as NSString).substring(with: range)
+        let replacement = selectedText.isEmpty
+            ? "\(prefix)\(suffix)"
+            : "\(prefix)\(selectedText)\(suffix)"
+        if tv.shouldChangeText(in: range, replacementString: replacement) {
+            tv.replaceCharacters(in: range, with: replacement)
+            tv.didChangeText()
+            if selectedText.isEmpty {
+                let cursorPos = range.location + prefix.utf16.count
+                tv.setSelectedRange(NSRange(location: cursorPos, length: 0))
+            }
+        }
+    }
+
+    /// 在选中行首插入前缀（标题 # / 列表 - / 待办 - [ ]  等）
+    @MainActor func insertLinePrefix(nodeId: UUID, prefix: String) {
+        guard let tv = textView(for: nodeId) else { return }
+        let str = tv.string as NSString
+        let range = tv.selectedRange()
+        let lineStart = str.lineRange(for: NSRange(location: range.location, length: 0)).location
+        let insertRange = NSRange(location: lineStart, length: 0)
+        if tv.shouldChangeText(in: insertRange, replacementString: prefix) {
+            tv.replaceCharacters(in: insertRange, with: prefix)
+            tv.didChangeText()
+        }
+    }
+
+    /// 在光标处插入原始文本，并将光标移至末尾
+    @MainActor func insertText(nodeId: UUID, text: String, cursorOffset: Int? = nil) {
+        guard let tv = textView(for: nodeId) else { return }
+        let range = tv.selectedRange()
+        if tv.shouldChangeText(in: range, replacementString: text) {
+            tv.replaceCharacters(in: range, with: text)
+            tv.didChangeText()
+            let newPos = range.location + (cursorOffset ?? text.utf16.count)
+            tv.setSelectedRange(NSRange(location: newPos, length: 0))
+        }
+    }
+}
+
 // MARK: - 支持粘贴图片的 Note 文本编辑器
 
 /// AppKit 包装的文本编辑器，支持从剪贴板粘贴图片
@@ -64,8 +132,16 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
         // 注册 ScrollView 到全局注册表（供画布路由滚动事件）
         if let nodeId {
             NoteScrollViewRegistry.shared.register(nodeId: nodeId, scrollView: scrollView)
+            NoteTextViewRegistry.shared.register(nodeId: nodeId, textView: textView)
         }
         return scrollView
+    }
+
+    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
+        if let nodeId = coordinator.parent.nodeId {
+            NoteScrollViewRegistry.shared.unregister(nodeId: nodeId)
+            NoteTextViewRegistry.shared.unregister(nodeId: nodeId)
+        }
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {

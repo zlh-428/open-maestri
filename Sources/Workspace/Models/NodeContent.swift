@@ -181,7 +181,7 @@ struct StickyNoteContent: Codable, Equatable {
         self.fileName = "\(name).md"
         self.fontSize = 14
         self.hasCustomName = false
-        self.isPreviewing = true
+        self.isPreviewing = false
         self.storageMode = .managed
     }
 }
