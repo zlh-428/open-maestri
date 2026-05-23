@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import SwiftTerm
+
+private let settingsLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "Settings")
 
 struct TerminalSettingsView: View {
     @Environment(AppState.self) private var appState
@@ -44,15 +47,27 @@ struct TerminalSettingsView: View {
         .frame(minWidth: 400)
         .onChange(of: appState.preferences.terminalTheme) { _, newTheme in
             applyThemeToAll(newTheme)
-            try? PersistenceManager.shared.savePreferences(appState.preferences)
+            do {
+                try PersistenceManager.shared.savePreferences(appState.preferences)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
         }
         .onChange(of: appState.preferences.terminalFontFamily) { _, newFamily in
             applyFontToAll(family: newFamily, size: appState.preferences.terminalFontSize)
-            try? PersistenceManager.shared.savePreferences(appState.preferences)
+            do {
+                try PersistenceManager.shared.savePreferences(appState.preferences)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
         }
         .onChange(of: appState.preferences.terminalFontSize) { _, newSize in
             applyFontToAll(family: appState.preferences.terminalFontFamily, size: newSize)
-            try? PersistenceManager.shared.savePreferences(appState.preferences)
+            do {
+                try PersistenceManager.shared.savePreferences(appState.preferences)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
         }
     }
 

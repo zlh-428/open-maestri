@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import AppKit
+
+private let settingsLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "Settings")
 
 struct ShortcutsSettingsView: View {
     @Environment(AppState.self) private var appState
@@ -69,14 +72,22 @@ struct ShortcutsSettingsView: View {
         var prefs = appState.preferences
         prefs.shortcuts.customKeys[actionId] = key
         appState.preferences = prefs
-        try? PersistenceManager.shared.savePreferences(prefs)
+        do {
+                try PersistenceManager.shared.savePreferences(prefs)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
     }
 
     private func resetAll() {
         var prefs = appState.preferences
         prefs.shortcuts.customKeys.removeAll()
         appState.preferences = prefs
-        try? PersistenceManager.shared.savePreferences(prefs)
+        do {
+                try PersistenceManager.shared.savePreferences(prefs)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
     }
 }
 

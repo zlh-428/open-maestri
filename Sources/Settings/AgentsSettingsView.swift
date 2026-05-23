@@ -1,4 +1,7 @@
+import OSLog
 import SwiftUI
+
+private let settingsLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "Settings")
 
 struct AgentsSettingsView: View {
     @Environment(AppState.self) private var appState
@@ -97,7 +100,11 @@ struct AgentsSettingsView: View {
     }
 
     private func save() {
-        try? PersistenceManager.shared.savePreferences(appState.preferences)
+        do {
+                try PersistenceManager.shared.savePreferences(appState.preferences)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
     }
 }
 

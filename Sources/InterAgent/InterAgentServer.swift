@@ -31,6 +31,7 @@ final class InterAgentServer {
 
     // MARK: - 启动
 
+    /// Starts the TCP HTTP server on a dynamic port. Throws if the listener cannot be created.
     func start() throws {
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
@@ -183,6 +184,7 @@ final class InterAgentServer {
         responseData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
     }
 
+    /// Gracefully shuts down the TCP listener and cancels all in-flight connections.
     func stop() {
         // 先取消 listener 阻止新连接进入
         listener?.cancel()

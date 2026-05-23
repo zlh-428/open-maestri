@@ -1,5 +1,8 @@
+import OSLog
 import SwiftUI
 import AppKit
+
+private let settingsLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "Settings")
 
 struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
@@ -88,7 +91,11 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .frame(minWidth: 420)
         .onChange(of: appState.preferences) { _, _ in
-            try? PersistenceManager.shared.savePreferences(appState.preferences)
+            do {
+                try PersistenceManager.shared.savePreferences(appState.preferences)
+            } catch {
+                settingsLogger.error("Failed to save preferences: \(error.localizedDescription)")
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .openInEditor)) { _ in
             openInPreferredIDE()

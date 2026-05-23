@@ -78,6 +78,7 @@ final class PersistenceManager {
 
     // MARK: - 通用原子 Codable I/O
 
+    /// Encodes `value` to JSON and writes it atomically to `url` on a background task.
     func save<T: Encodable>(_ value: T, to url: URL) async throws {
         let data = try encoder.encode(value)
         try await Task.detached(priority: .background) {
@@ -90,6 +91,7 @@ final class PersistenceManager {
         try atomicWrite(data, to: url)
     }
 
+    /// Decodes and returns a value of `type` from the JSON file at `url`, applying schema migrations.
     func load<T: Decodable>(_ type: T.Type, from url: URL) throws -> T {
         let data = try Data(contentsOf: url)
         return try migrating(data: data, type: type)

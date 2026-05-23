@@ -147,11 +147,13 @@ final class ConnectionManager {
 
     // MARK: - 断开连接
 
+    /// Removes an active connection by ID and posts `connectionStatusChanged`.
     func disconnect(id: UUID) {
         connections.removeValue(forKey: id)
         logger.debug("Connection \(id.uuidString.prefix(8)) removed")
     }
 
+    /// Removes all connections that involve the given node (called on node deletion).
     func disconnectAll(involvedNode nodeId: UUID) {
         let toRemove = connections.values.filter { $0.nodeIdA == nodeId || $0.nodeIdB == nodeId }
         toRemove.forEach { connections.removeValue(forKey: $0.id) }

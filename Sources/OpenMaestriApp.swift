@@ -1,4 +1,7 @@
+import OSLog
 import SwiftUI
+
+private let appLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open-maestri", category: "App")
 
 @main
 struct OpenMaestriApp: App {
@@ -22,7 +25,11 @@ struct OpenMaestriApp: App {
                     appState.startAutosave()
                     BackupManager.shared.startHourlyBackups()
                     // InterAgentServer 已在 AppDelegate.applicationDidFinishLaunching 启动
-                    try? RoutineScheduler.shared.loadRoutines()
+                    do {
+                        try RoutineScheduler.shared.loadRoutines()
+                    } catch {
+                        appLogger.error("Failed to load routines on launch: \(error.localizedDescription)")
+                    }
                     // Spotlight: 重建索引
                     let wsNodes = Dictionary(
                         uniqueKeysWithValues: appState.workspaces.map { ws in
