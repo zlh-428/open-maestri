@@ -45,6 +45,10 @@ final class FileTreeStateStore {
     private var pendingReloadWork: DispatchWorkItem?
     /// 上次 reload 时间戳，避免过于频繁
     private var lastReloadTime: CFAbsoluteTime = 0
+    /// git status 结果缓存（TTL 60s，避免每次 reload 都执行 git status）
+    private var _cachedGitStatus: [String: GitFileStatus] = [:]
+    private var _lastGitStatusTime: CFAbsoluteTime = 0
+    private static let _gitStatusCacheTTL: CFAbsoluteTime = 60.0
 
     init(rootPath: String) {
         self.rootPath = rootPath
@@ -96,14 +100,22 @@ final class FileTreeStateStore {
         }
 
         // 并行加载文件树（仅加载 1 层，子目录按需展开）和 git 状态
+        // git status 有 60s TTL 缓存，避免每次展开文件夹都重跑 git status
+        let gitStatusNeedsRefresh = now - _lastGitStatusTime > Self._gitStatusCacheTTL
+        let cachedStatus = _cachedGitStatus
         async let filesTask = Task.detached(priority: .userInitiated) {
             return Self.loadDirectory(path: root, depth: 0, maxDepth: 1)
         }.value
-        async let gitTask = Task.detached(priority: .utility) {
-            return Self.loadGitStatus(workingDirectory: root)
-        }.value
+        async let gitTask: [String: GitFileStatus] = gitStatusNeedsRefresh
+            ? Task.detached(priority: .utility) { Self.loadGitStatus(workingDirectory: root) }.value
+            : cachedStatus
 
         let (loaded, statusMap) = await (filesTask, gitTask)
+        // 仅当重新查询了 git status 时才更新缓存时间戳
+        if gitStatusNeedsRefresh {
+            _lastGitStatusTime = CFAbsoluteTimeGetCurrent()
+            _cachedGitStatus = statusMap
+        }
         // 将 git 状态标记到文件节点
         let annotated = Self.applyGitStatus(to: loaded, statusMap: statusMap, root: root)
         await MainActor.run {
