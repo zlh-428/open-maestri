@@ -1,14 +1,27 @@
 import Foundation
 import OSLog
 
-/// 文件树节点
-struct FileTreeItem: Identifiable, Hashable {
+/// 文件树节点（class 保证 NSOutlineView 可用对象身份 === 追踪 item）
+final class FileTreeItem: Identifiable, Hashable {
     let id: String   // 绝对路径
     var name: String
     var isDirectory: Bool
     var isExpanded: Bool = false
     var children: [FileTreeItem]?
     var gitStatus: GitFileStatus = .unmodified
+
+    init(id: String, name: String, isDirectory: Bool, isExpanded: Bool = false,
+         children: [FileTreeItem]? = nil, gitStatus: GitFileStatus = .unmodified) {
+        self.id = id
+        self.name = name
+        self.isDirectory = isDirectory
+        self.isExpanded = isExpanded
+        self.children = children
+        self.gitStatus = gitStatus
+    }
+
+    static func == (lhs: FileTreeItem, rhs: FileTreeItem) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
 }
 
 /// Git 文件状态
@@ -116,16 +129,15 @@ final class FileTreeStateStore {
         statusMap: [String: GitFileStatus],
         root: String
     ) -> [FileTreeItem] {
-        items.map { item in
-            var mutable = item
+        for item in items {
             if let status = statusMap[item.id] {
-                mutable.gitStatus = status
+                item.gitStatus = status
             }
             if let children = item.children {
-                mutable.children = applyGitStatus(to: children, statusMap: statusMap, root: root)
+                _ = applyGitStatus(to: children, statusMap: statusMap, root: root)
             }
-            return mutable
         }
+        return items
     }
 
     private static func loadDirectory(path: String, depth: Int, maxDepth: Int) -> [FileTreeItem] {
@@ -143,7 +155,7 @@ final class FileTreeStateStore {
                 id: fullPath,
                 name: name,
                 isDirectory: isDir.boolValue,
-                children: isDir.boolValue ? [] : nil
+                children: nil   // nil 触发 NSOutlineView 占位展开逻辑；展开时异步加载
             )
         }
         // 排序：文件夹在前、文件在后（与 Maestri / Finder 一致）
@@ -152,6 +164,7 @@ final class FileTreeStateStore {
             return a.name.localizedStandardCompare(b.name) == .orderedAscending
         }
     }
+
 
     // MARK: - 展开/折叠
 
@@ -172,19 +185,18 @@ final class FileTreeStateStore {
         // 应用 git 状态到加载的子节点
         let annotated = Self.applyGitStatus(to: children, statusMap: gitStatus, root: rootPath)
         await MainActor.run {
-            updateChildren(annotated, for: path, in: &items)
+            updateChildren(annotated, for: path, in: items)
         }
     }
 
-    private func updateChildren(_ children: [FileTreeItem], for path: String, in items: inout [FileTreeItem]) {
-        for i in items.indices {
-            if items[i].id == path {
-                items[i].children = children
+    private func updateChildren(_ children: [FileTreeItem], for path: String, in items: [FileTreeItem]) {
+        for item in items {
+            if item.id == path {
+                item.children = children
                 return
             }
-            if var children_ = items[i].children {
-                updateChildren(children, for: path, in: &children_)
-                items[i].children = children_
+            if let existingChildren = item.children {
+                updateChildren(children, for: path, in: existingChildren)
             }
         }
     }

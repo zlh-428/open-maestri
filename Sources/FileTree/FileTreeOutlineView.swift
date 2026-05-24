@@ -23,6 +23,29 @@ final class FileTreeViewRegistry {
     }
 }
 
+/// 全局注册表：nodeId → FileTreeIconGridView（供画布路由鼠标事件使用）
+final class FileTreeGridViewRegistry {
+    static let shared = FileTreeGridViewRegistry()
+    private var views: [UUID: FileTreeIconGridView] = [:]
+    private let lock = NSLock()
+    private init() {}
+
+    func register(nodeId: UUID, view: FileTreeIconGridView) {
+        lock.lock(); defer { lock.unlock() }
+        views[nodeId] = view
+    }
+
+    func unregister(nodeId: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        views.removeValue(forKey: nodeId)
+    }
+
+    func view(for nodeId: UUID) -> FileTreeIconGridView? {
+        lock.lock(); defer { lock.unlock() }
+        return views[nodeId]
+    }
+}
+
 /// 轻量适配器：将 FileTreeOutlineNSView 包装为 NSView（供 CanvasNodeRenderer 嵌入节点 contentView）
 final class FileTreeOutlineView: NSView {
     private var outlineNSView: FileTreeOutlineNSView?
@@ -35,6 +58,26 @@ final class FileTreeOutlineView: NSView {
     var onNavigateTo: ((String) -> Void)?
     /// Git 分支加载完成后的回调
     var onBranchLoaded: ((String) -> Void)?
+    /// 任意点击时通知 Canvas 选中此节点
+    var onTapped: (() -> Void)? {
+        get { outlineNSView?.onTapped }
+        set { outlineNSView?.onTapped = newValue }
+    }
+    /// 后退导航回调（由 CanvasNodesView 在 navBar 区域命中后退按钮时调用）
+    var onGoBack: (() -> Void)?
+    /// 前进导航回调
+    var onGoForward: (() -> Void)?
+    /// 节点底部额外的 SwiftUI 区域高度（如 git panel 展开时），供 fileTreeHitKind 识别
+    var extraBottomSwiftUIHeight: CGFloat = 0
+
+    /// 是否显示隐藏文件（以 . 开头）
+    var showHiddenFiles: Bool {
+        get { outlineNSView?.showHiddenFiles ?? false }
+        set {
+            outlineNSView?.showHiddenFiles = newValue
+            outlineNSView?.reloadData()
+        }
+    }
 
     /// 当前根路径（供 FileTreeRepresentable.updateNSView 比较使用）
     var currentRootPath: String { store.rootPath }
@@ -89,5 +132,29 @@ final class FileTreeOutlineView: NSView {
             await self?.store.reload()
             self?.outlineNSView?.reloadData()
         }
+    }
+
+    /// 应用搜索过滤词
+    func applyFilter(_ query: String) {
+        guard outlineNSView?.filterQuery != query else { return }
+        outlineNSView?.filterQuery = query
+        // 清空搜索时恢复树视图（didSet 已清空 searchResults，这里 reloadData 触发 restoreExpandedPaths）
+        if query.isEmpty {
+            outlineNSView?.reloadData()
+        }
+        // 搜索模式：由 didSet → scheduleSearch 异步驱动，无需手动 reloadData
+    }
+
+    /// 折叠所有已展开的文件夹
+    func collapseAll() {
+        outlineNSView?.collapseAll()
+    }
+
+    /// 程序化处理点击事件（不依赖 NSEvent 转发）
+    /// - Parameters:
+    ///   - localPoint: 相对于 FileTreeOutlineView 左上角的坐标
+    ///   - clickCount: 1=单击, 2=双击
+    func handleClickAtLocalPoint(_ localPoint: NSPoint, clickCount: Int) {
+        outlineNSView?.handleClickAtLocalPoint(localPoint, clickCount: clickCount)
     }
 }
