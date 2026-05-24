@@ -57,6 +57,13 @@ extension CanvasViewportView {
     /// 优先级：选中节点外扩 resize 热区 > 节点内容区（header/footer/content）> 未选中节点内缩 resize > 空白
     /// 纯几何计算，不依赖 BaseNodeView 或子视图 hitTest（避免无限递归）
     func hitTestCanvas(at loc: CGPoint) -> CanvasHitTestResult {
+        // 鼠标位移小于阈值时直接返回缓存结果（避免 60fps 下每帧两次 O(n) 遍历）
+        let dx = loc.x - _hitTestCachedPoint.x
+        let dy = loc.y - _hitTestCachedPoint.y
+        if dx * dx + dy * dy < Self._hitTestReuseThreshold * Self._hitTestReuseThreshold {
+            return _hitTestCachedResult
+        }
+
         // Pass 1：对已选中节点先检测外扩 resize 热区（在节点边框外侧，不与内容冲突）
         for node in sortedNodesByZIndexDesc where selectedNodeIds.contains(node.id) {
             guard !isNodeLocked(node.id) else { continue }
@@ -67,7 +74,9 @@ extension CanvasViewportView {
             guard expandedFrame.contains(loc) && !screenFrame.insetBy(dx: Self.resizeInnerDeadZone, dy: Self.resizeInnerDeadZone).contains(loc) else { continue }
             let localPt = CGPoint(x: loc.x - screenFrame.minX, y: loc.y - screenFrame.minY)
             if let edge = outerResizeEdge(at: localPt, nodeSize: screenFrame.size, halo: halo) {
-                return .nodeResize(node.id, edge)
+                let r = CanvasHitTestResult.nodeResize(node.id, edge)
+                _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                return r
             }
         }
 
@@ -84,20 +93,28 @@ extension CanvasViewportView {
             // header 在节点顶部（y 向下：minY 是顶边，localPt.y 小 = 顶部）
             let scaledHeaderHeight = CanvasNodeConstants.headerHeight * zoom
             if localPt.y <= scaledHeaderHeight {
-                return .nodeHeader(node.id)
+                let r = CanvasHitTestResult.nodeHeader(node.id)
+                _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                return r
             }
 
             // footer 在节点底部（仅终端节点有 footer）
             if case .terminal = node.content {
                 let scaledFooterHeight = CanvasNodeConstants.footerHeight * zoom
                 if localPt.y >= screenFrame.height - scaledFooterHeight {
-                    return .nodeFooter(node.id)
+                    let r = CanvasHitTestResult.nodeFooter(node.id)
+                    _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                    return r
                 }
             }
 
-            return .nodeContent(node.id, nodesHostingView ?? self)
+            let r = CanvasHitTestResult.nodeContent(node.id, nodesHostingView ?? self)
+            _hitTestCachedPoint = loc; _hitTestCachedResult = r
+            return r
         }
-        return .canvas
+        let r = CanvasHitTestResult.canvas
+        _hitTestCachedPoint = loc; _hitTestCachedResult = r
+        return r
     }
 
     // MARK: - Resize 热区常量

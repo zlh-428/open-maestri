@@ -56,10 +56,17 @@ final class CanvasViewportView: NSView {
     /// 当前选中的节点 ID 集合
     var selectedNodeIds: Set<UUID> = [] {
         didSet {
+            // 选中状态变化时使 hitTestCanvas 缓存失效（resize 热区范围随选中状态变化）
+            _hitTestCachedPoint = CGPoint(x: -1e9, y: -1e9)
             updateSelectionVisuals()
             reportSelectionChange()
         }
     }
+
+    // MARK: - hitTestCanvas 结果缓存（避免 60fps 鼠标移动时重复遍历）
+    var _hitTestCachedPoint: CGPoint = CGPoint(x: -1e9, y: -1e9)
+    var _hitTestCachedResult: CanvasHitTestResult = .canvas
+    static let _hitTestReuseThreshold: CGFloat = 2.0
 
     // MARK: - 回调
 
