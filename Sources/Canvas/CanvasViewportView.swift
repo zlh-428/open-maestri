@@ -172,6 +172,13 @@ final class CanvasViewportView: NSView {
         sortedNodesByZIndexDesc = sortedNodesByZIndex.reversed()
     }
 
+    /// 强制使视口裁剪缓存失效（供 CanvasNodeRenderer.sync() 在直接写 rootView 后调用，
+    /// 保证 _cachedViewportNodes 与实际渲染的节点集合保持一致，
+    /// 防止拖拽分支用旧白名单过滤导致新增节点消失）
+    func invalidateViewportCache() {
+        _viewportCacheDirty = true
+    }
+
     /// 仅更新指定节点的 frame（不触发全量 sort，因为 zIndex 未变）
     /// 用于拖动/resize 等高频场景，避免每帧 O(n log n) + O(n) 数组拷贝
     func updateNodeFrameInPlace(id: UUID, frame: CGRect) {
@@ -632,8 +639,16 @@ final class CanvasViewportView: NSView {
                 // 拖动中以 sortedNodesByZIndex 为权威来源重建 _cachedViewportNodes：
                 // 1. 排序顺序跟随最新 zIndex（bringNodesToFront 已更新 sortedNodesByZIndex）
                 // 2. frame 取实时值（updateNodeFrameInPlace 已同步到 sortedNodesByZIndex）
-                let cachedIds = Set(_cachedViewportNodes.map { $0.id })
-                _cachedViewportNodes = sortedNodesByZIndex.filter { cachedIds.contains($0.id) }
+                // 3. 缓存脏时（如 sync() 刚加入新节点）必须重新裁剪，否则新节点永远不进白名单
+                if _viewportCacheDirty {
+                    _cachedViewportNodes = viewportCulledNodes()
+                    _cachedViewportOrigin = canvasOrigin
+                    _cachedViewportZoom = zoom
+                    _viewportCacheDirty = false
+                } else {
+                    let cachedIds = Set(_cachedViewportNodes.map { $0.id })
+                    _cachedViewportNodes = sortedNodesByZIndex.filter { cachedIds.contains($0.id) }
+                }
             } else {
                 // 仅在视口参数大幅变化或缓存显式失效时重新裁剪（避免每帧 O(n) 遍历）
                 // 容差策略：origin 微小变化（< 50 画布单位 ≈ 亚节点级平移）不触发重算

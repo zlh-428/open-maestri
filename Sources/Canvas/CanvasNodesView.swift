@@ -93,12 +93,12 @@ struct CanvasNodesSwiftUIView: View {
                         .scaleEffect(zoom)
                         // position 与 hitTestCanvas/canvasRectToScreen 坐标系完全一致
                         .position(x: posX, y: posY)
-                        // 禁用布局动画：frame/position 由 AppKit 层逐帧驱动，
-                        // SwiftUI 隐式动画会在 resize/拖拽时把节点过渡到错误坐标导致消失
-                        .animation(.none, value: posX)
-                        .animation(.none, value: posY)
-                        .animation(.none, value: node.frame.width)
-                        .animation(.none, value: node.frame.height)
+                        // 所有几何变换（frame/scaleEffect/position）由 AppKit 层逐帧驱动，
+                        // 必须切断所有动画传播路径（包括 zoom 变化触发的 scaleEffect 动画），
+                        // 否则 SwiftUI 隐式动画会在拖拽/缩放时将节点插值到错误坐标导致消失。
+                        // .animation(.none, value:) 只覆盖特定值的通道，
+                        // .transaction 全量切断，是唯一可靠方案。
+                        .transaction { $0.animation = nil }
                         .allowsHitTesting(false)
                 }
             }

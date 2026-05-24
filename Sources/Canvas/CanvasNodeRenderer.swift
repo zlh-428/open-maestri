@@ -257,6 +257,10 @@ final class CanvasNodeRenderer {
         canvas.currentNodes = nodes
 
         // 视口裁剪：仅将可见节点传入 SwiftUI 渲染层
+        // 同时强制使视口缓存失效：sync() 直接写 rootView 绕过了 layout() 的缓存更新路径，
+        // 若不置脏，拖拽分支会用旧 _cachedViewportNodes 作过滤白名单，
+        // 导致 sync() 之后立即拖拽新节点时节点消失。
+        canvas.invalidateViewportCache()
         let visibleNodes = canvas.viewportCulledNodes()
 
         nodesHostingView?.rootView = CanvasNodesSwiftUIView(
