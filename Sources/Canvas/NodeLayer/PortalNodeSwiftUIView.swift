@@ -375,10 +375,12 @@ struct PortalWebViewRepresentable: NSViewRepresentable {
             webView = existing
         } else {
             webView = PortalWebViewStore.shared.createWebView(for: nodeId)
-            // 仅在有有效 URL 时首次加载
+            // 仅在有有效 URL 且 WebView 尚无内容时首次加载
+            // （防止 makeNSView 被 SwiftUI 重复调用时重复发起 load）
             let url = initialURL.trimmingCharacters(in: .whitespaces)
             if !url.isEmpty && url != "https://" && url != "http://",
-               let loadURL = URL(string: url) {
+               let loadURL = URL(string: url),
+               webView.url == nil && !webView.isLoading {
                 webView.load(URLRequest(url: loadURL))
             }
         }

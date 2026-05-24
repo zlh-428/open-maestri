@@ -38,6 +38,10 @@ final class WorkspaceManager: Identifiable {
     private let logger = Logger.make(category: "WorkspaceManager")
     private let pm = PersistenceManager.shared
 
+    /// Portal URL 静默更新缓存（不触发 @Observable → 不触发画布重渲染）
+    /// key: portalId, value: 最新落地 URL；save() 时会 patch 进 payload
+    private var _pendingPortalURLs: [UUID: String] = [:]
+
     init(entry: WorkspaceEntry) {
         self.id = entry.id
         self.name = entry.name
@@ -149,6 +153,15 @@ final class WorkspaceManager: Identifiable {
         isDirty = true
     }
 
+    // MARK: - Portal URL 静默更新（不触发画布重渲染）
+
+    /// 更新 Portal 节点的当前 URL，仅修改持久化缓存，不触发 @Observable → 不刷新画布
+    /// 供 handlePortalURLDidChange 调用；URL 将在下次 save() 时写入磁盘
+    func updatePortalURLSilently(portalId: UUID, url: String) {
+        _pendingPortalURLs[portalId] = url
+        isDirty = true
+    }
+
     // MARK: - 私有辅助
 
     /// 将当前状态快照为纯值类型，可安全传递到后台线程
@@ -157,6 +170,17 @@ final class WorkspaceManager: Identifiable {
     private func buildPayload() -> WorkspacePayload {
         var payload = WorkspacePayload(id: id, name: name, workingDirectory: workingDirectory)
         payload.nodes = nodes
+        // 将静默缓存的 Portal URL patch 进 payload（不影响内存中的 nodes）
+        if !_pendingPortalURLs.isEmpty {
+            for i in payload.nodes.indices {
+                let id = payload.nodes[i].id
+                if let url = _pendingPortalURLs[id],
+                   case .portal(var pc) = payload.nodes[i].content {
+                    pc.currentURL = url
+                    payload.nodes[i].content = .portal(pc)
+                }
+            }
+        }
         payload.connections = connections
         payload.noteConnections = noteConnections
         payload.portalConnections = portalConnections

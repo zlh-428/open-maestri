@@ -96,12 +96,9 @@ extension WorkspaceCanvasView {
     func handlePortalURLDidChange(notif: Notification) {
         guard let info = notif.userInfo,
               let portalId = info["portalId"] as? UUID,
-              let url = info["url"] as? String,
-              let idx = workspace.nodes.firstIndex(where: { $0.id == portalId }),
-              case .portal(var pc) = workspace.nodes[idx].content else { return }
-        guard pc.currentURL != url else { return }
-        pc.currentURL = url
-        workspace.nodes[idx].content = .portal(pc)
+              let url = info["url"] as? String else { return }
+        // 静默更新：不修改 workspace.nodes（避免触发 @Observable → 画布重渲染 → makeNSView → 重复加载 URL）
+        workspace.updatePortalURLSilently(portalId: portalId, url: url)
         Task { try? await workspace.save() }
     }
 }

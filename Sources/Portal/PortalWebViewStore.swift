@@ -44,6 +44,15 @@ final class PortalWebViewStore {
     private var portalGroups: [UUID: UUID] = [:]                     // portalId → groupId
 
     func createWebView(for portalId: UUID, initialURL: String? = nil, sharedGroupId: UUID? = nil) -> WKWebView {
+        // 去重保护：如果已存在同 portalId 的 WebView，直接返回（避免重复创建导致旧 WebView 丢失引用）
+        if let existing = webViews[portalId] {
+            // 如果调用方提供了 initialURL 且 WebView 当前无内容且未在加载中，才补充加载
+            if let urlStr = initialURL, let url = URL(string: urlStr),
+               existing.url == nil && !existing.isLoading {
+                existing.load(URLRequest(url: url))
+            }
+            return existing
+        }
         let config = WKWebViewConfiguration()
         // 独立 Portal 使用非持久化存储（storageScope: isolated）
         // Portal-Portal 连接时共享同一 WKWebsiteDataStore
@@ -57,8 +66,8 @@ final class PortalWebViewStore {
             }
             portalGroups[portalId] = groupId
         } else {
-            // 每个 Portal 默认独立存储（非持久化，避免 Cookie 污染）
-            config.websiteDataStore = WKWebsiteDataStore.nonPersistent()
+            // 使用持久化存储，保留 Cookie/Session，避免网站因会话丢失而无限刷新
+            config.websiteDataStore = WKWebsiteDataStore.default()
         }
         let webView = WKWebView(frame: .zero, configuration: config)
         // 设置 navigationDelegate 处理证书挑战（允许自签名 HTTPS）
@@ -90,6 +99,7 @@ final class PortalWebViewStore {
         navigationDelegates.removeValue(forKey: portalId)
         uiDelegates.removeValue(forKey: portalId)
         loadingContinuations.removeValue(forKey: portalId)?.resume()
+        lastNotifiedURLs.removeValue(forKey: portalId)
         // 清理共享组（如果是最后一个成员）
         if let groupId = portalGroups.removeValue(forKey: portalId) {
             let remaining = portalGroups.values.filter { $0 == groupId }
@@ -131,10 +141,16 @@ final class PortalWebViewStore {
 
     // MARK: - Navigation 回调（由 PortalNavigationDelegate 调用）
 
+    /// 上一次通知出去的 URL（防止同一 URL 重复 post 通知触发 @Observable 级联）
+    private var lastNotifiedURLs: [UUID: String] = [:]
+
     func navigationDidFinish(for portalId: UUID) {
         loadingContinuations.removeValue(forKey: portalId)?.resume()
         // 将最终落地 URL 写回模型，保证关闭重开后能恢复
-        if let url = webViews[portalId]?.url?.absoluteString, !url.isEmpty {
+        // 去抖：仅当 URL 与上次通知的不同时才 post，避免重复触发 @Observable 级联更新
+        if let url = webViews[portalId]?.url?.absoluteString, !url.isEmpty,
+           lastNotifiedURLs[portalId] != url {
+            lastNotifiedURLs[portalId] = url
             NotificationCenter.default.post(
                 name: .portalURLDidChange,
                 object: nil,
