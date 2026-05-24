@@ -37,6 +37,18 @@ final class FileTreeNavigationState {
         backStack.append(currentPath)
         currentPath = next
     }
+
+    func resetToRoot(_ newPath: String) {
+        backStack.removeAll()
+        forwardStack.removeAll()
+        currentPath = newPath
+    }
+}
+
+// MARK: - 排序方式枚举
+
+enum FileTreeSortOrder {
+    case name, modified, size
 }
 
 // MARK: - FileTreeNodeSwiftUIView
@@ -56,11 +68,14 @@ struct FileTreeNodeSwiftUIView: View {
 
     @Environment(\.dropTargetNodeId) private var dropTargetNodeId
 
-    /// 每个节点独立的导航状态（State 保证生命周期绑定到视图）
     @State private var navState: FileTreeNavigationState
     @State private var viewMode: FileTreeViewMode = .list
     @State private var showGitPanel = false
     @State private var currentBranch: String = ""
+    @State private var searchText: String = ""
+    @State private var showHiddenFiles: Bool = false
+    @State private var sortOrder: FileTreeSortOrder = .name
+    @State private var collapseAllTrigger: Int = 0
 
     private var isDropTarget: Bool { dropTargetNodeId == nodeId }
 
@@ -93,28 +108,32 @@ struct FileTreeNodeSwiftUIView: View {
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            // 背景：vibrancy 毛玻璃 + 半透明叠加 + 阴影
+            // 背景：毛玻璃 + 半透明叠加 + 阴影
             RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
-                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.75))
+                .fill(Color(nsColor: .windowBackgroundColor).opacity(0.85))
                 .background {
-                    VibrancyBackground(material: .popover, blendingMode: .behindWindow)
+                    VibrancyBackground(material: .sidebar, blendingMode: .behindWindow)
                         .clipShape(RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius))
                 }
-                .shadow(color: .black.opacity(0.15), radius: 10, y: 3)
+                .shadow(color: .black.opacity(0.18), radius: 16, y: 6)
                 .overlay {
                     RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.8), lineWidth: 0.5)
                 }
 
             VStack(spacing: 0) {
-                // 对标 Maestri 的 Header 工具栏
+                // 顶部导航工具栏
                 FileTreeNavigationBar(
                     navState: navState,
                     viewMode: $viewMode,
                     showGitPanel: $showGitPanel,
+                    showHiddenFiles: $showHiddenFiles,
+                    sortOrder: $sortOrder,
                     currentBranch: currentBranch,
                     isLocked: isLocked,
-                    rootPath: content.rootPath
+                    onCollapseAll: {
+                        collapseAllTrigger += 1
+                    }
                 )
                 .frame(height: CanvasNodeConstants.headerHeight + 8)
 
@@ -126,15 +145,19 @@ struct FileTreeNodeSwiftUIView: View {
                         nodeId: nodeId,
                         content: content,
                         navState: navState,
-                        onBranchLoaded: { branch in
-                            currentBranch = branch
-                        }
+                        searchText: searchText,
+                        showHiddenFiles: showHiddenFiles,
+                        showGitPanel: showGitPanel,
+                        collapseAllTrigger: collapseAllTrigger,
+                        onBranchLoaded: { branch in currentBranch = branch },
+                        onTapped: { onActivated?(nodeId) }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     FileTreeGridRepresentable(
                         nodeId: nodeId,
-                        navState: navState
+                        navState: navState,
+                        onTapped: { onActivated?(nodeId) }
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -150,7 +173,7 @@ struct FileTreeNodeSwiftUIView: View {
                 Divider().opacity(0.3)
 
                 // 底部搜索栏
-                FileTreeSearchBar()
+                FileTreeSearchBar(searchText: $searchText)
                     .frame(height: 40)
             }
             .clipShape(RoundedRectangle(cornerRadius: CanvasNodeConstants.cornerRadius))
@@ -174,53 +197,81 @@ struct FileTreeNodeSwiftUIView: View {
                     .allowsHitTesting(false)
             }
         }
-        // 右键菜单由 AppKit 层 CanvasViewportView.menu(for:) 统一处理
+        .onChange(of: content.rootPath) { _, newPath in
+            if navState.currentPath != newPath {
+                navState.resetToRoot(newPath)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NavBarMenuAction.setViewMode)) { note in
+            guard (note.userInfo?[NavBarMenuAction.nodeIdKey] as? UUID) == nodeId,
+                  let mode = note.userInfo?[NavBarMenuAction.viewModeKey] as? FileTreeViewMode
+            else { return }
+            viewMode = mode
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NavBarMenuAction.toggleHidden)) { note in
+            guard (note.userInfo?[NavBarMenuAction.nodeIdKey] as? UUID) == nodeId else { return }
+            showHiddenFiles.toggle()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NavBarMenuAction.collapseAll)) { note in
+            guard (note.userInfo?[NavBarMenuAction.nodeIdKey] as? UUID) == nodeId else { return }
+            collapseAllTrigger += 1
+        }
     }
 }
 
-// MARK: - 顶部导航工具栏（对标 Maestri [<][>] 路径 [List|Grid] [Branch]）
+// MARK: - 顶部导航工具栏
 
 private struct FileTreeNavigationBar: View {
     @Bindable var navState: FileTreeNavigationState
     @Binding var viewMode: FileTreeViewMode
     @Binding var showGitPanel: Bool
+    @Binding var showHiddenFiles: Bool
+    @Binding var sortOrder: FileTreeSortOrder
     let currentBranch: String
     let isLocked: Bool
-    let rootPath: String
+    let onCollapseAll: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            // ─── 后退 / 前进 按钮 ───
+        HStack(spacing: 8) {
+            // ─── 左侧：白色胶囊后退/前进按钮 ───
             HStack(spacing: 0) {
                 Button(action: { navState.goBack() }) {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(navState.canGoBack ? Color.primary : Color.secondary.opacity(0.4))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(navState.canGoBack ? Color.primary : Color.secondary.opacity(0.35))
+                        .frame(width: 28, height: 24)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!navState.canGoBack)
 
+                Divider()
+                    .frame(height: 14)
+                    .opacity(0.4)
+
                 Button(action: { navState.goForward() }) {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(navState.canGoForward ? Color.primary : Color.secondary.opacity(0.4))
-                        .frame(width: 28, height: 28)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(navState.canGoForward ? Color.primary : Color.secondary.opacity(0.35))
+                        .frame(width: 28, height: 24)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(!navState.canGoForward)
             }
+            .background(
+                Capsule()
+                    .fill(Color(nsColor: .controlBackgroundColor).opacity(0.9))
+                    .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+            )
             .padding(.leading, 8)
 
-            // ─── 当前目录名称（截断显示） ───
+            // ─── 中间：当前目录名称 ───
             Text(navState.currentDirectoryName)
                 .font(.system(size: 13, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .padding(.leading, 4)
-                .help(navState.currentPath)   // hover tooltip 显示完整路径
+                .help(navState.currentPath)
 
             Spacer()
 
@@ -229,7 +280,6 @@ private struct FileTreeNavigationBar: View {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .padding(.trailing, 4)
             }
 
             // ─── Git Branch 指示器 ───
@@ -252,37 +302,71 @@ private struct FileTreeNavigationBar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.trailing, 4)
             }
 
-            // ─── List / Grid 视图切换 ───
-            HStack(spacing: 1) {
+            // ─── 右侧：白色胶囊菜单按钮 ───
+            Menu {
+                // 视图模式
                 Button(action: { viewMode = .list }) {
-                    Image(systemName: "list.bullet")
-                        .font(.system(size: 12))
-                        .foregroundStyle(viewMode == .list ? Color.accentColor : Color.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(viewMode == .list ? Color.accentColor.opacity(0.12) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
+                    Label("列表视图", systemImage: "list.bullet")
                 }
-                .buttonStyle(.plain)
-
                 Button(action: { viewMode = .grid }) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 12))
-                        .foregroundStyle(viewMode == .grid ? Color.accentColor : Color.secondary)
-                        .frame(width: 24, height: 24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(viewMode == .grid ? Color.accentColor.opacity(0.12) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
+                    Label("图标视图", systemImage: "square.grid.2x2")
                 }
-                .buttonStyle(.plain)
+                Button(action: {}) {
+                    Label("差异视图", systemImage: "arrow.left.arrow.right.square")
+                }
+                .disabled(true)
+
+                Divider()
+
+                // 显示隐藏文件
+                Button(action: { showHiddenFiles.toggle() }) {
+                    Label(
+                        showHiddenFiles ? "隐藏隐藏文件" : "显示隐藏文件",
+                        systemImage: showHiddenFiles ? "eye.slash" : "eye"
+                    )
+                }
+
+                // 排序方式子菜单
+                Menu("排序方式") {
+                    Button(action: { sortOrder = .name }) {
+                        Label("名称", systemImage: sortOrder == .name ? "checkmark" : "")
+                    }
+                    Button(action: { sortOrder = .modified }) {
+                        Label("修改时间", systemImage: sortOrder == .modified ? "checkmark" : "")
+                    }
+                    Button(action: { sortOrder = .size }) {
+                        Label("大小", systemImage: sortOrder == .size ? "checkmark" : "")
+                    }
+                }
+
+                Divider()
+
+                // 全部折叠（仅列表模式）
+                Button(action: { onCollapseAll() }) {
+                    Label("全部折叠", systemImage: "arrow.up.to.line")
+                }
+                .disabled(viewMode != .list)
+
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "list.bullet.indent")
+                        .font(.system(size: 12))
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 9))
+                }
+                .foregroundStyle(Color.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.9))
+                        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+                )
             }
+            .menuStyle(.borderlessButton)
+            .fixedSize()
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -361,6 +445,8 @@ private struct GitActionButton: View {
 // MARK: - 底部搜索栏
 
 private struct FileTreeSearchBar: View {
+    @Binding var searchText: String
+
     var body: some View {
         HStack(spacing: 0) {
             HStack(spacing: 6) {
@@ -368,11 +454,18 @@ private struct FileTreeSearchBar: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
 
-                Text("label.search")
+                TextField("label.search", text: $searchText)
+                    .textFieldStyle(.plain)
                     .font(.system(size: 13))
-                    .foregroundStyle(Color(nsColor: .placeholderTextColor))
 
-                Spacer()
+                if !searchText.isEmpty {
+                    Button(action: { searchText = "" }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 7)
@@ -392,24 +485,25 @@ struct FileTreeRepresentable: NSViewRepresentable {
     let nodeId: UUID
     let content: FileTreeContent
     @Bindable var navState: FileTreeNavigationState
+    let searchText: String
+    let showHiddenFiles: Bool
+    let showGitPanel: Bool
+    let collapseAllTrigger: Int
     var onBranchLoaded: ((String) -> Void)?
+    var onTapped: (() -> Void)?
 
     func makeNSView(context: Context) -> NSView {
-        // 复用已注册的 view（避免切换工作区时重建）
         if let existing = FileTreeViewRegistry.shared.view(for: nodeId) {
-            // 将最新的 navState 回调注入到已有 view
-            existing.onNavigateTo = { path in
-                navState.navigateTo(path)
-            }
+            existing.onNavigateTo = { path in navState.navigateTo(path) }
             existing.onBranchLoaded = onBranchLoaded
+            existing.onTapped = onTapped
             return existing
         }
 
         let fileTreeView = FileTreeOutlineView(rootPath: content.rootPath)
-        fileTreeView.onNavigateTo = { path in
-            navState.navigateTo(path)
-        }
+        fileTreeView.onNavigateTo = { path in navState.navigateTo(path) }
         fileTreeView.onBranchLoaded = onBranchLoaded
+        fileTreeView.onTapped = onTapped
 
         FileTreeViewRegistry.shared.register(nodeId: nodeId, view: fileTreeView)
         return fileTreeView
@@ -417,15 +511,29 @@ struct FileTreeRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let ftv = nsView as? FileTreeOutlineView else { return }
-        // navState.currentPath 变化时，更新 outline view 的根目录
         if ftv.currentRootPath != navState.currentPath {
             ftv.changeRoot(to: navState.currentPath)
         }
-        // 保证回调始终是最新的
-        ftv.onNavigateTo = { path in
-            navState.navigateTo(path)
-        }
+        ftv.onNavigateTo = { path in navState.navigateTo(path) }
         ftv.onBranchLoaded = onBranchLoaded
+        ftv.onTapped = onTapped
+        ftv.onGoBack = { navState.goBack() }
+        ftv.onGoForward = { navState.goForward() }
+        ftv.applyFilter(searchText)
+        ftv.showHiddenFiles = showHiddenFiles
+        // git panel 展开时额外占据 120pt，需告知 fileTreeHitKind 将其识别为 SwiftUI 区域
+        ftv.extraBottomSwiftUIHeight = showGitPanel ? 120 : 0
+
+        if context.coordinator.lastCollapseAllTrigger != collapseAllTrigger {
+            context.coordinator.lastCollapseAllTrigger = collapseAllTrigger
+            ftv.collapseAll()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator {
+        var lastCollapseAllTrigger: Int = 0
     }
 }
 
@@ -434,12 +542,13 @@ struct FileTreeRepresentable: NSViewRepresentable {
 struct FileTreeGridRepresentable: NSViewRepresentable {
     let nodeId: UUID
     @Bindable var navState: FileTreeNavigationState
+    var onTapped: (() -> Void)?
 
     func makeNSView(context: Context) -> FileTreeIconGridView {
         let grid = FileTreeIconGridView(rootPath: navState.currentPath)
-        grid.onNavigateTo = { path in
-            navState.navigateTo(path)
-        }
+        grid.onNavigateTo = { path in navState.navigateTo(path) }
+        grid.onTapped = onTapped
+        FileTreeGridViewRegistry.shared.register(nodeId: nodeId, view: grid)
         return grid
     }
 
@@ -447,8 +556,9 @@ struct FileTreeGridRepresentable: NSViewRepresentable {
         if nsView.rootPath != navState.currentPath {
             nsView.changeRoot(to: navState.currentPath)
         }
-        nsView.onNavigateTo = { path in
-            navState.navigateTo(path)
-        }
+        nsView.onNavigateTo = { path in navState.navigateTo(path) }
+        nsView.onTapped = onTapped
+        nsView.onGoBack = { navState.goBack() }
+        nsView.onGoForward = { navState.goForward() }
     }
 }

@@ -15,6 +15,11 @@ final class FileTreeIconGridView: NSView {
     var rootPath: String { store.rootPath }
 
     var onNavigateTo: ((String) -> Void)?
+    /// 任意点击时通知 Canvas 选中此节点
+    var onTapped: (() -> Void)?
+    /// 后退/前进导航（由 CanvasNodesView 在 navBar 区域命中对应按钮时调用）
+    var onGoBack: (() -> Void)?
+    var onGoForward: (() -> Void)?
 
     // MARK: - Private
 
@@ -87,13 +92,68 @@ final class FileTreeIconGridView: NSView {
         }
     }
 
+    // MARK: - Mouse Events
+
+    override func mouseDown(with event: NSEvent) {
+        onTapped?()
+        super.mouseDown(with: event)
+    }
+
+    /// 由 CanvasNodesView 调用，将鼠标事件转发给内部 NSCollectionView，
+    /// 确保选中和手势识别器（双击）都能正确触发
+    func forwardMouseDown(with event: NSEvent) {
+        onTapped?()
+        collectionView.mouseDown(with: event)
+    }
+
+    /// 程序化点击处理（不依赖 NSEvent 转发）
+    /// - Parameters:
+    ///   - localPoint: 相对于 FileTreeIconGridView 左上角的坐标
+    ///   - clickCount: 1=单击, 2=双击
+    func handleClickAtLocalPoint(_ localPoint: NSPoint, clickCount: Int) {
+        onTapped?()
+
+        // 考虑 scrollView 的 contentOffset
+        let scrollOffset = scrollView.contentView.bounds.origin
+        let adjustedPoint = NSPoint(x: localPoint.x + scrollOffset.x, y: localPoint.y + scrollOffset.y)
+
+        // 查找点击位置对应的 item
+        guard let indexPath = collectionView.indexPathForItem(at: adjustedPoint),
+              indexPath.item < store.items.count else {
+            // 点击空白区域：取消选中
+            collectionView.deselectAll(nil)
+            return
+        }
+
+        let fi = store.items[indexPath.item]
+
+        if clickCount >= 2 {
+            // 双击：目录导航进入 / 文件 Quick Look
+            if fi.isDirectory {
+                onNavigateTo?(fi.id)
+            } else {
+                QuickLookCoordinator.shared.preview(url: URL(fileURLWithPath: fi.id))
+            }
+        } else {
+            // 单击：选中
+            collectionView.selectItems(at: [indexPath], scrollPosition: [])
+        }
+    }
+
     // MARK: - Double Click
 
     @objc private func handleDoubleClick(_ gesture: NSClickGestureRecognizer) {
+        // 优先通过手势坐标直接查找 item（避免事件转发导致 selectionIndexPaths 未更新的问题）
         let pt = gesture.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: pt),
-              indexPath.item < store.items.count else { return }
-        let fi = store.items[indexPath.item]
+        let indexPath: IndexPath?
+        if let ip = collectionView.indexPathForItem(at: pt) {
+            indexPath = ip
+        } else {
+            // fallback：使用已有的 selection 状态
+            indexPath = collectionView.selectionIndexPaths.first
+        }
+        guard let ip = indexPath, ip.item < store.items.count else { return }
+        let fi = store.items[ip.item]
         if fi.isDirectory {
             onNavigateTo?(fi.id)
         } else {
