@@ -39,7 +39,9 @@ final class PersistenceManager {
     let encoder: JSONEncoder = {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
+        #if DEBUG
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        #endif
         return enc
     }()
 
