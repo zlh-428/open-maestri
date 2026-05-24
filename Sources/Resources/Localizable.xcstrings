@@ -5488,6 +5488,254 @@
           }
         }
       }
+    },
+    "filetree.menu.list_view": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List View"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表视图"
+          }
+        }
+      }
+    },
+    "filetree.menu.icon_view": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Icon View"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图标视图"
+          }
+        }
+      }
+    },
+    "filetree.menu.hide_hidden_files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Hidden Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏隐藏文件"
+          }
+        }
+      }
+    },
+    "filetree.menu.show_hidden_files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Hidden Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示隐藏文件"
+          }
+        }
+      }
+    },
+    "filetree.menu.collapse_all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部折叠"
+          }
+        }
+      }
+    },
+    "filetree.error.directory_not_found": {
+      "comment": "File tree error when directory does not exist. %@ is the directory name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Directory not found: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目录不存在：%@"
+          }
+        }
+      }
+    },
+    "note.toolbar.more_colors": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Colors"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多颜色"
+          }
+        }
+      }
+    },
+    "workspace.delete_confirm": {
+      "comment": "Confirmation dialog title when deleting a workspace. %@ is the workspace name.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete workspace \"%@\"?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认删除工作区 \"%@\"？"
+          }
+        }
+      }
+    },
+    "workspace.duplicate_suffix": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副本"
+          }
+        }
+      }
+    },
+    "workspace.new_group": {
+      "comment": "Default name for a new sidebar group. %lld is the group number.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Group %lld"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新分组 %lld"
+          }
+        }
+      }
+    },
+    "workspace.load_failed": {
+      "comment": "Error message when a workspace fails to load. %1$@ is workspace name, %2$@ is error description.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace \"%1$@\" failed to load: %2$@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作区 \"%1$@\" 加载失败: %2$@"
+          }
+        }
+      }
+    },
+    "routine.interval.seconds": {
+      "comment": "Routine interval description for sub-minute intervals. %1$d is seconds, %2$d is prompt count.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ds interval · %2$d prompts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$ds 间隔 · %2$d 条提示"
+          }
+        }
+      }
+    },
+    "routine.interval.minutes": {
+      "comment": "Routine interval description for minute-based intervals. %1$d is minutes, %2$d is prompt count.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %1$d min · %2$d prompts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每 %1$d 分钟 · %2$d 条提示"
+          }
+        }
+      }
+    },
+    "routine.interval.hours": {
+      "comment": "Routine interval description for hour-based intervals. %1$d is hours, %2$d is prompt count.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %1$d hr · %2$d prompts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每 %1$d 小时 · %2$d 条提示"
+          }
+        }
+      }
+    },
+    "floor.error.not_git_repo": {
+      "comment": "Error when creating a Floor in a directory that is not a git repository. %@ is the working directory path.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working directory '%@' is not a git repository. Please run git init first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作目录 '%@' 不是 git repository，无法创建 Floor。请先运行 git init。"
+          }
+        }
+      }
     }
   },
   "version": "1"

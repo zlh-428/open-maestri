@@ -149,10 +149,10 @@ struct RoutineRow: View {
 
     private var intervalDescription: String {
         let secs = routine.intervalSeconds
-        if secs < 60 { return "\(Int(secs))s 间隔 · \(routine.prompts.count) 条提示" }
+        if secs < 60 { return String(format: "routine.interval.seconds".localized, Int(secs), routine.prompts.count) }
         let mins = Int(secs / 60)
-        if mins < 60 { return "每 \(mins) 分钟 · \(routine.prompts.count) 条提示" }
-        return "每 \(Int(mins / 60)) 小时 · \(routine.prompts.count) 条提示"
+        if mins < 60 { return String(format: "routine.interval.minutes".localized, mins, routine.prompts.count) }
+        return String(format: "routine.interval.hours".localized, Int(mins / 60), routine.prompts.count)
     }
 }
 

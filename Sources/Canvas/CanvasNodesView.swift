@@ -58,9 +58,11 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
         if let (nodeId, hitKind) = fileTreeHitKind(at: loc, canvas: canvas) {
             switch hitKind {
             case .navBar:
-                // NavBar 区域：解析后退/前进/菜单按钮，根据 x 坐标精确分发
-                handleNavBarClick(nodeId: nodeId, loc: loc, event: event, canvas: canvas)
-                return
+                // NavBar 区域：精确分发按钮动作；只有弹出菜单时才消费事件，
+                // 其余情况（后退/前进/标题空白）继续转发给 canvas 完成选中/拖拽
+                if handleNavBarClick(nodeId: nodeId, loc: loc, event: event, canvas: canvas) {
+                    return
+                }
             case .content:
                 // NSOutlineView/NSCollectionView 区域：先选中节点，再转发事件
                 canvas.selectFileTreeNode(at: loc, modifiers: event.modifierFlags)
@@ -85,28 +87,40 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
         nextResponder?.mouseDown(with: event)
     }
 
-    /// 处理 navBar 区域点击：根据 x 坐标区分后退/前进/菜单，精确分发
+    /// 处理 navBar 区域点击：根据 x 坐标精确分发到后退/前进/菜单按钮。
+    /// 返回 true 表示事件已被消费（菜单弹出），false 表示应继续交给 canvas 处理（选中/拖拽）。
+    @discardableResult
     private func handleNavBarClick(
         nodeId: UUID, loc: CGPoint, event: NSEvent, canvas: CanvasViewportView
-    ) {
-        guard let frame = canvas.currentNodes.first(where: { $0.id == nodeId })?.frame else { return }
-        let sf = canvas.canvasRectToScreen(frame)
-        // 把屏幕 x 坐标换算回节点内部的逻辑 x（zoom=1 空间）
-        let localX = (loc.x - sf.minX) / canvas.zoom
+    ) -> Bool {
+        guard let node = canvas.currentNodes.first(where: { $0.id == nodeId }) else { return false }
+        let sf = canvas.canvasRectToScreen(node.frame)
+        let localX    = (loc.x - sf.minX) / canvas.zoom
+        let nodeWidth = node.frame.width
 
-        // FileTreeNavigationBar 布局：
-        //   .padding(.leading, 8) + 后退按钮 frame(28) + Divider + 前进按钮 frame(28) + ...
-        //   后退: x ∈ [8, 36)，前进: x ∈ [36, 64)，其余为菜单/git/标题区域
-        if localX >= 8 && localX < 36 {
+        // FileTreeNavigationBar 布局（从左到右）：
+        //   leading(8) + 后退(28) + Divider(~1) + 前进(28) + 标题/Spacer + [git按钮] + 菜单胶囊 + trailing(8)
+        //   菜单胶囊内容：list.dash(12) + spacing(4) + chevron.up.chevron.down(9) ≈ 25pt
+        //   加 padding(.horizontal, 10) × 2 = 45pt 宽，trailing padding 8pt
+        //   → 胶囊热区：menuMinX = nodeWidth - 53，menuMaxX = nodeWidth - 8
+        let backRange    = 8.0...35.0 as ClosedRange<CGFloat>
+        let forwardRange = 36.0...63.0 as ClosedRange<CGFloat>
+        let menuMinX     = nodeWidth - 53.0
+        let menuMaxX     = nodeWidth - 8.0
+
+        if backRange.contains(localX) {
             FileTreeViewRegistry.shared.view(for: nodeId)?.onGoBack?()
             FileTreeGridViewRegistry.shared.view(for: nodeId)?.onGoBack?()
-        } else if localX >= 36 && localX < 64 {
+            return false   // 后退后仍允许 canvas 选中节点
+        } else if forwardRange.contains(localX) {
             FileTreeViewRegistry.shared.view(for: nodeId)?.onGoForward?()
             FileTreeGridViewRegistry.shared.view(for: nodeId)?.onGoForward?()
-        } else {
-            // 菜单按钮、git 按钮等：直接弹出 NSMenu，避免事件转发引起递归
+            return false   // 前进后仍允许 canvas 选中节点
+        } else if localX >= menuMinX && localX <= menuMaxX {
             showNavBarMenu(nodeId: nodeId, event: event)
+            return true    // 菜单已弹出，消费事件，不再选中/拖拽
         }
+        return false       // 标题/空白区域：交给 canvas 拖拽
     }
 
     /// 弹出 navBar 右侧菜单（列表/图标视图切换、显示隐藏文件等）。
@@ -116,13 +130,13 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
 
         let menu = NSMenu()
 
-        let listItem = NSMenuItem(title: "列表视图", action: #selector(menuSetListView(_:)), keyEquivalent: "")
+        let listItem = NSMenuItem(title: "filetree.menu.list_view".localized, action: #selector(menuSetListView(_:)), keyEquivalent: "")
         listItem.image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: nil)
         listItem.target = self
         listItem.representedObject = nodeId.uuidString
         menu.addItem(listItem)
 
-        let gridItem = NSMenuItem(title: "图标视图", action: #selector(menuSetGridView(_:)), keyEquivalent: "")
+        let gridItem = NSMenuItem(title: "filetree.menu.icon_view".localized, action: #selector(menuSetGridView(_:)), keyEquivalent: "")
         gridItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
         gridItem.target = self
         gridItem.representedObject = nodeId.uuidString
@@ -130,7 +144,7 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
 
         menu.addItem(.separator())
 
-        let hiddenTitle = fileTreeView.showHiddenFiles ? "隐藏隐藏文件" : "显示隐藏文件"
+        let hiddenTitle = fileTreeView.showHiddenFiles ? "filetree.menu.hide_hidden_files".localized : "filetree.menu.show_hidden_files".localized
         let hiddenIcon  = fileTreeView.showHiddenFiles ? "eye.slash" : "eye"
         let hiddenItem = NSMenuItem(title: hiddenTitle, action: #selector(menuToggleHidden(_:)), keyEquivalent: "")
         hiddenItem.image = NSImage(systemSymbolName: hiddenIcon, accessibilityDescription: nil)
@@ -140,13 +154,30 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
 
         menu.addItem(.separator())
 
-        let collapseItem = NSMenuItem(title: "全部折叠", action: #selector(menuCollapseAll(_:)), keyEquivalent: "")
+        let collapseItem = NSMenuItem(title: "filetree.menu.collapse_all".localized, action: #selector(menuCollapseAll(_:)), keyEquivalent: "")
         collapseItem.image = NSImage(systemSymbolName: "arrow.up.to.line", accessibilityDescription: nil)
         collapseItem.target = self
         collapseItem.representedObject = nodeId.uuidString
         menu.addItem(collapseItem)
 
-        // 使用 canvas 父视图作为菜单锚点（避免 NSHostingView 的事件拦截导致菜单项不可选）
+        // NSMenu.popUp 是同步阻塞调用，其内部事件追踪通过 NSWindow.hitTest 确定命中视图。
+        // 由于 CanvasNodesView 覆盖整个画布并在 hitTest 中始终返回 self，导致菜单追踪时
+        // 找不到菜单窗口下的视图，菜单项显示灰色无法点击。
+        // 解法：popUp 前临时将自身从父视图移除（popUp 同步阻塞，移除期间不会触发重绘/布局），
+        // popUp 返回后立即加回，整个过程对用户不可见。
+        let savedSuperview = superview
+        let savedIndex = superview?.subviews.firstIndex(of: self)
+        removeFromSuperview()
+        defer {
+            if let sv = savedSuperview {
+                if let idx = savedIndex {
+                    sv.subviews.insert(self, at: idx)
+                } else {
+                    sv.addSubview(self)
+                }
+            }
+        }
+
         if let canvas = canvas {
             let canvasPoint = canvas.convert(event.locationInWindow, from: nil)
             menu.popUp(positioning: nil, at: canvasPoint, in: canvas)

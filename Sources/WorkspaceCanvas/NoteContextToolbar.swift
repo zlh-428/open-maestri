@@ -251,7 +251,7 @@ struct NoteColorPickerPopover: View {
                 HStack(spacing: 6) {
                     Image(systemName: "paintpalette")
                         .font(.system(size: 13))
-                    Text("更多颜色")
+                    Text("note.toolbar.more_colors".localized)
                         .font(.system(size: 13))
                 }
                 .frame(maxWidth: .infinity)

@@ -21,7 +21,7 @@ struct WorkspaceSidebarView: View {
         .navigationTitle("")
         .toolbar { addWorkspaceToolbarItem }
         .confirmationDialog(
-            "确认删除工作区 \"\(workspaceToDelete?.name ?? "")\"？",
+            String(format: "workspace.delete_confirm".localized, workspaceToDelete?.name ?? ""),
             isPresented: $showDeleteConfirm,
             titleVisibility: .visible
         ) {
@@ -230,7 +230,7 @@ struct WorkspaceSidebarView: View {
         var manifest = appState.manifest
         var copy = entry
         copy.id = UUID()
-        copy.name = "\(entry.name) 副本"
+        copy.name = "\(entry.name) \("workspace.duplicate_suffix".localized)"
         copy.isPinned = false
         manifest.workspaces.append(copy)
         appState.manifest = manifest
@@ -272,7 +272,7 @@ struct WorkspaceSidebarView: View {
     // MARK: - 分组管理
 
     private func addNewGroup() {
-        let group = SidebarGroup(name: "新分组 \(sidebarLayout.groups.count + 1)")
+        let group = SidebarGroup(name: String(format: "workspace.new_group".localized, sidebarLayout.groups.count + 1))
         sidebarLayout.groups.append(group)
         saveSidebarLayout()
     }

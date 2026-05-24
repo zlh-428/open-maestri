@@ -39,9 +39,8 @@ final class FloorManager {
         // 验证工作目录是 git repo
         let gitDir = workingDirectory + "/.git"
         guard FileManager.default.fileExists(atPath: gitDir) else {
-            throw MaestriError.terminalConnectionFailed(
-                "工作目录 '\(workingDirectory)' 不是 git repository，无法创建 Floor。请先运行 git init。"
-            )
+            let fmt = Bundle.main.localizedString(forKey: "floor.error.not_git_repo", value: nil, table: nil)
+            throw MaestriError.terminalConnectionFailed(String(format: fmt, workingDirectory))
         }
 
         let floor = Floor(name: name, branchName: branchName, workspaceDir: workingDirectory)

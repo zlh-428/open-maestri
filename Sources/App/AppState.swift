@@ -83,6 +83,7 @@ final class AppState {
             }
 
             // 加载所有工作区（串行，便于逐一捕获错误）
+            let loadFailedFormat = await MainActor.run { "workspace.load_failed".localized }
             var loadedWorkspaces: [WorkspaceManager] = []
             var errors: [String] = []
             for entry in man.workspaces {
@@ -90,7 +91,7 @@ final class AppState {
                 do {
                     try ws.load()
                 } catch {
-                    errors.append("工作区 \"\(entry.name)\" 加载失败: \(error.localizedDescription)")
+                    errors.append(String(format: loadFailedFormat, entry.name, error.localizedDescription))
                     logger.error("Workspace \(entry.id) load error: \(error)")
                 }
                 loadedWorkspaces.append(ws)

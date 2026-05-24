@@ -87,7 +87,7 @@ final class FileTreeStateStore {
             await MainActor.run {
                 items = [FileTreeItem(
                     id: root,
-                    name: "目录不存在：\(URL(fileURLWithPath: root).lastPathComponent)",
+                    name: String(format: "filetree.error.directory_not_found".localized, URL(fileURLWithPath: root).lastPathComponent),
                     isDirectory: false,
                     children: nil
                 )]
