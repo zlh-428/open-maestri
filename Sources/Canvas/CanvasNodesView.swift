@@ -30,11 +30,239 @@ extension EnvironmentValues {
 /// hitTest 默认返回 self（不穿透内部 SwiftUI 视图到 AppKit 层），
 /// 天然实现 Maestri 的 SwiftUIGestureBlocker 效果。
 /// 所有鼠标/滚轮事件透传给父视图 CanvasViewportView 统一处理。
+/// 例外：fileTree 节点的 NavBar 区域（List/Grid 切换、前进/后退等按钮）允许 SwiftUI 响应。
 final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
 
+    /// 注入 canvas 引用，用于 fileTree NavBar 区域的坐标判断
+    weak var canvas: CanvasViewportView?
+
+    // MARK: - hitTest 拦截
+
+    /// 始终返回 self，确保所有鼠标事件经过 CanvasNodesView.mouseDown 路由。
+    /// NSHostingView 在内部 SwiftUI 设 allowsHitTesting(false) 时可能返回 nil，
+    /// 导致事件绕过本视图直接到达 CanvasViewportView，fileTree 等节点的程序化
+    /// 点击转发逻辑失效（展开按钮、行选中、双击导航均不响应）。
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // 仅在点击位于本视图 bounds 内时拦截
+        guard bounds.contains(point) else { return nil }
+        return self
+    }
 
     override func mouseDown(with event: NSEvent) {
+        guard let canvas else {
+            nextResponder?.mouseDown(with: event)
+            return
+        }
+
+        let loc = canvas.convert(event.locationInWindow, from: nil)
+        if let (nodeId, hitKind) = fileTreeHitKind(at: loc, canvas: canvas) {
+            switch hitKind {
+            case .navBar:
+                // NavBar 区域：解析后退/前进/菜单按钮，根据 x 坐标精确分发
+                handleNavBarClick(nodeId: nodeId, loc: loc, event: event, canvas: canvas)
+                return
+            case .content:
+                // NSOutlineView/NSCollectionView 区域：先选中节点，再转发事件
+                canvas.selectFileTreeNode(at: loc, modifiers: event.modifierFlags)
+                forwardMouseDownToFileTreeContent(nodeId: nodeId, event: event)
+                return
+            case .swiftUI:
+                // 纯 SwiftUI 区域（搜索栏等）：
+                // 由于节点设置了 allowsHitTesting(false)，super.mouseDown 无法将事件路由给 SwiftUI TextField。
+                // 因此手动查找点击位置下的 NSTextField 并激活第一响应者。
+                canvas.selectFileTreeNode(at: loc, modifiers: event.modifierFlags)
+                let windowPoint = event.locationInWindow
+                let selfPoint = self.convert(windowPoint, from: nil)
+                if let targetTextField = findTextField(at: selfPoint) {
+                    self.window?.makeFirstResponder(targetTextField)
+                } else {
+                    super.mouseDown(with: event)
+                }
+                return
+            }
+        }
+
         nextResponder?.mouseDown(with: event)
+    }
+
+    /// 处理 navBar 区域点击：根据 x 坐标区分后退/前进/菜单，精确分发
+    private func handleNavBarClick(
+        nodeId: UUID, loc: CGPoint, event: NSEvent, canvas: CanvasViewportView
+    ) {
+        guard let frame = canvas.currentNodes.first(where: { $0.id == nodeId })?.frame else { return }
+        let sf = canvas.canvasRectToScreen(frame)
+        // 把屏幕 x 坐标换算回节点内部的逻辑 x（zoom=1 空间）
+        let localX = (loc.x - sf.minX) / canvas.zoom
+
+        // FileTreeNavigationBar 布局：
+        //   .padding(.leading, 8) + 后退按钮 frame(28) + Divider + 前进按钮 frame(28) + ...
+        //   后退: x ∈ [8, 36)，前进: x ∈ [36, 64)，其余为菜单/git/标题区域
+        if localX >= 8 && localX < 36 {
+            FileTreeViewRegistry.shared.view(for: nodeId)?.onGoBack?()
+            FileTreeGridViewRegistry.shared.view(for: nodeId)?.onGoBack?()
+        } else if localX >= 36 && localX < 64 {
+            FileTreeViewRegistry.shared.view(for: nodeId)?.onGoForward?()
+            FileTreeGridViewRegistry.shared.view(for: nodeId)?.onGoForward?()
+        } else {
+            // 菜单按钮、git 按钮等：直接弹出 NSMenu，避免事件转发引起递归
+            showNavBarMenu(nodeId: nodeId, event: event)
+        }
+    }
+
+    /// 弹出 navBar 右侧菜单（列表/图标视图切换、显示隐藏文件等）。
+    /// 不再转发 mouseDown 事件，直接构造并弹出 NSMenu，彻底避免递归。
+    private func showNavBarMenu(nodeId: UUID, event: NSEvent) {
+        guard let fileTreeView = FileTreeViewRegistry.shared.view(for: nodeId) else { return }
+
+        let menu = NSMenu()
+
+        let listItem = NSMenuItem(title: "列表视图", action: #selector(menuSetListView(_:)), keyEquivalent: "")
+        listItem.image = NSImage(systemSymbolName: "list.bullet", accessibilityDescription: nil)
+        listItem.target = self
+        listItem.representedObject = nodeId.uuidString
+        menu.addItem(listItem)
+
+        let gridItem = NSMenuItem(title: "图标视图", action: #selector(menuSetGridView(_:)), keyEquivalent: "")
+        gridItem.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: nil)
+        gridItem.target = self
+        gridItem.representedObject = nodeId.uuidString
+        menu.addItem(gridItem)
+
+        menu.addItem(.separator())
+
+        let hiddenTitle = fileTreeView.showHiddenFiles ? "隐藏隐藏文件" : "显示隐藏文件"
+        let hiddenIcon  = fileTreeView.showHiddenFiles ? "eye.slash" : "eye"
+        let hiddenItem = NSMenuItem(title: hiddenTitle, action: #selector(menuToggleHidden(_:)), keyEquivalent: "")
+        hiddenItem.image = NSImage(systemSymbolName: hiddenIcon, accessibilityDescription: nil)
+        hiddenItem.target = self
+        hiddenItem.representedObject = nodeId.uuidString
+        menu.addItem(hiddenItem)
+
+        menu.addItem(.separator())
+
+        let collapseItem = NSMenuItem(title: "全部折叠", action: #selector(menuCollapseAll(_:)), keyEquivalent: "")
+        collapseItem.image = NSImage(systemSymbolName: "arrow.up.to.line", accessibilityDescription: nil)
+        collapseItem.target = self
+        collapseItem.representedObject = nodeId.uuidString
+        menu.addItem(collapseItem)
+
+        // 使用 canvas 父视图作为菜单锚点（避免 NSHostingView 的事件拦截导致菜单项不可选）
+        if let canvas = canvas {
+            let canvasPoint = canvas.convert(event.locationInWindow, from: nil)
+            menu.popUp(positioning: nil, at: canvasPoint, in: canvas)
+        } else {
+            let localPoint = self.convert(event.locationInWindow, from: nil)
+            menu.popUp(positioning: nil, at: localPoint, in: self)
+        }
+    }
+
+    @objc private func menuSetListView(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let nodeId = UUID(uuidString: idStr) else { return }
+        NavBarMenuActionRelay.shared.setViewMode(.list, for: nodeId)
+    }
+
+    @objc private func menuSetGridView(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let nodeId = UUID(uuidString: idStr) else { return }
+        NavBarMenuActionRelay.shared.setViewMode(.grid, for: nodeId)
+    }
+
+    @objc private func menuToggleHidden(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let nodeId = UUID(uuidString: idStr) else { return }
+        NavBarMenuActionRelay.shared.toggleHidden(for: nodeId)
+    }
+
+    @objc private func menuCollapseAll(_ sender: NSMenuItem) {
+        guard let idStr = sender.representedObject as? String,
+              let nodeId = UUID(uuidString: idStr) else { return }
+        FileTreeViewRegistry.shared.view(for: nodeId)?.collapseAll()
+    }
+
+    /// 处理 fileTree 内容区的点击事件（程序化 API，不依赖 NSEvent 转发）
+    ///
+    /// 由于 NSOutlineView 通过 SwiftUI NSViewRepresentable 嵌入，经过 scaleEffect 变换后
+    /// 其在 window 坐标系中的 frame 与视觉位置不一致，直接转发 NSEvent 会导致坐标错误。
+    /// 因此计算出点击在内容区域内的本地坐标，通过程序化 API 执行操作。
+    private func forwardMouseDownToFileTreeContent(nodeId: UUID, event: NSEvent) {
+        guard let canvas = canvas,
+              let node = canvas.currentNodes.first(where: { $0.id == nodeId }) else { return }
+
+        // 计算点击在内容区域的本地坐标
+        let canvasLoc = canvas.convert(event.locationInWindow, from: nil)
+        let nodeScreenFrame = canvas.canvasRectToScreen(node.frame)
+        let navBarH = (CanvasNodeConstants.headerHeight + 8) * canvas.zoom
+        let contentTop = nodeScreenFrame.minY + navBarH
+
+        // 相对于内容区域左上角的坐标（还原到 zoom=1 空间）
+        let localX = (canvasLoc.x - nodeScreenFrame.minX) / canvas.zoom
+        let localY = (canvasLoc.y - contentTop) / canvas.zoom
+        let localPoint = NSPoint(x: localX, y: localY)
+
+        // list 模式：程序化处理点击
+        if let fileTreeView = FileTreeViewRegistry.shared.view(for: nodeId) {
+            fileTreeView.handleClickAtLocalPoint(localPoint, clickCount: event.clickCount)
+            return
+        }
+        // grid 模式：程序化处理点击
+        if let gridView = FileTreeGridViewRegistry.shared.view(for: nodeId) {
+            gridView.handleClickAtLocalPoint(localPoint, clickCount: event.clickCount)
+            return
+        }
+    }
+
+    /// fileTree 节点内的命中区域类型
+    /// - navBar:  顶部导航栏（后退/前进/菜单按钮），高度 = headerHeight(32) + 8 = 40
+    /// - content: NSOutlineView / NSCollectionView 区域，需转发给 AppKit 视图
+    /// - swiftUI: 底部搜索栏等由 SwiftUI 渲染的区域，需用 super.mouseDown 正常路由
+    private enum FileTreeContentHitKind { case navBar, content, swiftUI }
+
+    private func fileTreeHitKind(
+        at loc: CGPoint,
+        canvas: CanvasViewportView
+    ) -> (UUID, FileTreeContentHitKind)? {
+        // loc 是 canvas 的 flipped 坐标系（isFlipped=true，y 向下，minY=顶边）
+        for node in canvas.currentNodes {
+            guard case .fileTree = node.content else { continue }
+            let sf = canvas.canvasRectToScreen(node.frame)
+            guard sf.contains(loc) else { continue }
+            let localFromTop = loc.y - sf.minY
+            let navBarH    = (CanvasNodeConstants.headerHeight + 8) * canvas.zoom
+            // 底部 SwiftUI 区域 = 搜索栏(40) + git panel(0 或 120，由 extraBottomSwiftUIHeight 提供)
+            let extraH = FileTreeViewRegistry.shared.view(for: node.id)?.extraBottomSwiftUIHeight ?? 0
+            let swiftUIBottomH = (40 + extraH) * canvas.zoom
+            let localFromBottom = sf.height - (loc.y - sf.minY)
+            if localFromTop <= navBarH {
+                return (node.id, .navBar)
+            } else if localFromBottom <= swiftUIBottomH {
+                // 底部纯 SwiftUI 区域（搜索栏 + git panel）：走 super.mouseDown 正常路由
+                return (node.id, .swiftUI)
+            } else {
+                return (node.id, .content)
+            }
+        }
+        return nil
+    }
+
+    /// 递归查找指定坐标下的 NSTextField（SwiftUI TextField 底层使用 NSTextField 渲染）
+    private func findTextField(at point: CGPoint) -> NSTextField? {
+        // 从 self 出发递归查找包含该点的 NSTextField
+        return findTextField(in: self, at: point)
+    }
+
+    private func findTextField(in view: NSView, at pointInSelf: CGPoint) -> NSTextField? {
+        for subview in view.subviews.reversed() {
+            let pointInSubview = subview.convert(pointInSelf, from: self)
+            guard subview.bounds.contains(pointInSubview) else { continue }
+            if let textField = subview as? NSTextField, textField.isEditable || textField.isSelectable {
+                return textField
+            }
+            if let found = findTextField(in: subview, at: pointInSelf) {
+                return found
+            }
+        }
+        return nil
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -99,6 +327,9 @@ struct CanvasNodesSwiftUIView: View {
                         // .animation(.none, value:) 只覆盖特定值的通道，
                         // .transaction 全量切断，是唯一可靠方案。
                         .transaction { $0.animation = nil }
+                        // fileTree 节点的 hitTesting 由 CanvasNodesView.mouseDown 手动转发事件：
+                        // 若设为 true，NSHostingView.hitTest 会穿透到内部 NSOutlineView，
+                        // 导致 CanvasNodesView.mouseDown 不被调用，所有路由逻辑失效。
                         .allowsHitTesting(false)
                 }
             }

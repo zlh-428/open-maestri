@@ -72,6 +72,8 @@ final class CanvasNodeRenderer {
         hostingView.safeAreaRegions = []
         hostingView.frame = canvas.bounds
         hostingView.autoresizingMask = [.width, .height]
+        // 注入 canvas 引用，供 fileTree NavBar 区域的 mouseDown 路由使用
+        hostingView.canvas = canvas
         canvas.addSubview(hostingView)
         nodesHostingView = hostingView
         canvas.nodesHostingView = hostingView
@@ -276,6 +278,8 @@ final class CanvasNodeRenderer {
                    let tv = provider.terminalView {
                     tv.window?.makeFirstResponder(tv)
                 }
+                // bringNodesToFront 会更新 zIndex 并触发 canvasSelectionChanged 通知（重建 rootView 显示选中框）
+                canvas.bringNodesToFront([id])
                 canvas.selectedNodeIds = [id]
             },
             onClose: { [weak self] id in

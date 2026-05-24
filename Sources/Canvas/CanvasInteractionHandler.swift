@@ -161,6 +161,23 @@ extension CanvasViewportView {
         bringNodesToFront([id])
     }
 
+    /// fileTree 内容区点击时由 CanvasNodesView 主动调用，触发节点选中流程
+    /// （内容区事件被 NSOutlineView/NSCollectionView 消费，不会到达 CanvasInteractionHandler.mouseDown）
+    func selectFileTreeNode(at loc: CGPoint, modifiers: NSEvent.ModifierFlags) {
+        let hit = hitTestCanvas(at: loc)
+        switch hit {
+        case .nodeContent(let id, _), .nodeHeader(let id), .nodeFooter(let id):
+            updateSelection(id, modifiers: modifiers)
+            NotificationCenter.default.post(
+                name: .canvasNodeActivated,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
+        default:
+            break
+        }
+    }
+
     // MARK: - 统一鼠标事件处理
 
     override func mouseDown(with event: NSEvent) {
