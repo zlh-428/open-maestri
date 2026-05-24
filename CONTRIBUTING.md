@@ -1,205 +1,184 @@
-# 本地开发指南
+# Contributing to open-maestri
 
-## 环境要求
+<a href="CONTRIBUTING.zh-CN.md">中文</a> | <strong>English</strong>
 
-| 工具 | 版本要求 |
-|------|---------|
-| macOS | 14.0（Sonoma）或更高 |
-| Xcode | 16.0 或更高 |
-| Swift | 5.9 或更高（随 Xcode 附带） |
+---
 
-确认版本：
+## Human Parts
+
+*This section is written for humans.*
+
+open-maestri is an AI-native canvas built around the idea that AI agents should be first-class collaborators — not just tools. We believe the best contributions come from using the app the way it was meant to be used: with an agent by your side. Whether you are fixing a bug, proposing a feature, or refactoring code, letting an agent do the heavy lifting is not cheating. It is the point.
+
+You do not need to know Swift to contribute. You need a clear description of what is wrong or what you want, and an agent that can turn that into a pull request.
+
+### Getting Started
+
+Clone the repo and paste this prompt into your code agent (Claude Code, Cursor, Copilot, etc.) to orient it:
+
+```
+I am contributing to open-maestri, an AI-native infinite canvas for macOS.
+Please read CLAUDE.md for the full architecture overview, coding conventions,
+and build commands. Then read CONTRIBUTING.md for contribution guidelines.
+Let me know when you are ready and what questions you have.
+```
+
+Your agent will read `CLAUDE.md`, understand the project layout, and guide you through making your change.
+
+---
+
+### Report a Bug via Your Code Agent
+
+Found something broken? Paste the following prompt into your agent, fill in the blanks, and let it draft an issue for you.
+
+<details>
+<summary>Bug report agent prompt</summary>
+
+```
+I want to report a bug in open-maestri. Help me write a clear, detailed bug report.
+
+Here is what happened:
+[describe what you saw]
+
+Here is what I expected to happen:
+[describe expected behavior]
+
+Steps to reproduce:
+[list the steps, as precisely as you can]
+
+Before we write the report, please ask me the following diagnostic questions
+so we can include the right environment details:
+
+1. What version of macOS are you running?
+   (System Settings → General → About → macOS version)
+
+2. What version of Xcode do you have installed?
+   (Xcode → About Xcode)
+
+3. Run `swift --version` in Terminal and paste the output.
+
+4. Is the open-maestri app currently running when the bug occurs,
+   or does it happen during launch / shutdown?
+
+5. Are there any crash logs?
+   (open Console.app → Crash Reports, filter by "open-maestri")
+
+6. Did the bug appear after a recent update, or has it always been present?
+
+Once I answer these questions, format everything as a GitHub issue with:
+- A short, descriptive title
+- Environment section (macOS, Xcode, Swift versions)
+- Steps to reproduce
+- Expected behavior
+- Actual behavior
+- Any relevant logs or screenshots placeholder
+
+Then show me the formatted issue text so I can copy it to GitHub.
+```
+
+</details>
+
+---
+
+### Request a Feature via Your Code Agent
+
+Have an idea? Paste this prompt to help your agent shape it into a proper feature request.
+
+<details>
+<summary>Feature request agent prompt</summary>
+
+```
+I want to request a new feature for open-maestri. Help me write a clear,
+well-scoped feature request.
+
+My idea:
+[describe what you want]
+
+Before writing the request, please ask me:
+
+1. What problem does this solve, or what workflow does it improve?
+2. How would a user trigger this feature (keyboard shortcut, menu item,
+   canvas gesture, omaestri CLI command)?
+3. Does this need to work across agent sessions, or is it session-local?
+4. Are there similar features in the existing codebase I should reference?
+   (You can check CLAUDE.md and the Sources/ directory for clues.)
+5. Is this additive (new behavior) or does it change existing behavior?
+
+After I answer, please:
+- Read CLAUDE.md to check if this conflicts with any existing constraints
+  (especially the "not implementing Ombro" note and platform targets)
+- Draft a GitHub feature request issue with: title, motivation, proposed UX,
+  scope notes, and any open questions
+- Flag any parts that seem out of scope or technically risky
+```
+
+</details>
+
+---
+
+## Agent Parts
+
+*This section is written for agents.*
+
+### About the Project
+
+open-maestri is a macOS application providing an infinite canvas where AI agent terminals, browser portals, markdown notes, and file trees co-exist as draggable nodes. Nodes communicate through the `omaestri` CLI — a local HTTP server embedded in the app that lets terminals send messages to each other and to the canvas. The data format is compatible with Maestri v0.25.4.
+
+The canvas engine is AppKit (`NSView`). All UI outside the canvas is SwiftUI. The two layers bridge via `NSViewRepresentable`. State management uses `@Observable` (Swift 5.9+, not `ObservableObject`). There is no iOS code.
+
+### Prerequisites
+
+| Tool | Minimum version |
+|------|----------------|
+| macOS | 14.0 (Sonoma) |
+| Xcode | 16.0 |
+| Swift | 5.9 (bundled with Xcode) |
+
+Verify your environment:
 
 ```bash
 swift --version
 xcodebuild -version
 ```
 
----
-
-## 获取源码
+Clone and let SPM resolve dependencies automatically (SwiftTerm, Sparkle):
 
 ```bash
 git clone https://github.com/your-org/open-maestri.git
 cd open-maestri
 ```
 
-首次克隆后，SPM 会自动解析并下载依赖（SwiftTerm、Sparkle），无需额外操作。
-
----
-
-## 日常开发工作流
-
-### 方式一：Xcode（推荐）
+### Build & Test
 
 ```bash
-open Package.swift
-```
-
-Xcode 识别 `Package.swift` 后自动配置项目。
-
-- `⌘R` — 构建并运行
-- `⌘B` — 仅构建
-- `⌘U` — 运行所有测试
-- `⌘⇧K` — 清理构建产物
-
-> **提示：** 首次打开时 Xcode 会解析依赖，需等待约 30 秒。进度显示在顶部状态栏。
-
-### 方式二：命令行
-
-```bash
-# 构建（Debug）
+# Development build
 swift build
 
-# 构建并运行
-swift run
+# Open in Xcode (recommended for UI work)
+open Package.swift
 
-# 构建（Release，更接近发布版本性能）
-swift build -c release
-
-# 运行编译好的二进制
-.build/debug/open-maestri
-```
-
----
-
-## 项目结构速查
-
-```
-Sources/
-├── App/              # 应用生命周期（AppDelegate、AppState、ContentView）
-├── Canvas/           # 无限画布渲染（NSView，手势控制）
-├── Connection/       # 绳索物理与连接逻辑
-├── Terminal/         # PTY 终端节点（SwiftTerm 封装）
-├── Note/             # Markdown 笔记节点
-├── InterAgent/       # omaestri CLI 本地 HTTP 服务
-├── Workspace/        # 持久化、序列化（workspace.json）
-├── Settings/         # 设置面板 UI
-├── Portal/           # WKWebView 内嵌浏览器节点
-├── FileTree/         # 文件浏览器节点
-├── Floor/            # git worktree 分支隔离
-├── Routine/          # 定时任务调度
-├── SSH/              # 远程 SSH 隧道
-├── Maestro/          # Maestro 编排模式
-├── Roles/            # Agent 角色系统
-├── Spotlight/        # macOS CoreSpotlight 集成
-└── Shared/           # 共享工具、数据模型
-```
-
-新功能一般对应一个模块目录。修改某个功能时，先找到对应目录，再从 `*State.swift` 或 `*View.swift` 入手。
-
----
-
-## 运行测试
-
-```bash
-# 运行所有测试
+# Run all tests
 swift test
 
-# 运行指定测试目标
-swift test --filter OpenMaestriTests.CanvasTests
+# Run a specific test
+swift test --filter OpenMaestriTests.WorkspaceManagerTests/testCreateWorkspace
 
-# 运行指定测试方法
-swift test --filter OpenMaestriTests.CanvasTests/testNodePlacement
-```
-
-测试文件位于 `Tests/OpenMaestriTests/`，按模块分目录组织，与 `Sources/` 结构对应。
-
----
-
-## 依赖管理
-
-项目使用 Swift Package Manager，依赖定义在 `Package.swift`：
-
-| 依赖 | 用途 |
-|------|------|
-| [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) | VT100/xterm-256color PTY 终端渲染 |
-| [Sparkle](https://github.com/sparkle-project/Sparkle) | 应用内自动更新 |
-
-更新依赖到最新兼容版本：
-
-```bash
-swift package update
-```
-
-查看当前解析版本：
-
-```bash
-cat Package.resolved
-```
-
----
-
-## 代码风格
-
-- Swift 6 严格并发模型（`Sendable`、`@MainActor`）
-- SwiftUI 作为 UI 主体，画布渲染使用 `AppKit NSView`
-- 数据流：单向，`AppState` 作为全局状态容器，通过 `.environment()` 向下传递
-- 文件规模：单文件不超过 400 行；超出时拆分
-
-提交前运行一次构建和测试，确保无编译错误：
-
-```bash
-swift build && swift test
-```
-
----
-
-## 常见问题
-
-**Q: 构建报错 `missing package product`**
-
-依赖未完整下载，执行：
-
-```bash
-swift package resolve
-```
-
-**Q: Xcode 报 `No such module 'SwiftTerm'`**
-
-在 Xcode 中选择 `File → Packages → Resolve Package Versions`。
-
-**Q: 运行时提示权限错误（PTY / 文件访问）**
-
-开发期间直接用 `swift run` 运行，不走沙盒。Xcode 中需确认 Scheme 的 `Signing & Capabilities` 未启用 App Sandbox。
-
-**Q: 改了 `Package.swift` 后 Xcode 没有同步**
-
-关闭 Xcode，重新执行 `open Package.swift`。
-
----
-
-## 提交规范
-
-```
-<type>: <简短描述>
-
-<可选正文>
-```
-
-类型：`feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf`
-
-示例：
-
-```
-feat: add omaestri portal snapshot command
-fix: canvas viewport not restoring scroll position on launch
-refactor: extract rope physics into standalone CatenaryCalculator
-```
-
----
-
-## CI
-
-Push 到 `main` 或 `develop` 分支，或向 `main` 提 PR 时，GitHub Actions 自动执行构建和测试。
-
-本地模拟 CI 行为：
-
-```bash
-xcodebuild \
-  -scheme open-maestri \
+# CI-equivalent build (no code signing)
+xcodebuild -scheme open-maestri \
   -destination 'platform=macOS' \
   test \
   CODE_SIGN_IDENTITY="" \
   CODE_SIGNING_REQUIRED=NO
 ```
+
+Commit convention: `<type>: <short description>` — types are `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`.
+
+### Where to Go Next
+
+| Document | What it covers |
+|----------|---------------|
+| `CLAUDE.md` | Architecture overview, coding constraints, data formats, IPC protocol |
+| `docs/reference/maestri-reference-index.md` | Canvas UI spec, node types, keyboard shortcuts |
+| `Sources/InterAgent/` | `omaestri` CLI server and command routing — start here for new CLI commands |
+| `Sources/Canvas/` | Canvas viewport, node rendering, drag and zoom |
+| `Sources/Workspace/` | Persistence, serialization, `workspace.json` schema |
