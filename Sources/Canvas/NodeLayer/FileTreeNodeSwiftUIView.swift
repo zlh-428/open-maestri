@@ -304,69 +304,21 @@ private struct FileTreeNavigationBar: View {
                 .buttonStyle(.plain)
             }
 
-            // ─── 右侧：白色胶囊菜单按钮 ───
-            Menu {
-                // 视图模式
-                Button(action: { viewMode = .list }) {
-                    Label("列表视图", systemImage: "list.bullet")
-                }
-                Button(action: { viewMode = .grid }) {
-                    Label("图标视图", systemImage: "square.grid.2x2")
-                }
-                Button(action: {}) {
-                    Label("差异视图", systemImage: "arrow.left.arrow.right.square")
-                }
-                .disabled(true)
-
-                Divider()
-
-                // 显示隐藏文件
-                Button(action: { showHiddenFiles.toggle() }) {
-                    Label(
-                        showHiddenFiles ? "隐藏隐藏文件" : "显示隐藏文件",
-                        systemImage: showHiddenFiles ? "eye.slash" : "eye"
-                    )
-                }
-
-                // 排序方式子菜单
-                Menu("排序方式") {
-                    Button(action: { sortOrder = .name }) {
-                        Label("名称", systemImage: sortOrder == .name ? "checkmark" : "")
-                    }
-                    Button(action: { sortOrder = .modified }) {
-                        Label("修改时间", systemImage: sortOrder == .modified ? "checkmark" : "")
-                    }
-                    Button(action: { sortOrder = .size }) {
-                        Label("大小", systemImage: sortOrder == .size ? "checkmark" : "")
-                    }
-                }
-
-                Divider()
-
-                // 全部折叠（仅列表模式）
-                Button(action: { onCollapseAll() }) {
-                    Label("全部折叠", systemImage: "arrow.up.to.line")
-                }
-                .disabled(viewMode != .list)
-
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "list.bullet.indent")
-                        .font(.system(size: 12))
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 9))
-                }
-                .foregroundStyle(Color.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    Capsule()
-                        .fill(Color(nsColor: .controlBackgroundColor).opacity(0.9))
-                        .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
-                )
+            // ─── 右侧：白色胶囊菜单按钮（纯视觉，点击由 AppKit 层 showNavBarMenu 处理） ───
+            HStack(spacing: 4) {
+                Image(systemName: "list.dash")
+                    .font(.system(size: 12, weight: .medium))
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .medium))
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
+            .foregroundStyle(Color.primary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(.white)
+                    .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
+            )
             .padding(.trailing, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

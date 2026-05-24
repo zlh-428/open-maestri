@@ -36,6 +36,12 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
     /// 注入 canvas 引用，用于 fileTree NavBar 区域的坐标判断
     weak var canvas: CanvasViewportView?
 
+    // MARK: - Responder
+
+    /// NSHostingView 默认 acceptsFirstResponder = false，
+    /// 导致 self 不在 responder chain，NSMenu 认为 target 无法响应 action 而置灰所有菜单项。
+    override var acceptsFirstResponder: Bool { true }
+
     // MARK: - hitTest 拦截
 
     /// 始终返回 self，确保所有鼠标事件经过 CanvasNodesView.mouseDown 路由。
@@ -160,31 +166,16 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
         collapseItem.representedObject = nodeId.uuidString
         menu.addItem(collapseItem)
 
-        // NSMenu.popUp 是同步阻塞调用，其内部事件追踪通过 NSWindow.hitTest 确定命中视图。
-        // 由于 CanvasNodesView 覆盖整个画布并在 hitTest 中始终返回 self，导致菜单追踪时
-        // 找不到菜单窗口下的视图，菜单项显示灰色无法点击。
-        // 解法：popUp 前临时将自身从父视图移除（popUp 同步阻塞，移除期间不会触发重绘/布局），
-        // popUp 返回后立即加回，整个过程对用户不可见。
-        let savedSuperview = superview
-        let savedIndex = superview?.subviews.firstIndex(of: self)
-        removeFromSuperview()
-        defer {
-            if let sv = savedSuperview {
-                if let idx = savedIndex {
-                    sv.subviews.insert(self, at: idx)
-                } else {
-                    sv.addSubview(self)
-                }
-            }
-        }
-
+        let popupPoint: NSPoint
+        let anchorView: NSView
         if let canvas = canvas {
-            let canvasPoint = canvas.convert(event.locationInWindow, from: nil)
-            menu.popUp(positioning: nil, at: canvasPoint, in: canvas)
+            popupPoint = canvas.convert(event.locationInWindow, from: nil)
+            anchorView = canvas
         } else {
-            let localPoint = self.convert(event.locationInWindow, from: nil)
-            menu.popUp(positioning: nil, at: localPoint, in: self)
+            popupPoint = self.convert(event.locationInWindow, from: nil)
+            anchorView = self
         }
+        menu.popUp(positioning: nil, at: popupPoint, in: anchorView)
     }
 
     @objc private func menuSetListView(_ sender: NSMenuItem) {
