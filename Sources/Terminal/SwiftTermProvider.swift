@@ -413,7 +413,7 @@ final class SwiftTermProvider: NSObject {
         scrollbackDirty = true
         if scrollbackDebounceTask == nil {
             scrollbackDebounceTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(8))
                 guard !Task.isCancelled else { return }
                 await self?.flushScrollback()
                 self?.scrollbackDebounceTask = nil
