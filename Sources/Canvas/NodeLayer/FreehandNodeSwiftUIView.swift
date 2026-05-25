@@ -72,14 +72,16 @@ struct FreehandNodeSwiftUIView: View {
             let h = geo.size.height
             let r: CGFloat = 4
             ZStack {
-                controlDot(at: CGPoint(x: 0,   y: 0),   r: r)
-                controlDot(at: CGPoint(x: w,   y: 0),   r: r)
-                controlDot(at: CGPoint(x: 0,   y: h),   r: r)
-                controlDot(at: CGPoint(x: w,   y: h),   r: r)
-                controlDot(at: CGPoint(x: w/2, y: 0),   r: r)
-                controlDot(at: CGPoint(x: w/2, y: h),   r: r)
-                controlDot(at: CGPoint(x: 0,   y: h/2), r: r)
-                controlDot(at: CGPoint(x: w,   y: h/2), r: r)
+                if content.rotation == 0 {
+                    controlDot(at: CGPoint(x: 0,   y: 0),   r: r)
+                    controlDot(at: CGPoint(x: w,   y: 0),   r: r)
+                    controlDot(at: CGPoint(x: 0,   y: h),   r: r)
+                    controlDot(at: CGPoint(x: w,   y: h),   r: r)
+                    controlDot(at: CGPoint(x: w/2, y: 0),   r: r)
+                    controlDot(at: CGPoint(x: w/2, y: h),   r: r)
+                    controlDot(at: CGPoint(x: 0,   y: h/2), r: r)
+                    controlDot(at: CGPoint(x: w,   y: h/2), r: r)
+                }
                 rotationHandle(w: w)
             }
         }
