@@ -47,18 +47,22 @@ struct StrokeNodeSwiftUIView: View {
             }
             context.stroke(path, with: .color(strokeColor), style: strokeStyle)
 
-            if content.strokeType == .arrow {
-                drawArrowHead(context: context, path: path, end: end,
+            if content.strokeType == .arrow, let cp = content.controlPoint {
+                let ctrl = CGPoint(x: cp.x * size.width, y: cp.y * size.height)
+                drawArrowHead(context: context, end: end, controlPoint: ctrl,
                               color: strokeColor, lineWidth: content.strokeWidth)
             }
         }
     }
 
-    private func drawArrowHead(context: GraphicsContext, path: Path, end: CGPoint,
+    private func drawArrowHead(context: GraphicsContext, end: CGPoint, controlPoint: CGPoint,
                                color: Color, lineWidth: CGFloat) {
         let arrowSize: CGFloat = max(10, lineWidth * 4)
-        guard let tangent = path.tangentAtEnd() else { return }
-        let angle = atan2(tangent.y, tangent.x)
+        let dx = end.x - controlPoint.x
+        let dy = end.y - controlPoint.y
+        let len = sqrt(dx * dx + dy * dy)
+        guard len > 0 else { return }
+        let angle = atan2(dy, dx)
         var head = Path()
         head.move(to: end)
         head.addLine(to: CGPoint(
@@ -107,27 +111,3 @@ struct StrokeNodeSwiftUIView: View {
     }
 }
 
-// MARK: - Path 末尾切线辅助
-
-private extension Path {
-    func tangentAtEnd() -> CGPoint? {
-        var points: [CGPoint] = []
-        forEach { element in
-            switch element {
-            case .move(let p):           points.append(p)
-            case .line(let p):           points.append(p)
-            case .quadCurve(let p, _):   points.append(p)
-            case .curve(let p, _, _):    points.append(p)
-            case .closeSubpath: break
-            }
-        }
-        guard points.count >= 2 else { return nil }
-        let last = points[points.count - 1]
-        let prev = points[points.count - 2]
-        let dx = last.x - prev.x
-        let dy = last.y - prev.y
-        let len = sqrt(dx * dx + dy * dy)
-        guard len > 0 else { return nil }
-        return CGPoint(x: dx / len, y: dy / len)
-    }
-}
