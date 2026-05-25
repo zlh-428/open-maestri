@@ -13,6 +13,7 @@ struct ShapeContextToolbar: View {
     @State private var showStrokeColorPicker = false
     @State private var showStrokeStylePicker = false
     @State private var showFillStylePicker = false
+    @State private var isDeleteHovered = false
 
     var body: some View {
         HStack(spacing: 2) {
@@ -245,8 +246,6 @@ struct ShapeContextToolbar: View {
 
     // MARK: - 删除
 
-    @State private var isDeleteHovered = false
-
     private var deleteButton: some View {
         Button { onDelete() } label: {
             Image(systemName: "trash")
@@ -333,19 +332,17 @@ struct ShapeFillStylePopover: View {
 
     private typealias StyleOption = (style: ShapeFillStyle, label: String, icon: String)
 
-    private var styles: [StyleOption] {
-        [
-            (style: .solid,        label: "Solid",         icon: "square.fill"),
-            (style: .none,         label: "No Fill",       icon: "square"),
-            (style: .hatched,      label: "Hatched",       icon: "square.lefthalf.filled"),
-            (style: .crossHatched, label: "Cross Hatched", icon: "square.grid.2x2"),
-        ]
-    }
+    private static let styles: [StyleOption] = [
+        (style: .solid,        label: "Solid",         icon: "square.fill"),
+        (style: .none,         label: "No Fill",       icon: "square"),
+        (style: .hatched,      label: "Hatched",       icon: "square.lefthalf.filled"),
+        (style: .crossHatched, label: "Cross Hatched", icon: "square.grid.2x2"),
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(styles.indices, id: \.self) { idx in
-                let option = styles[idx]
+            ForEach(Self.styles.indices, id: \.self) { idx in
+                let option = Self.styles[idx]
                 Button {
                     onSelect(option.style)
                 } label: {
