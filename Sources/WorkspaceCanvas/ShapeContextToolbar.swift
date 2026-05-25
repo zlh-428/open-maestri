@@ -9,16 +9,19 @@ struct ShapeContextToolbar: View {
     let onContentChange: (ShapeContent) -> Void
     let onDelete: () -> Void
 
-    @State private var showFillColorPicker = false
-    @State private var showStrokeColorPicker = false
+    @State private var showThemeColorPicker = false
     @State private var showStrokeStylePicker = false
     @State private var showFillStylePicker = false
     @State private var isDeleteHovered = false
 
+    /// 主题色（边框和填充共用同一颜色来源）
+    private var themeColor: Color {
+        NoteColorPickerPopover.colorFromString(content.strokeColor)
+    }
+
     var body: some View {
         HStack(spacing: 2) {
-            fillColorButton
-            strokeColorButton
+            themeColorButton
             strokeWidthStepper
 
             toolbarSeparator
@@ -50,51 +53,34 @@ struct ShapeContextToolbar: View {
         )
     }
 
-    // MARK: - 填充颜色
+    // MARK: - 主题色（边框 + 填充同步）
 
-    private var fillColorButton: some View {
+    private var themeColorButton: some View {
         Button {
-            showFillColorPicker = true
+            showThemeColorPicker = true
         } label: {
-            Circle()
-                .fill(Color(hex: content.fillColor) ?? .pink)
-                .frame(width: 18, height: 18)
-                .overlay(Circle().strokeBorder(Color(white: 0.7), lineWidth: 1))
-                .frame(width: 30, height: 30)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("Fill Color")
-        .popover(isPresented: $showFillColorPicker, arrowEdge: .bottom) {
-            NoteColorPickerPopover(selectedColor: content.fillColor) { color in
-                var updated = content
-                updated.fillColor = color
-                onContentChange(updated)
-                showFillColorPicker = false
+            ZStack {
+                // 外圈：描边色（代表边框）
+                Circle()
+                    .strokeBorder(themeColor, lineWidth: 3)
+                    .frame(width: 22, height: 22)
+                // 内圈：填充色（30% 透明度）
+                Circle()
+                    .fill(themeColor.opacity(0.3))
+                    .frame(width: 14, height: 14)
             }
-        }
-    }
-
-    // MARK: - 边框颜色
-
-    private var strokeColorButton: some View {
-        Button {
-            showStrokeColorPicker = true
-        } label: {
-            Image(systemName: "line.diagonal")
-                .font(.system(size: 13))
-                .foregroundStyle(Color(hex: content.strokeColor) ?? .blue)
-                .frame(width: 30, height: 30)
-                .contentShape(Rectangle())
+            .frame(width: 30, height: 30)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("Stroke Color")
-        .popover(isPresented: $showStrokeColorPicker, arrowEdge: .bottom) {
+        .help("Theme Color")
+        .popover(isPresented: $showThemeColorPicker, arrowEdge: .bottom) {
             NoteColorPickerPopover(selectedColor: content.strokeColor) { color in
                 var updated = content
                 updated.strokeColor = color
+                updated.fillColor = color
                 onContentChange(updated)
-                showStrokeColorPicker = false
+                showThemeColorPicker = false
             }
         }
     }
@@ -157,7 +143,7 @@ struct ShapeContextToolbar: View {
 
     @ViewBuilder
     private func strokeStylePreview(_ style: ShapeStrokeStyle) -> some View {
-        let color = Color(hex: content.strokeColor) ?? .blue
+        let color = Color.primary
         Canvas { ctx, size in
             var path = Path()
             path.move(to: CGPoint(x: 4, y: size.height/2))

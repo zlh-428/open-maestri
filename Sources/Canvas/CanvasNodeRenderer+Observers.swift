@@ -94,6 +94,11 @@ extension CanvasNodeRenderer {
                   let id = notif.userInfo?["nodeId"] as? UUID,
                   let content = notif.userInfo?["content"] as? NodeContent else { return }
             canvas?.updateNodeContentInPlace(id: id, content: content)
+            // 若携带新 frame（文本节点内容/样式变化时自动测量），同步更新画布 frame
+            if let newFrame = notif.userInfo?["frame"] as? CGRect {
+                canvas?.updateNodeFrameInPlace(id: id, frame: newFrame)
+                canvas?.nodeCanvasFrames[id] = newFrame
+            }
             // displayName 同步
             if case .terminal(let tc) = content {
                 TerminalManager.shared.terminals[id]?.displayName = tc.name

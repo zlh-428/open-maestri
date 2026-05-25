@@ -420,25 +420,17 @@ struct WorkspaceCanvasView: View {
         .onReceive(NotificationCenter.default.publisher(for: .textNodeDidChange)) { notif in
             guard let nodeId = notif.userInfo?["nodeId"] as? UUID,
                   let text   = notif.userInfo?["text"] as? String,
-                  let tf     = notif.userInfo?["textField"] as? NSTextField,
                   let idx    = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
                   case .text(var tc) = workspace.nodes[idx].content else { return }
             tc.text = text
-            var updated = workspace.nodes[idx]
-            updated.content = .text(tc)
-            workspace.nodes[idx] = updated
-            let measured = tf.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: tc.fontSize + 32))
-            let newWidth  = max(80, measured.width + 20)
-            let newHeight = tc.fontSize + 16
-            workspace.updateNodeFrame(id: nodeId, frame: CGRect(
-                origin: workspace.nodes[idx].frame.origin,
-                size: CGSize(width: newWidth, height: newHeight)
-            ))
-            // 通知 CanvasNodeRenderer 更新 currentNodes 里的 frame（syncKey 不变时 sync 不触发）
+            workspace.nodes[idx].content = .text(tc)
+            let newSize = measuredTextNodeSize(tc)
+            let newFrame = CGRect(origin: workspace.nodes[idx].frame.origin, size: newSize)
+            workspace.updateNodeFrame(id: nodeId, frame: newFrame)
             NotificationCenter.default.post(
                 name: .canvasNodeContentChanged,
                 object: nil,
-                userInfo: ["nodeId": nodeId, "content": workspace.nodes[idx].content]
+                userInfo: ["nodeId": nodeId, "content": workspace.nodes[idx].content, "frame": newFrame]
             )
         }
         .onReceive(NotificationCenter.default.publisher(for: .textNodeDidEndEditing)) { notif in
@@ -446,25 +438,18 @@ struct WorkspaceCanvasView: View {
                   let text   = notif.userInfo?["text"] as? String else { return }
             if let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
                case .text(var tc) = workspace.nodes[idx].content {
-                if text.isEmpty {
-                    workspace.removeNode(id: nodeId)
-                    selectedNodeIds.removeAll()
+                tc.text = text
+                workspace.nodes[idx].content = .text(tc)
+                if !text.isEmpty {
+                    let newSize = measuredTextNodeSize(tc)
+                    let newFrame = CGRect(origin: workspace.nodes[idx].frame.origin, size: newSize)
+                    workspace.updateNodeFrame(id: nodeId, frame: newFrame)
+                    NotificationCenter.default.post(
+                        name: .canvasNodeContentChanged,
+                        object: nil,
+                        userInfo: ["nodeId": nodeId, "content": workspace.nodes[idx].content, "frame": newFrame]
+                    )
                 } else {
-                    tc.text = text
-                    var updated = workspace.nodes[idx]
-                    updated.content = .text(tc)
-                    workspace.nodes[idx] = updated
-                    // 退出编辑时重新测量宽度，确保 Text 视图完整显示
-                    if let tf = notif.userInfo?["textField"] as? NSTextField {
-                        let measured = tf.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: tc.fontSize + 32))
-                        let newWidth  = max(80, measured.width + 20)
-                        let newHeight = tc.fontSize + 16
-                        workspace.updateNodeFrame(id: nodeId, frame: CGRect(
-                            origin: workspace.nodes[idx].frame.origin,
-                            size: CGSize(width: newWidth, height: newHeight)
-                        ))
-                    }
-                    // 通知 CanvasNodeRenderer 用最终 content 刷新 rootView
                     NotificationCenter.default.post(
                         name: .canvasNodeContentChanged,
                         object: nil,

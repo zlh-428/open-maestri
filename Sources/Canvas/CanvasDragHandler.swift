@@ -16,7 +16,7 @@ extension CanvasViewportView {
         case "fileTree":
             return CGSize(width: 360, height: 480)
         case "text":
-            return CGSize(width: 200, height: 60)
+            return CGSize(width: 45, height:35)
         case "shape":
             return CGSize(width: 200, height: 150)
         default:

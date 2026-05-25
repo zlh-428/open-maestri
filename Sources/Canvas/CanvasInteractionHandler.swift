@@ -324,13 +324,46 @@ extension CanvasViewportView {
                 object: nil,
                 userInfo: ["nodeId": id]
             )
-            // shape 节点：启动 mayDragNode 以支持拖拽；
-            // contentTarget 非 nil 标记"已选中状态下点击"，mouseUp 据此触发编辑
+            // shape 节点
             if let node = currentNodes.first(where: { $0.id == id }),
                case .shape = node.content {
+                // 已选中时再次点击 → 进入编辑态
+                // NSTextView 始终注册在 ShapeTextViewRegistry，直接转发坐标修正后的 mouseDown，
+                // 由 NSTextView 自身定位光标（与 Note 节点处理路径完全一致）
+                if wasAlreadySelected,
+                   let tv = ShapeTextViewRegistry.shared.textView(for: id) {
+                    // ShapeTextEditor 始终存在，tv 始终注册，无需等待 SwiftUI 更新。
+                    // 1. 先发通知让 SwiftUI 设 isEditing=true（同步触发 @State 变更）
+                    NotificationCenter.default.post(
+                        name: .shapeNodeShouldBeginEditing,
+                        object: nil,
+                        userInfo: ["nodeId": id, "selectAll": false]
+                    )
+                    // 2. 下一 runloop tick：SwiftUI updateNSView 已将 isEditable=true，
+                    //    用正确坐标转发 mouseDown 定位光标
+                    let correctedLocation = correctedWindowLocationForShapeTextView(for: event, nodeId: id, textView: tv)
+                    let capturedEvent = event
+                    DispatchQueue.main.async {
+                        tv.window?.makeFirstResponder(tv)
+                        if let syntheticEvent = NSEvent.mouseEvent(
+                            with: .leftMouseDown,
+                            location: correctedLocation,
+                            modifierFlags: capturedEvent.modifierFlags,
+                            timestamp: capturedEvent.timestamp,
+                            windowNumber: capturedEvent.windowNumber,
+                            context: nil,
+                            eventNumber: capturedEvent.eventNumber,
+                            clickCount: capturedEvent.clickCount,
+                            pressure: capturedEvent.pressure
+                        ) {
+                            tv.mouseDown(with: syntheticEvent)
+                        }
+                    }
+                    return
+                }
+                // 未选中或无 NSTextView：走普通 mayDragNode
                 let startFrame = nodeCanvasFrames[id] ?? .zero
-                let target: NSView? = wasAlreadySelected ? (nodesHostingView ?? self) : nil
-                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: target)
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
                 return
             }
             // 如果节点已经处于选中状态，将鼠标事件路由给终端视图（支持文字选中）
@@ -485,6 +518,8 @@ extension CanvasViewportView {
                     target.mouseUp(with: cancelEvent)
                 }
             }
+            // 拖动开始时将焦点还给画布，防止 NSTextView 等内容视图在拖动中消费事件
+            window?.makeFirstResponder(self)
 
             // 切换为真正拖动
             let canvasMouse = screenToCanvas(startMouse)
@@ -825,16 +860,7 @@ extension CanvasViewportView {
                     userInfo: ["nodeId": id]
                 )
             }
-            // shape 节点：contentTarget != nil 表示"已选中状态下再次点击" → 进入文字编辑态
-            if contentTarget != nil,
-               let node = currentNodes.first(where: { $0.id == id }),
-               case .shape = node.content {
-                NotificationCenter.default.post(
-                    name: .shapeNodeShouldBeginEditing,
-                    object: nil,
-                    userInfo: ["nodeId": id]
-                )
-            }
+            // shape 节点编辑态触发已移至 mouseDown（NSTextView 始终注册，直接转发坐标修正事件）
             // 单击已在多选集合中的节点 → 收窄为单选
             if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
                 selectedNodeIds = [id]
@@ -1049,6 +1075,27 @@ extension CanvasViewportView {
 
         // 用 webView 自身坐标系统转回窗口坐标
         return webView.convert(CGPoint(x: localX, y: localY), to: nil)
+    }
+
+
+    /// NSTextView 坐标修正（Shape 节点）
+    /// Shape 节点无 header/footer，NSTextView 覆盖整个节点 frame，只需减去 frame 原点
+    private func correctedWindowLocationForShapeTextView(for event: NSEvent, nodeId: UUID, textView: NSView) -> CGPoint {
+        let loc = convert(event.locationInWindow, from: nil)
+
+        guard let node = currentNodes.first(where: { $0.id == nodeId }) else {
+            return event.locationInWindow
+        }
+
+        let screenFrame = canvasRectToScreen(node.frame)
+
+        let relX = loc.x - screenFrame.minX
+        let relY = loc.y - screenFrame.minY
+
+        let localX = relX / zoom
+        let localY = relY / zoom
+
+        return textView.convert(CGPoint(x: localX, y: localY), to: nil)
     }
 
     /// NSTextView 坐标修正（Note 节点）
