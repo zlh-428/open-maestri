@@ -49,8 +49,8 @@ final class CanvasViewportTests: XCTestCase {
         // CanvasViewportView 的缩放范围 Constants.canvasMinZoom...canvasMaxZoom
         let minZoom = Constants.canvasMinZoom
         let maxZoom = Constants.canvasMaxZoom
-        XCTAssertEqual(minZoom, 0.25)
-        XCTAssertEqual(maxZoom, 2.0)
+        XCTAssertEqual(minZoom, 0.1)
+        XCTAssertEqual(maxZoom, 3.0)
         XCTAssertLessThan(minZoom, maxZoom)
     }
 

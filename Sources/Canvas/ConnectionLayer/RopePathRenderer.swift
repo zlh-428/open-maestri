@@ -18,11 +18,17 @@ struct RopePathRenderer {
     }
 
     static func lineWidth(for status: ConnectionStatus) -> CGFloat {
-        1.5
+        switch status {
+        case .communicating: return 2.5
+        case .idle, .disconnected, .error: return 1.5
+        }
     }
 
     static func isDashed(for status: ConnectionStatus) -> Bool {
-        true
+        switch status {
+        case .communicating: return false
+        case .idle, .disconnected, .error: return true
+        }
     }
 
     // MARK: - 路径生成
