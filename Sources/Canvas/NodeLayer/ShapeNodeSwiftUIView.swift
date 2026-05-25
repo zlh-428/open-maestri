@@ -106,7 +106,21 @@ struct ShapeNodeSwiftUIView: View {
     private var shapeCanvas: some View {
         Canvas { context, size in
             let rect = CGRect(origin: .zero, size: size)
-            let path = Path(roundedRect: rect, cornerRadius: 0)
+            let path: Path
+            switch content.shapeType {
+            case .rect:
+                path = Path(roundedRect: rect, cornerRadius: 0)
+            case .ellipse:
+                path = Path(ellipseIn: rect)
+            case .diamond:
+                var p = Path()
+                p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+                p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+                p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+                p.addLine(to: CGPoint(x: rect.minX, y: rect.midY))
+                p.closeSubpath()
+                path = p
+            }
 
             let themeColor = resolveColor(content.strokeColor)
 
