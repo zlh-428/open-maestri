@@ -54,6 +54,7 @@ struct TextContextToolbar: View {
                 .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
         )
         .onAppear { localFontSize = fontSize }
+        .onChange(of: fontSize) { newSize in localFontSize = newSize }
     }
 
     // MARK: - 字号控件
@@ -138,12 +139,13 @@ struct TextContextToolbar: View {
         Button { NSFontManager.shared.orderFrontFontPanel(nil) } label: {
             Text("Aa")
                 .font(.system(size: 12))
-                .foregroundStyle(Color(white: 0.3))
+                .foregroundStyle(Color(white: 0.45))
                 .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("System Font")
+        .help("Custom Font (preview only)")
+        .opacity(0.6)
     }
 
     // MARK: - 颜色按钮
