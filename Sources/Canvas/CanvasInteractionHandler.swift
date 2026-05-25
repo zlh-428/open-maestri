@@ -10,6 +10,7 @@ enum CanvasHitTestResult {
     case nodeFooter(UUID)
     case nodeContent(UUID, NSView)
     case nodeResize(UUID, ResizeEdge)
+    case nodeRotateHandle(UUID)
 }
 
 // MARK: - 画布交互状态机
@@ -24,6 +25,8 @@ enum CanvasInteraction {
     case draggingNode(UUID, startMouse: CGPoint, startFrame: CGRect)
     case batchDragging([UUID: CGRect], primaryId: UUID, startMouse: CGPoint)
     case resizingNode(UUID, edge: ResizeEdge, startFrame: CGRect, startMouse: CGPoint)
+    /// 正在旋转 shape 节点
+    case rotatingNode(UUID, startAngle: CGFloat, nodeCenter: CGPoint)
     case marquee(start: CGPoint)
     case panCanvas(startOrigin: CGPoint, startMouse: CGPoint)
     case drawing(start: CGPoint)
@@ -62,6 +65,36 @@ extension CanvasViewportView {
         let dy = loc.y - _hitTestCachedPoint.y
         if dx * dx + dy * dy < Self._hitTestReuseThreshold * Self._hitTestReuseThreshold {
             return _hitTestCachedResult
+        }
+
+        // Pass 0：shape 节点旋转手柄命中检测（优先级最高）
+        for node in sortedNodesByZIndexDesc where selectedNodeIds.contains(node.id) {
+            guard case .shape(let sc) = node.content else { continue }
+            let screenFrame = canvasRectToScreen(node.frame)
+            let nodeCenter = CGPoint(x: screenFrame.midX, y: screenFrame.midY)
+
+            // 旋转手柄在节点顶边中点上方 (lineLength=20 + dotRadius=5) = 25pt（未旋转坐标系）
+            let handleOffsetY: CGFloat = 25
+            let unrotatedHandleX = screenFrame.midX
+            let unrotatedHandleY = screenFrame.minY - handleOffsetY
+
+            // 将手柄位置从节点局部坐标旋转到屏幕坐标
+            let dx0 = unrotatedHandleX - nodeCenter.x
+            let dy0 = unrotatedHandleY - nodeCenter.y
+            let cosA = cos(sc.rotation)
+            let sinA = sin(sc.rotation)
+            let rotatedX = nodeCenter.x + dx0 * cosA - dy0 * sinA
+            let rotatedY = nodeCenter.y + dx0 * sinA + dy0 * cosA
+
+            let handleCenter = CGPoint(x: rotatedX, y: rotatedY)
+            let halo: CGFloat = 12
+            let distSq = (loc.x - handleCenter.x) * (loc.x - handleCenter.x) +
+                         (loc.y - handleCenter.y) * (loc.y - handleCenter.y)
+            if distSq <= halo * halo {
+                let r = CanvasHitTestResult.nodeRotateHandle(node.id)
+                _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                return r
+            }
         }
 
         // Pass 1：对已选中节点先检测外扩 resize 热区（在节点边框外侧，不与内容冲突）
@@ -200,7 +233,7 @@ extension CanvasViewportView {
                 object: nil,
                 userInfo: ["nodeId": id]
             )
-        default:
+        case .nodeResize, .nodeRotateHandle, .canvas:
             break
         }
     }
@@ -371,6 +404,18 @@ extension CanvasViewportView {
             }
             // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
 
+        case .nodeRotateHandle(let id):
+            guard !isNodeLocked(id) else { return }
+            guard let node = currentNodes.first(where: { $0.id == id }),
+                  case .shape(let sc) = node.content else { return }
+            let screenFrame = canvasRectToScreen(node.frame)
+            let nodeCenter = CGPoint(x: screenFrame.midX, y: screenFrame.midY)
+            let dx = loc.x - nodeCenter.x
+            let dy = loc.y - nodeCenter.y
+            let startAngle = atan2(dy, dx) - sc.rotation
+            updateSelection(id, modifiers: event.modifierFlags)
+            interaction = .rotatingNode(id, startAngle: startAngle, nodeCenter: nodeCenter)
+
         case .nodeResize(let id, let edge):
             guard !isNodeLocked(id) else { return }
             updateSelection(id, modifiers: event.modifierFlags)
@@ -534,6 +579,19 @@ extension CanvasViewportView {
             let dx = loc.x - startMouse.x
             let dy = loc.y - startMouse.y
             applyResizeOnCanvas(id: id, edge: edge, dx: dx, dy: dy, startFrame: startFrame)
+
+        // --- 旋转 ---
+        case .rotatingNode(let id, let startAngle, let nodeCenter):
+            let dx = loc.x - nodeCenter.x
+            let dy = loc.y - nodeCenter.y
+            let currentAngle = atan2(dy, dx)
+            let newRotation = currentAngle - startAngle
+            // Post notification for WorkspaceCanvasView to update ShapeContent.rotation
+            NotificationCenter.default.post(
+                name: .shapeNodeRotationChanged,
+                object: nil,
+                userInfo: ["nodeId": id, "rotation": newRotation]
+            )
 
         // --- 框选 ---
         case .marquee(let start):
@@ -757,6 +815,16 @@ extension CanvasViewportView {
                     userInfo: ["nodeId": id]
                 )
             }
+            // shape 节点：已选中时再次单击 → 进入文字编辑态
+            if selectedNodeIds.contains(id),
+               let node = currentNodes.first(where: { $0.id == id }),
+               case .shape = node.content {
+                NotificationCenter.default.post(
+                    name: .shapeNodeShouldBeginEditing,
+                    object: nil,
+                    userInfo: ["nodeId": id]
+                )
+            }
             // 单击已在多选集合中的节点 → 收窄为单选
             if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
                 selectedNodeIds = [id]
@@ -781,6 +849,9 @@ extension CanvasViewportView {
             if let finalFrame = nodeCanvasFrames[id] {
                 onNodeResizeEnded?(id, finalFrame)
             }
+
+        case .rotatingNode:
+            break  // defer handles interaction = .idle; WorkspaceCanvasView handles save via notification
 
         case .marquee(let start):
             if let current = marqueeCurrentPoint {
@@ -888,6 +959,8 @@ extension CanvasViewportView {
         switch hitTestCanvas(at: loc) {
         case .nodeResize(_, let edge):
             edge.cursor.set()
+        case .nodeRotateHandle:
+            NSCursor.crosshair.set()
         case .nodeHeader, .nodeFooter, .nodeContent, .canvas:
             NSCursor.arrow.set()
         }
