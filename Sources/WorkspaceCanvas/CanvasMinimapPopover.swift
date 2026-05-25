@@ -130,6 +130,10 @@ struct CanvasMinimapPopover: View {
             return Color(red: 0.7, green: 0.7, blue: 0.9)    // 浅紫色（文本标签）
         case .shape:
             return Color(red: 0.9, green: 0.75, blue: 0.85)  // 浅粉色（手绘）
+        case .stroke:
+            return Color(red: 0.59, green: 0.51, blue: 0.94)  // 浅紫蓝色（线条/箭头）
+        case .freehand:
+            return Color(red: 0.6, green: 0.85, blue: 0.75)   // 浅青绿色（手绘）
         }
     }
 }

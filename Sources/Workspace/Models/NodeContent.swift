@@ -9,11 +9,13 @@ enum NodeContent: Codable, Equatable {
     case fileTree(FileTreeContent)
     case text(TextContent)
     case shape(ShapeContent)
+    case stroke(StrokeContent)
+    case freehand(FreehandContent)
 
     // MARK: - Codable
 
     private enum TypeKeys: String, CodingKey {
-        case terminal, stickyNote, portal, fileTree, text, shape
+        case terminal, stickyNote, portal, fileTree, text, shape, stroke, freehand
     }
 
     private enum InnerKey: String, CodingKey {
@@ -40,6 +42,12 @@ enum NodeContent: Codable, Equatable {
         } else if container.contains(.shape) {
             let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .shape)
             self = .shape(try inner.decode(ShapeContent.self, forKey: ._0))
+        } else if container.contains(.stroke) {
+            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .stroke)
+            self = .stroke(try inner.decode(StrokeContent.self, forKey: ._0))
+        } else if container.contains(.freehand) {
+            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .freehand)
+            self = .freehand(try inner.decode(FreehandContent.self, forKey: ._0))
         } else {
             throw DecodingError.dataCorruptedError(
                 forKey: TypeKeys.terminal,
@@ -70,6 +78,12 @@ enum NodeContent: Codable, Equatable {
         case .shape(let c):
             var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .shape)
             try inner.encode(c, forKey: ._0)
+        case .stroke(let c):
+            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .stroke)
+            try inner.encode(c, forKey: ._0)
+        case .freehand(let c):
+            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .freehand)
+            try inner.encode(c, forKey: ._0)
         }
     }
 
@@ -82,7 +96,7 @@ enum NodeContent: Codable, Equatable {
     var isConnectable: Bool {
         switch self {
         case .terminal, .stickyNote, .portal: return true
-        case .fileTree, .text, .shape:         return false
+        case .fileTree, .text, .shape, .stroke, .freehand: return false
         }
     }
 }
@@ -349,7 +363,8 @@ struct ShapeContent: Codable, Equatable {
 
 enum ShapeType: String, Codable {
     case rect
-    // 未来扩展：case ellipse, diamond, triangle
+    case ellipse
+    case diamond
 }
 
 enum ShapeStrokeStyle: String, Codable {
@@ -358,4 +373,56 @@ enum ShapeStrokeStyle: String, Codable {
 
 enum ShapeFillStyle: String, Codable {
     case solid, none, hatched, crossHatched
+}
+
+// MARK: - Stroke Content（线条/箭头）
+
+struct StrokeContent: Codable, Equatable {
+    var strokeType: StrokeType
+    var startPoint: CGPoint        // 归一化坐标（0.0–1.0，相对节点 frame 宽高）
+    var endPoint: CGPoint          // 归一化坐标
+    var controlPoint: CGPoint?     // 仅 arrow 有效，贝塞尔控制点，归一化坐标
+    var strokeColor: String        // hex
+    var strokeWidth: CGFloat
+    var strokeStyle: ShapeStrokeStyle
+
+    init(strokeType: StrokeType) {
+        self.strokeType = strokeType
+        self.startPoint = CGPoint(x: 0, y: 0.5)
+        self.endPoint = CGPoint(x: 1, y: 0.5)
+        self.controlPoint = strokeType == .arrow ? CGPoint(x: 0.5, y: 0.5) : nil
+        self.strokeColor = "#3B82F6"
+        self.strokeWidth = 2.0
+        self.strokeStyle = .solid
+    }
+}
+
+enum StrokeType: String, Codable {
+    case line
+    case arrow
+}
+
+// MARK: - Freehand Content（手绘/荧光笔）
+
+struct FreehandContent: Codable, Equatable {
+    var freehandType: FreehandType
+    var points: [CGPoint]          // 归一化坐标点序列（0.0–1.0）
+    var strokeColor: String
+    var strokeWidth: CGFloat
+    var opacity: CGFloat           // pen=1.0, highlighter=0.4
+    var rotation: CGFloat          // 旋转角度（弧度）
+
+    init(freehandType: FreehandType) {
+        self.freehandType = freehandType
+        self.points = []
+        self.strokeColor = "#3B82F6"
+        self.strokeWidth = freehandType == .highlighter ? 12.0 : 3.0
+        self.opacity = freehandType == .highlighter ? 0.4 : 1.0
+        self.rotation = 0
+    }
+}
+
+enum FreehandType: String, Codable {
+    case pen
+    case highlighter
 }

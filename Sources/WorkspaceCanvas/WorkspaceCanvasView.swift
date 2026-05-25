@@ -913,6 +913,8 @@ private func contentTypeName(_ content: NodeContent) -> String {
     case .fileTree:  return "fileTree"
     case .text:      return "text"
     case .shape:     return "shape"
+    case .stroke:    return "stroke"
+    case .freehand:  return "freehand"
     }
 }
 

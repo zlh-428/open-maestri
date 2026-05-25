@@ -87,7 +87,7 @@ extension CanvasViewportView {
             menu.addItem(NSMenuItem.separator())
             menu.addItem(destructiveItem("canvas.context.delete".localized, action: #selector(contextMenuClose(_:)), id: id))
 
-        case .text, .shape:
+        case .text, .shape, .stroke, .freehand:
             menu.addItem(menuItem("canvas.context.duplicate".localized, action: #selector(contextMenuDuplicate(_:)), id: id))
             let lockTitle = node.isLocked ? "menu.unlock".localized : "menu.lock".localized
             menu.addItem(menuItem(lockTitle, action: #selector(contextMenuLockToggle(_:)), id: id))

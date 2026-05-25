@@ -418,6 +418,9 @@ struct CanvasNodesSwiftUIView: View {
                 },
                 onClose: onClose
             )
+        case .stroke, .freehand:
+            // 占位：渲染层将在后续 Task 中实现
+            Color.clear
         }
     }
 }
