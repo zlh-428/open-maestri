@@ -429,6 +429,11 @@ struct WorkspaceCanvasView: View {
             }
             textNodeEditingId = nil
         }
+        .onReceive(NotificationCenter.default.publisher(for: .textNodeShouldBeginEditing)) { notif in
+            guard let nodeId = notif.userInfo?["nodeId"] as? UUID else { return }
+            selectedNodeIds = [nodeId]
+            textNodeEditingId = nodeId
+        }
         .autosave(workspace: workspace)
         .environment(\.textNodeEditingId, textNodeEditingId)
     }

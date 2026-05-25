@@ -71,4 +71,6 @@ extension Notification.Name {
     static let textNodeDidChange         = Notification.Name("OpenMaestri.textNodeDidChange")
     /// Text 节点编辑结束：userInfo 含 "nodeId" UUID, "text" String
     static let textNodeDidEndEditing     = Notification.Name("OpenMaestri.textNodeDidEndEditing")
+    /// 请求 text 节点进入编辑态：userInfo 含 "nodeId" UUID
+    static let textNodeShouldBeginEditing = Notification.Name("OpenMaestri.textNodeShouldBeginEditing")
 }

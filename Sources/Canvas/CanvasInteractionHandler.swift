@@ -67,6 +67,9 @@ extension CanvasViewportView {
         // Pass 1：对已选中节点先检测外扩 resize 热区（在节点边框外侧，不与内容冲突）
         for node in sortedNodesByZIndexDesc where selectedNodeIds.contains(node.id) {
             guard !isNodeLocked(node.id) else { continue }
+            // text/drawing 节点不支持 resize，尺寸由内容自适应
+            if case .text    = node.content { continue }
+            if case .drawing = node.content { continue }
             let screenFrame = canvasRectToScreen(node.frame)
             // 外扩热区：以 selectionOutset + resizeHaloWidth 向外膨胀
             let halo = Self.resizeHaloWidth
@@ -745,6 +748,16 @@ extension CanvasViewportView {
                 object: nil,
                 userInfo: ["nodeId": id]
             )
+            // text 节点：已选中时再次单击 → 进入编辑态
+            if selectedNodeIds.contains(id),
+               let node = currentNodes.first(where: { $0.id == id }),
+               case .text = node.content {
+                NotificationCenter.default.post(
+                    name: .textNodeShouldBeginEditing,
+                    object: nil,
+                    userInfo: ["nodeId": id]
+                )
+            }
             // 单击已在多选集合中的节点 → 收窄为单选
             if selectedNodeIds.count > 1 && selectedNodeIds.contains(id) {
                 selectedNodeIds = [id]

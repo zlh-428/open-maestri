@@ -45,6 +45,11 @@ extension WorkspaceCanvasView {
         )
         workspace.addNode(node)
         Task { try? await workspace.save() }
+        NotificationCenter.default.post(
+            name: .textNodeShouldBeginEditing,
+            object: nil,
+            userInfo: ["nodeId": node.id]
+        )
     }
 
     func createDrawingAtFrame(_ frame: CGRect) {
