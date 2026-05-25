@@ -17,6 +17,8 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
     var onConnectionCreated: ((UUID, UUID) -> Void)?
     /// 拖拽绘制完成回调（传入节点类型和画布坐标 CGRect）
     var onNodeDrawn: ((String, CGRect) -> Void)?
+    /// freehand 绘制完成回调（nodeType, 归一化点序列, 边界矩形画布坐标）
+    var onFreehandDrawn: ((String, [CGPoint], CGRect) -> Void)?
     /// 节点选中变化回调（选中 IDs + 首个选中节点的屏幕 frame）
     var onSelectionChanged: ((Set<UUID>, CGRect?) -> Void)?
     /// Finder 文件拖入回调（文件路径数组 + 画布坐标落点）
@@ -92,6 +94,7 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         nsView.isInDrawingMode = isDrawingMode
         nsView.drawingNodeType = drawingNodeType
         nsView.onNodeDrawn = onNodeDrawn
+        nsView.onFreehandDrawn = onFreehandDrawn
         nsView.onFilesDropped = onFilesDropped
         nsView.onFilesDroppedOnNode = onFilesDroppedOnNode
         nsView.agentPresets = agentPresets

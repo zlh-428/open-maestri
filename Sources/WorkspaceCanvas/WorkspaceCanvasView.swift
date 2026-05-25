@@ -28,6 +28,16 @@ struct WorkspaceCanvasView: View {
             // 顶部浮动工具栏区域
             toolbarOverlay
         }
+        .onReceive(NotificationCenter.default.publisher(for: .strokeNodeDrawn)) { notif in
+            guard let nodeType = notif.userInfo?["nodeType"] as? String,
+                  let startPoint = notif.userInfo?["startPoint"] as? CGPoint,
+                  let endPoint = notif.userInfo?["endPoint"] as? CGPoint,
+                  let frame = notif.userInfo?["frame"] as? CGRect else { return }
+            let strokeType: StrokeType = nodeType == "stroke_arrow" ? .arrow : .line
+            createStrokeAtFrame(frame, strokeType: strokeType,
+                                startCanvas: startPoint, endCanvas: endPoint)
+            activeDrawingTool = nil
+        }
     }
 
     /// 当前是否全屏
@@ -162,112 +172,66 @@ struct WorkspaceCanvasView: View {
         .zIndex(100)
     }
 
+    /// 构建 CanvasViewportRepresentable（单独提取以帮助编译器推断类型）
+    private var canvasViewportRepresentable: CanvasViewportRepresentable {
+        CanvasViewportRepresentable(
+            canvasOrigin: $canvasOrigin,
+            zoom: $zoom,
+            backgroundMode: backgroundMode,
+            workspace: workspace,
+            isConnecting: isConnecting,
+            isDrawingMode: activeDrawingTool != nil,
+            drawingNodeType: activeDrawingTool == "shape" ? activeShapeSubtool : (activeDrawingTool ?? "terminal"),
+            onViewportChanged: { origin, z in
+                canvasOrigin = origin
+                zoom = z
+                workspace.canvasOrigin = origin
+                workspace.canvasZoom = z
+            },
+            onDeleteSelectedNodes: {
+                // CanvasNodeRenderer 通过 onClose 回调处理节点删除
+            },
+            onNodeJumpNumbersRequested: { _ in
+                // 数字徽章由 TerminalNodeView 自行管理
+            },
+            onConnectionCreated: handleConnectionCreated(idA:idB:),
+            onNodeDrawn: { nodeType, canvasRect in
+                handleNodeDrawn(nodeType: nodeType, frame: canvasRect)
+            },
+            onFreehandDrawn: { (nodeType: String, normalizedPoints: [CGPoint], boundingFrame: CGRect) in
+                handleFreehandDrawn(nodeType: nodeType, points: normalizedPoints, frame: boundingFrame)
+            },
+            onSelectionChanged: { ids, frame in
+                selectedNodeIds = ids
+                selectedNodeScreenFrame = frame
+                if let editingId = textNodeEditingId, !ids.contains(editingId) {
+                    textNodeEditingId = nil
+                }
+            },
+            onFilesDropped: { paths, canvasPoint in
+                handleFilesDropped(paths: paths, at: canvasPoint)
+            },
+            onFilesDroppedOnNode: { paths, nodeId in
+                handleFilesDroppedOnNode(paths: paths, nodeId: nodeId)
+            },
+            rolePresets: appState.preferences.rolePresets,
+            agentPresets: appState.preferences.agentPresets.filter { $0.isActive },
+            onCanvasContextCreateNode: { nodeType, canvasPoint in
+                handleCanvasContextCreateNode(nodeType: nodeType, at: canvasPoint)
+            },
+            onCanvasContextCreateTerminal: { presetIndex, canvasPoint in
+                handleCanvasContextCreateTerminal(presetIndex: presetIndex, at: canvasPoint)
+            },
+            onCanvasContextPaste: { canvasPoint in
+                handleCanvasContextPaste(at: canvasPoint)
+            }
+        )
+    }
+
     @ViewBuilder
     private var canvasBody: some View {
         ZStack {
-            CanvasViewportRepresentable(
-                canvasOrigin: $canvasOrigin,
-                zoom: $zoom,
-                backgroundMode: backgroundMode,
-                workspace: workspace,
-                isConnecting: isConnecting,
-                isDrawingMode: activeDrawingTool != nil,
-                drawingNodeType: activeDrawingTool == "shape" ? activeShapeSubtool : (activeDrawingTool ?? "terminal"),
-                onViewportChanged: { origin, z in
-                    canvasOrigin = origin
-                    zoom = z
-                    workspace.canvasOrigin = origin
-                    workspace.canvasZoom = z
-                },
-                onDeleteSelectedNodes: {
-                    // CanvasNodeRenderer 通过 onClose 回调处理节点删除
-                },
-                onNodeJumpNumbersRequested: { _ in
-                    // 数字徽章由 TerminalNodeView 自行管理
-                },
-                onConnectionCreated: { idA, idB in
-                    // 防止同一对节点重复连接
-                    let alreadyConnected = workspace.connections.contains {
-                        ($0.terminalIdA == idA && $0.terminalIdB == idB) ||
-                        ($0.terminalIdA == idB && $0.terminalIdB == idA)
-                    } || workspace.noteConnections.contains {
-                        ($0.terminalId == idA && $0.noteNodeId == idB) ||
-                        ($0.terminalId == idB && $0.noteNodeId == idA)
-                    } || workspace.portalConnections.contains {
-                        ($0.terminalId == idA && $0.portalNodeId == idB) ||
-                        ($0.terminalId == idB && $0.portalNodeId == idA)
-                    } || workspace.noteToNoteConnections.contains {
-                        ($0.noteNodeIdA == idA && $0.noteNodeIdB == idB) ||
-                        ($0.noteNodeIdA == idB && $0.noteNodeIdB == idA)
-                    } || workspace.portalToPortalConnections.contains {
-                        ($0.portalIdA == idA && $0.portalIdB == idB) ||
-                        ($0.portalIdA == idB && $0.portalIdB == idA)
-                    }
-                    guard !alreadyConnected else {
-                        isConnecting = false
-                        return
-                    }
-
-                    // 根据节点内容类型选择正确的连接类型
-                    let typeA = workspace.nodes.first { $0.id == idA }.map { contentTypeName($0.content) }
-                    let typeB = workspace.nodes.first { $0.id == idB }.map { contentTypeName($0.content) }
-                    let cm = ConnectionManager.shared
-
-                    switch (typeA, typeB) {
-                    case ("terminal", "terminal"):
-                        let conn = cm.connectTerminals(idA: idA, idB: idB, serverPort: InterAgentServer.shared.port)
-                        workspace.addConnection(conn)
-                    case ("terminal", "stickyNote"), ("stickyNote", "terminal"):
-                        let termId = typeA == "terminal" ? idA : idB
-                        let noteId = typeA == "stickyNote" ? idA : idB
-                        let conn = cm.connectTerminalToNote(terminalId: termId, noteNodeId: noteId)
-                        workspace.addNoteConnection(conn)
-                    case ("terminal", "portal"), ("portal", "terminal"):
-                        let termId = typeA == "terminal" ? idA : idB
-                        let portId = typeA == "portal" ? idA : idB
-                        let conn = cm.connectTerminalToPortal(terminalId: termId, portalNodeId: portId)
-                        workspace.addPortalConnection(conn)
-                    case ("stickyNote", "stickyNote"):
-                        let conn = cm.connectNoteToNote(noteNodeIdA: idA, noteNodeIdB: idB)
-                        workspace.noteToNoteConnections.append(conn)
-                    case ("portal", "portal"):
-                        let conn = cm.connectPortalToPortal(portalIdA: idA, portalIdB: idB)
-                        workspace.addPortalToPortalConnection(conn)
-                        PortalWebViewStore.shared.shareSession(portalIdA: idA, portalIdB: idB)
-                    default:
-                        break
-                    }
-                    Task { try? await workspace.save() }
-                    isConnecting = false
-                },
-                onNodeDrawn: { nodeType, canvasRect in
-                    handleNodeDrawn(nodeType: nodeType, frame: canvasRect)
-                },
-                onSelectionChanged: { ids, frame in
-                    selectedNodeIds = ids
-                    selectedNodeScreenFrame = frame
-                    if let editingId = textNodeEditingId, !ids.contains(editingId) {
-                        textNodeEditingId = nil
-                    }
-                },
-                onFilesDropped: { paths, canvasPoint in
-                    handleFilesDropped(paths: paths, at: canvasPoint)
-                },
-                onFilesDroppedOnNode: { paths, nodeId in
-                    handleFilesDroppedOnNode(paths: paths, nodeId: nodeId)
-                },
-                rolePresets: appState.preferences.rolePresets,
-                agentPresets: appState.preferences.agentPresets.filter { $0.isActive },
-                onCanvasContextCreateNode: { nodeType, canvasPoint in
-                    handleCanvasContextCreateNode(nodeType: nodeType, at: canvasPoint)
-                },
-                onCanvasContextCreateTerminal: { presetIndex, canvasPoint in
-                    handleCanvasContextCreateTerminal(presetIndex: presetIndex, at: canvasPoint)
-                },
-                onCanvasContextPaste: { canvasPoint in
-                    handleCanvasContextPaste(at: canvasPoint)
-                }
-            )
+            canvasViewportRepresentable
             .ignoresSafeArea()
 
             // 底部右下角控件组
@@ -551,6 +515,68 @@ struct WorkspaceCanvasView: View {
         default:
             break
         }
+        activeDrawingTool = nil
+    }
+
+    private func handleConnectionCreated(idA: UUID, idB: UUID) {
+        // 防止同一对节点重复连接
+        let alreadyConnected = workspace.connections.contains {
+            ($0.terminalIdA == idA && $0.terminalIdB == idB) ||
+            ($0.terminalIdA == idB && $0.terminalIdB == idA)
+        } || workspace.noteConnections.contains {
+            ($0.terminalId == idA && $0.noteNodeId == idB) ||
+            ($0.terminalId == idB && $0.noteNodeId == idA)
+        } || workspace.portalConnections.contains {
+            ($0.terminalId == idA && $0.portalNodeId == idB) ||
+            ($0.terminalId == idB && $0.portalNodeId == idA)
+        } || workspace.noteToNoteConnections.contains {
+            ($0.noteNodeIdA == idA && $0.noteNodeIdB == idB) ||
+            ($0.noteNodeIdA == idB && $0.noteNodeIdB == idA)
+        } || workspace.portalToPortalConnections.contains {
+            ($0.portalIdA == idA && $0.portalIdB == idB) ||
+            ($0.portalIdA == idB && $0.portalIdB == idA)
+        }
+        guard !alreadyConnected else {
+            isConnecting = false
+            return
+        }
+
+        // 根据节点内容类型选择正确的连接类型
+        let typeA = workspace.nodes.first { $0.id == idA }.map { contentTypeName($0.content) }
+        let typeB = workspace.nodes.first { $0.id == idB }.map { contentTypeName($0.content) }
+        let cm = ConnectionManager.shared
+
+        switch (typeA, typeB) {
+        case ("terminal", "terminal"):
+            let conn = cm.connectTerminals(idA: idA, idB: idB, serverPort: InterAgentServer.shared.port)
+            workspace.addConnection(conn)
+        case ("terminal", "stickyNote"), ("stickyNote", "terminal"):
+            let termId = typeA == "terminal" ? idA : idB
+            let noteId = typeA == "stickyNote" ? idA : idB
+            let conn = cm.connectTerminalToNote(terminalId: termId, noteNodeId: noteId)
+            workspace.addNoteConnection(conn)
+        case ("terminal", "portal"), ("portal", "terminal"):
+            let termId = typeA == "terminal" ? idA : idB
+            let portId = typeA == "portal" ? idA : idB
+            let conn = cm.connectTerminalToPortal(terminalId: termId, portalNodeId: portId)
+            workspace.addPortalConnection(conn)
+        case ("stickyNote", "stickyNote"):
+            let conn = cm.connectNoteToNote(noteNodeIdA: idA, noteNodeIdB: idB)
+            workspace.noteToNoteConnections.append(conn)
+        case ("portal", "portal"):
+            let conn = cm.connectPortalToPortal(portalIdA: idA, portalIdB: idB)
+            workspace.addPortalToPortalConnection(conn)
+            PortalWebViewStore.shared.shareSession(portalIdA: idA, portalIdB: idB)
+        default:
+            break
+        }
+        Task { try? await workspace.save() }
+        isConnecting = false
+    }
+
+    private func handleFreehandDrawn(nodeType: String, points: [CGPoint], frame: CGRect) {
+        let freehandType: FreehandType = nodeType == "freehand_highlighter" ? .highlighter : .pen
+        createFreehandFromPoints(points, boundingFrame: frame, freehandType: freehandType)
         activeDrawingTool = nil
     }
 

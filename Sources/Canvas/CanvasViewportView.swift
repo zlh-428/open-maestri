@@ -810,6 +810,13 @@ final class CanvasViewportView: NSView {
     var isInDrawingMode: Bool = false
     var drawingNodeType: String = "terminal"
     var onNodeDrawn: ((String, CGRect) -> Void)?
+    /// freehand 绘制完成回调（nodeType, 归一化点序列, 边界矩形画布坐标）
+    var onFreehandDrawn: ((String, [CGPoint], CGRect) -> Void)?
+
+    /// 当前绘图工具是否为 stroke（直线/箭头）模式
+    var isStrokeDrawing: Bool { drawingNodeType.hasPrefix("stroke_") }
+    /// 当前绘图工具是否为 freehand（自由笔）模式
+    var isFreehandDrawing: Bool { drawingNodeType.hasPrefix("freehand_") }
 
     // MARK: - 框选/绘制/snap 辅助状态（由 CanvasInteractionHandler 维护）
 

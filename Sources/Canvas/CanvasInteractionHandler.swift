@@ -30,6 +30,10 @@ enum CanvasInteraction {
     case marquee(start: CGPoint)
     case panCanvas(startOrigin: CGPoint, startMouse: CGPoint)
     case drawing(start: CGPoint)
+    /// 正在绘制 stroke（直线/箭头）节点
+    case drawingStroke(start: CGPoint)
+    /// 正在绘制 freehand（自由笔）节点；points 为屏幕坐标采样序列
+    case drawingFreehand(points: [CGPoint])
     /// 鼠标正在与节点内容区交互（如终端文字选中）；事件转发给 contentTarget
     case contentInteraction(UUID, contentTarget: NSView)
 }
@@ -290,7 +294,13 @@ extension CanvasViewportView {
         if isInDrawingMode {
             let hit = hitTestCanvas(at: loc)
             if case .canvas = hit {
-                interaction = .drawing(start: loc)
+                if isStrokeDrawing {
+                    interaction = .drawingStroke(start: loc)
+                } else if isFreehandDrawing {
+                    interaction = .drawingFreehand(points: [loc])
+                } else {
+                    interaction = .drawing(start: loc)
+                }
                 drawingLastSnappedRect = nil
                 return
             }
@@ -650,6 +660,23 @@ extension CanvasViewportView {
             snapGuideView?.selectionRect = rect
             needsDisplay = true
 
+        // --- stroke 节点绘制模式（直线/箭头）---
+        case .drawingStroke:
+            drawingCurrentPoint = loc
+            needsDisplay = true
+
+        // --- freehand 节点绘制模式（自由笔，采样间距 4pt）---
+        case .drawingFreehand(var pts):
+            let last = pts.last ?? loc
+            let dx = loc.x - last.x
+            let dy = loc.y - last.y
+            if dx * dx + dy * dy > 16 {
+                pts.append(loc)
+                interaction = .drawingFreehand(points: pts)
+            }
+            drawingCurrentPoint = loc
+            needsDisplay = true
+
         // --- 节点绘制模式（网格吸附 + haptic）---
         case .drawing(let start):
             drawingCurrentPoint = loc
@@ -911,6 +938,68 @@ extension CanvasViewportView {
             }
             marqueeCurrentPoint = nil
             snapGuideView?.selectionRect = nil
+            needsDisplay = true
+
+        case .drawingStroke(let start):
+            let canvasStart = screenToCanvas(start)
+            guard let current = drawingCurrentPoint else {
+                needsDisplay = true
+                break
+            }
+            let canvasCurrent = screenToCanvas(current)
+            let dx = canvasCurrent.x - canvasStart.x
+            let dy = canvasCurrent.y - canvasStart.y
+            let dist = sqrt(dx * dx + dy * dy)
+            if dist >= 10 {
+                let minX = min(canvasStart.x, canvasCurrent.x)
+                let minY = min(canvasStart.y, canvasCurrent.y)
+                let maxX = max(canvasStart.x, canvasCurrent.x)
+                let maxY = max(canvasStart.y, canvasCurrent.y)
+                let padding: CGFloat = max(CGFloat(UserDefaults.standard.double(forKey: "drawingDefaultStrokeWidth")), 4)
+                let boundingRect = CGRect(
+                    x: minX - padding, y: minY - padding,
+                    width: (maxX - minX) + padding * 2,
+                    height: (maxY - minY) + padding * 2
+                )
+                NotificationCenter.default.post(
+                    name: .strokeNodeDrawn,
+                    object: nil,
+                    userInfo: [
+                        "nodeType": drawingNodeType,
+                        "startPoint": canvasStart,
+                        "endPoint": canvasCurrent,
+                        "frame": boundingRect
+                    ]
+                )
+            }
+            drawingCurrentPoint = nil
+            needsDisplay = true
+
+        case .drawingFreehand(let pts):
+            guard pts.count >= 2 else {
+                drawingCurrentPoint = nil
+                needsDisplay = true
+                break
+            }
+            let canvasPts = pts.map { screenToCanvas($0) }
+            let minX = canvasPts.map(\.x).min()!
+            let minY = canvasPts.map(\.y).min()!
+            let maxX = canvasPts.map(\.x).max()!
+            let maxY = canvasPts.map(\.y).max()!
+            let padding: CGFloat = 8
+            let boundingRect = CGRect(
+                x: minX - padding, y: minY - padding,
+                width: (maxX - minX) + padding * 2,
+                height: (maxY - minY) + padding * 2
+            )
+            let normalized = canvasPts.map { pt in
+                CGPoint(
+                    x: boundingRect.width > 0 ? (pt.x - boundingRect.minX) / boundingRect.width : 0.5,
+                    y: boundingRect.height > 0 ? (pt.y - boundingRect.minY) / boundingRect.height : 0.5
+                )
+            }
+            onFreehandDrawn?(drawingNodeType, normalized, boundingRect)
+            drawingCurrentPoint = nil
             needsDisplay = true
 
         case .drawing(let start):

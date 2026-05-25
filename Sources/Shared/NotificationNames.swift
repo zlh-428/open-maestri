@@ -81,4 +81,6 @@ extension Notification.Name {
     static let shapeNodeRotationChanged = Notification.Name("OpenMaestri.shapeNodeRotationChanged")
     /// shape 节点旋转结束（mouseUp）：userInfo 含 "nodeId" UUID
     static let shapeNodeRotationDidEnd = Notification.Name("OpenMaestri.shapeNodeRotationDidEnd")
+    /// stroke 节点绘制完成：userInfo 含 "nodeType" String, "startPoint" CGPoint, "endPoint" CGPoint, "frame" CGRect
+    static let strokeNodeDrawn = Notification.Name("OpenMaestri.strokeNodeDrawn")
 }
