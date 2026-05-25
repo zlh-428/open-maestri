@@ -69,7 +69,6 @@ extension CanvasViewportView {
             guard !isNodeLocked(node.id) else { continue }
             // text/drawing 节点不支持 resize，尺寸由内容自适应
             if case .text    = node.content { continue }
-            if case .drawing = node.content { continue }
             let screenFrame = canvasRectToScreen(node.frame)
             // 外扩热区：以 selectionOutset + resizeHaloWidth 向外膨胀
             let halo = Self.resizeHaloWidth
