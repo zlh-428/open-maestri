@@ -299,6 +299,7 @@ struct TextContent: Codable, Equatable {
     var fontWeight: String      // "regular" | "medium" | "bold"
     var color: String           // hex
     var alignment: String       // "left" | "center" | "right"
+    var fontFamily: String      // "sans" | "serif" | "mono" | 具体字体名
 
     init(text: String = "") {
         self.text = text
@@ -306,6 +307,17 @@ struct TextContent: Codable, Equatable {
         self.fontWeight = "regular"
         self.color = "#000000"
         self.alignment = "left"
+        self.fontFamily = "sans"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        text       = try c.decode(String.self,  forKey: .text)
+        fontSize   = try c.decode(CGFloat.self, forKey: .fontSize)
+        fontWeight = try c.decode(String.self,  forKey: .fontWeight)
+        color      = try c.decode(String.self,  forKey: .color)
+        alignment  = try c.decode(String.self,  forKey: .alignment)
+        fontFamily = try c.decodeIfPresent(String.self, forKey: .fontFamily) ?? "sans"
     }
 }
 
