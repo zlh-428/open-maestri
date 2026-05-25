@@ -57,19 +57,23 @@ struct ShapeNodeSwiftUIView: View {
                 if let color = Color(hex: content.fillColor) {
                     context.fill(path, with: .color(color.opacity(0.15)))
                 }
-                context.clipToLayer { ctx in
-                    ctx.fill(path, with: .color(.black))
+                context.drawLayer { ctx in
+                    ctx.clipToLayer { c in
+                        c.fill(path, with: .color(.black))
+                    }
+                    drawHatchLines(context: ctx, size: size, angle: 45, color: content.strokeColor)
                 }
-                drawHatchLines(context: context, size: size, angle: 45, color: content.strokeColor)
             case .crossHatched:
                 if let color = Color(hex: content.fillColor) {
                     context.fill(path, with: .color(color.opacity(0.15)))
                 }
-                context.clipToLayer { ctx in
-                    ctx.fill(path, with: .color(.black))
+                context.drawLayer { ctx in
+                    ctx.clipToLayer { c in
+                        c.fill(path, with: .color(.black))
+                    }
+                    drawHatchLines(context: ctx, size: size, angle: 45, color: content.strokeColor)
+                    drawHatchLines(context: ctx, size: size, angle: -45, color: content.strokeColor)
                 }
-                drawHatchLines(context: context, size: size, angle: 45, color: content.strokeColor)
-                drawHatchLines(context: context, size: size, angle: -45, color: content.strokeColor)
             }
 
             // 边框
@@ -211,6 +215,7 @@ private struct ShapeTextEditor: NSViewRepresentable {
         tf.alignment = .center
         tf.font = .systemFont(ofSize: fontSize)
         tf.delegate = context.coordinator
+        tf.focusRingType = .none
         tf.stringValue = text
         DispatchQueue.main.async {
             tf.window?.makeFirstResponder(tf)
@@ -221,6 +226,9 @@ private struct ShapeTextEditor: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSTextField, context: Context) {
         nsView.font = .systemFont(ofSize: fontSize)
+        if nsView.currentEditor() == nil {
+            nsView.stringValue = text
+        }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
@@ -235,9 +243,10 @@ private struct ShapeTextEditor: NSViewRepresentable {
             }
         }
 
-        func control(_ control: NSControl, textShouldEndEditing fieldEditor: NSText) -> Bool {
+        func controlTextDidEndEditing(_ obj: Notification) {
+            guard let tf = obj.object as? NSTextField else { return }
+            parent.text = tf.stringValue
             parent.onCommit()
-            return true
         }
     }
 }
