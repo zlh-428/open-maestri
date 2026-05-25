@@ -2,6 +2,7 @@ import XCTest
 import CoreGraphics
 @testable import open_maestri
 
+@MainActor
 final class RopeSimulationTests: XCTestCase {
     let sim = RopeSimulation()
 
