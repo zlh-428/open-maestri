@@ -75,6 +75,10 @@ extension Notification.Name {
     static let textNodeShouldBeginEditing = Notification.Name("OpenMaestri.textNodeShouldBeginEditing")
     /// 请求 shape 节点进入文字编辑态：userInfo 含 "nodeId" UUID
     static let shapeNodeShouldBeginEditing = Notification.Name("OpenMaestri.shapeNodeShouldBeginEditing")
+    /// shape 节点文字编辑结束：userInfo 含 "nodeId" UUID, "text" String
+    static let shapeNodeTextDidEndEditing = Notification.Name("OpenMaestri.shapeNodeTextDidEndEditing")
     /// shape 节点旋转角变化（拖动中实时）：userInfo 含 "nodeId" UUID, "rotation" CGFloat
     static let shapeNodeRotationChanged = Notification.Name("OpenMaestri.shapeNodeRotationChanged")
+    /// shape 节点旋转结束（mouseUp）：userInfo 含 "nodeId" UUID
+    static let shapeNodeRotationDidEnd = Notification.Name("OpenMaestri.shapeNodeRotationDidEnd")
 }

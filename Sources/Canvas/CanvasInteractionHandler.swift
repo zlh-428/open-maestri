@@ -102,6 +102,7 @@ extension CanvasViewportView {
             guard !isNodeLocked(node.id) else { continue }
             // text/drawing 节点不支持 resize，尺寸由内容自适应
             if case .text    = node.content { continue }
+            if case .shape(let sc) = node.content, sc.rotation != 0 { continue }
             let screenFrame = canvasRectToScreen(node.frame)
             // 外扩热区：以 selectionOutset + resizeHaloWidth 向外膨胀
             let halo = Self.resizeHaloWidth
@@ -850,8 +851,12 @@ extension CanvasViewportView {
                 onNodeResizeEnded?(id, finalFrame)
             }
 
-        case .rotatingNode:
-            break  // defer handles interaction = .idle; WorkspaceCanvasView handles save via notification
+        case .rotatingNode(let id, _, _):
+            NotificationCenter.default.post(
+                name: .shapeNodeRotationDidEnd,
+                object: nil,
+                userInfo: ["nodeId": id]
+            )
 
         case .marquee(let start):
             if let current = marqueeCurrentPoint {

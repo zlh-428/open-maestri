@@ -448,12 +448,31 @@ struct WorkspaceCanvasView: View {
             selectedNodeIds = [nodeId]
             textNodeEditingId = nodeId
         }
+        .onReceive(NotificationCenter.default.publisher(for: .shapeNodeTextDidEndEditing)) { notif in
+            guard let id = notif.userInfo?["nodeId"] as? UUID,
+                  let text = notif.userInfo?["text"] as? String,
+                  var sc = shapeContent(nodeId: id) else { return }
+            sc.text = text
+            setShapeContent(nodeId: id, content: sc)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .shapeNodeRotationChanged)) { notif in
             guard let id = notif.userInfo?["nodeId"] as? UUID,
                   let rotation = notif.userInfo?["rotation"] as? CGFloat,
-                  var sc = shapeContent(nodeId: id) else { return }
+                  let idx = workspace.nodes.firstIndex(where: { $0.id == id }),
+                  case .shape(var sc) = workspace.nodes[idx].content else { return }
             sc.rotation = rotation
-            setShapeContent(nodeId: id, content: sc)
+            let newContent = NodeContent.shape(sc)
+            workspace.nodes[idx].content = newContent
+            NotificationCenter.default.post(
+                name: .canvasNodeContentChanged,
+                object: nil,
+                userInfo: ["nodeId": id, "content": newContent]
+            )
+            // Save deferred to rotation end
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shapeNodeRotationDidEnd)) { notif in
+            guard let _ = notif.userInfo?["nodeId"] as? UUID else { return }
+            Task { try? await workspace.save() }
         }
         .autosave(workspace: workspace)
         .environment(\.textNodeEditingId, textNodeEditingId)

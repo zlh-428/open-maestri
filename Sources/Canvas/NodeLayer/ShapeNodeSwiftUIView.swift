@@ -123,9 +123,12 @@ struct ShapeNodeSwiftUIView: View {
                 text: $editText,
                 fontSize: content.fontSize,
                 onCommit: {
-                    var updated = content
-                    updated.text = editText
-                    onContentChange?(updated)
+                    // Notify WorkspaceCanvasView to persist text change
+                    NotificationCenter.default.post(
+                        name: .shapeNodeTextDidEndEditing,
+                        object: nil,
+                        userInfo: ["nodeId": nodeId, "text": editText]
+                    )
                     isEditing = false
                 }
             )
