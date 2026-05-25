@@ -97,6 +97,20 @@ struct WorkspaceCanvasView: View {
                     .contentShape(Rectangle())
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeContentType == "shape",
+                          let shapeId = selectedNodeIds.first,
+                          let sc = shapeContent(nodeId: shapeId) {
+                    ShapeContextToolbar(
+                        nodeId: shapeId,
+                        content: sc,
+                        onContentChange: { newContent in setShapeContent(nodeId: shapeId, content: newContent) },
+                        onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
                 } else {
                     NodeContextToolbar(
                         onEdit: { editSelectedNode() },
@@ -433,6 +447,13 @@ struct WorkspaceCanvasView: View {
             guard let nodeId = notif.userInfo?["nodeId"] as? UUID else { return }
             selectedNodeIds = [nodeId]
             textNodeEditingId = nodeId
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .shapeNodeRotationChanged)) { notif in
+            guard let id = notif.userInfo?["nodeId"] as? UUID,
+                  let rotation = notif.userInfo?["rotation"] as? CGFloat,
+                  var sc = shapeContent(nodeId: id) else { return }
+            sc.rotation = rotation
+            setShapeContent(nodeId: id, content: sc)
         }
         .autosave(workspace: workspace)
         .environment(\.textNodeEditingId, textNodeEditingId)
