@@ -77,6 +77,14 @@ enum NodeContent: Codable, Equatable {
         if case .terminal(let c) = self { return c }
         return nil
     }
+
+    /// 节点是否可作为连线端点（fileTree、text、drawing 不支持连线）
+    var isConnectable: Bool {
+        switch self {
+        case .terminal, .stickyNote, .portal: return true
+        case .fileTree, .text, .drawing:      return false
+        }
+    }
 }
 
 // MARK: - Terminal Content

@@ -184,6 +184,14 @@ extension CanvasViewportView {
         let hit = hitTestCanvas(at: loc)
         switch hit {
         case .nodeContent(let id, _), .nodeHeader(let id), .nodeFooter(let id):
+            // 连线模式下点击不可连接节点：取消连线模式，保留原选中状态
+            if isInConnectingMode || connectingFromNodeId != nil {
+                let isConnectable = currentNodes.first(where: { $0.id == id })?.content.isConnectable ?? true
+                if !isConnectable {
+                    isInConnectingMode = false
+                    return
+                }
+            }
             updateSelection(id, modifiers: modifiers)
             NotificationCenter.default.post(
                 name: .canvasNodeActivated,
