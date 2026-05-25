@@ -454,8 +454,8 @@ struct WorkspaceCanvasView: View {
             createFileTreeAtFrame(frame)
         case "text":
             createTextAtFrame(frame)
-        case "drawing":
-            createDrawingAtFrame(frame)
+        case "shape":
+            createShapeAtFrame(frame)
         default:
             break
         }
@@ -855,7 +855,7 @@ private func contentTypeName(_ content: NodeContent) -> String {
     case .portal:    return "portal"
     case .fileTree:  return "fileTree"
     case .text:      return "text"
-    case .drawing:   return "drawing"
+    case .shape:     return "shape"
     }
 }
 

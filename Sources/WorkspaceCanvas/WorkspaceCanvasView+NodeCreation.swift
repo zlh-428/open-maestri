@@ -52,11 +52,11 @@ extension WorkspaceCanvasView {
         )
     }
 
-    func createDrawingAtFrame(_ frame: CGRect) {
-        let dc = DrawingContent()
+    func createShapeAtFrame(_ frame: CGRect) {
+        let sc = ShapeContent()
         let node = CanvasNode(
             frame: frame,
-            content: .drawing(dc)
+            content: .shape(sc)
         )
         workspace.addNode(node)
         Task { try? await workspace.save() }
@@ -123,7 +123,7 @@ extension WorkspaceCanvasView {
         case "stickyNote": prefix = "Note"
         case "fileTree": prefix = "File Tree"
         case "text": prefix = "Text"
-        case "drawing": prefix = "Drawing"
+        case "shape": prefix = "Shape"
         default: prefix = "Node"
         }
 
@@ -133,7 +133,7 @@ extension WorkspaceCanvasView {
             case ("stickyNote", .stickyNote): return true
             case ("fileTree", .fileTree): return true
             case ("text", .text): return true
-            case ("drawing", .drawing): return true
+            case ("shape", .shape): return true
             default: return false
             }
         }

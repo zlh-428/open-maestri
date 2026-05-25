@@ -85,13 +85,13 @@ struct CanvasToolbar: View {
                     toggleDrawingTool("text")
                 }
 
-                // 8. 手绘工具
+                // 8. 图形工具（矩形）
                 FloatingToolButton(
                     icon: "pencil.and.scribble",
-                    tooltip: "canvas.toolbar.draw".localized,
-                    isActive: activeDrawingTool == "drawing"
+                    tooltip: "canvas.toolbar.shape".localized,
+                    isActive: activeDrawingTool == "shape"
                 ) {
-                    toggleDrawingTool("drawing")
+                    toggleDrawingTool("shape")
                 }
             }
             .padding(.horizontal, 8)
@@ -258,7 +258,7 @@ struct CanvasToolbar: View {
         case "stickyNote": prefix = "Note"
         case "fileTree": prefix = "File Tree"
         case "text": prefix = "Text"
-        case "drawing": prefix = "Drawing"
+        case "shape": prefix = "Shape"
         default: prefix = "Node"
         }
 
@@ -268,7 +268,7 @@ struct CanvasToolbar: View {
             case ("stickyNote", .stickyNote): return true
             case ("fileTree", .fileTree): return true
             case ("text", .text): return true
-            case ("drawing", .drawing): return true
+            case ("shape", .shape): return true
             default: return false
             }
         }
