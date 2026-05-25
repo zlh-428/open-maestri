@@ -418,9 +418,36 @@ struct CanvasNodesSwiftUIView: View {
                 },
                 onClose: onClose
             )
-        case .stroke, .freehand:
-            // 占位：渲染层将在后续 Task 中实现
-            Color.clear
+        case .stroke(let sc):
+            StrokeNodeSwiftUIView(
+                nodeId: node.id,
+                content: sc,
+                isSelected: isSelected,
+                zoom: zoom,
+                onContentChange: { newContent in
+                    NotificationCenter.default.post(
+                        name: .canvasNodeContentChanged,
+                        object: nil,
+                        userInfo: ["nodeId": node.id, "content": NodeContent.stroke(newContent)]
+                    )
+                },
+                onClose: onClose
+            )
+        case .freehand(let fc):
+            FreehandNodeSwiftUIView(
+                nodeId: node.id,
+                content: fc,
+                isSelected: isSelected,
+                zoom: zoom,
+                onContentChange: { newContent in
+                    NotificationCenter.default.post(
+                        name: .canvasNodeContentChanged,
+                        object: nil,
+                        userInfo: ["nodeId": node.id, "content": NodeContent.freehand(newContent)]
+                    )
+                },
+                onClose: onClose
+            )
         }
     }
 }
