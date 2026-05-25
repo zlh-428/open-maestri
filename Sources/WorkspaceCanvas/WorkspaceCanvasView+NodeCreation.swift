@@ -104,7 +104,7 @@ extension WorkspaceCanvasView {
         case "stickyNote": return CGSize(width: 300, height: 240)
         case "portal": return CGSize(width: 500, height: 380)
         case "fileTree": return CGSize(width: 360, height: 480)
-        case "text": return CGSize(width: 200, height: 60)
+        case "text": return CGSize(width: 60, height: 28)
         case "linkedFile": return CGSize(width: 300, height: 240)
         default: return CGSize(width: 400, height: 300)
         }
