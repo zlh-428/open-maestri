@@ -8,6 +8,8 @@ struct CanvasToolbar: View {
     @Binding var isConnecting: Bool
     /// 当前选中的绘制工具（nil = 选择模式，非绘制）
     @Binding var activeDrawingTool: String?
+    /// 当前选中的绘制子工具（shape 二级工具）
+    @Binding var activeShapeSubtool: String
     @Environment(AppState.self) private var appState
 
     @State private var showTerminalSheet = false
@@ -16,97 +18,112 @@ struct CanvasToolbar: View {
     @State private var showFileTreeSheet = false
 
     var body: some View {
-        // 居中悬浮工具栏（参考 Maestri 产品设计）
-        HStack(spacing: 0) {
-            Spacer()
+        VStack(spacing: 0) {
+            // 居中悬浮工具栏（参考 Maestri 产品设计）
+            HStack(spacing: 0) {
+                Spacer()
 
-            HStack(spacing: 2) {
-                // 1. 选择工具（鼠标指针）
-                FloatingToolButton(
-                    icon: "cursorarrow",
-                    tooltip: "canvas.toolbar.select".localized,
-                    isActive: activeDrawingTool == nil && !isConnecting
-                ) {
-                    activeDrawingTool = nil
-                    isConnecting = false
-                }
+                HStack(spacing: 2) {
+                    // 1. 选择工具（鼠标指针）
+                    FloatingToolButton(
+                        icon: "cursorarrow",
+                        tooltip: "canvas.toolbar.select".localized,
+                        isActive: activeDrawingTool == nil && !isConnecting
+                    ) {
+                        activeDrawingTool = nil
+                        isConnecting = false
+                    }
 
-                // 2. Terminal 工具
-                FloatingToolButton(
-                    icon: "apple.terminal",
-                    tooltip: "canvas.toolbar.terminal".localized,
-                    isActive: activeDrawingTool == "terminal"
-                ) {
-                    toggleDrawingTool("terminal")
-                }
+                    // 2. Terminal 工具
+                    FloatingToolButton(
+                        icon: "apple.terminal",
+                        tooltip: "canvas.toolbar.terminal".localized,
+                        isActive: activeDrawingTool == "terminal"
+                    ) {
+                        toggleDrawingTool("terminal")
+                    }
 
-                // 3. Note 工具
-                FloatingToolButton(
-                    icon: "text.document",
-                    tooltip: "canvas.toolbar.note".localized,
-                    isActive: activeDrawingTool == "stickyNote"
-                ) {
-                    toggleDrawingTool("stickyNote")
-                }
+                    // 3. Note 工具
+                    FloatingToolButton(
+                        icon: "text.document",
+                        tooltip: "canvas.toolbar.note".localized,
+                        isActive: activeDrawingTool == "stickyNote"
+                    ) {
+                        toggleDrawingTool("stickyNote")
+                    }
 
-                // 4. 链接文件（占位，暂未实现）
-                FloatingToolButton(
-                    icon: "paperclip",
-                    tooltip: "canvas.toolbar.text".localized,
-                    isActive: activeDrawingTool == "linkedFile"
-                ) {
-                    toggleDrawingTool("linkedFile")
-                }
+                    // 4. 链接文件（占位，暂未实现）
+                    FloatingToolButton(
+                        icon: "paperclip",
+                        tooltip: "canvas.toolbar.text".localized,
+                        isActive: activeDrawingTool == "linkedFile"
+                    ) {
+                        toggleDrawingTool("linkedFile")
+                    }
 
-                // 5. FileTree 工具
-                FloatingToolButton(
-                    icon: "folder",
-                    tooltip: "canvas.toolbar.filetree".localized,
-                    isActive: activeDrawingTool == "fileTree"
-                ) {
-                    toggleDrawingTool("fileTree")
-                }
+                    // 5. FileTree 工具
+                    FloatingToolButton(
+                        icon: "folder",
+                        tooltip: "canvas.toolbar.filetree".localized,
+                        isActive: activeDrawingTool == "fileTree"
+                    ) {
+                        toggleDrawingTool("fileTree")
+                    }
 
-                // 6. Portal 工具
-                FloatingToolButton(
-                    icon: "globe",
-                    tooltip: "canvas.toolbar.portal".localized,
-                    isActive: activeDrawingTool == "portal"
-                ) {
-                    toggleDrawingTool("portal")
-                }
+                    // 6. Portal 工具
+                    FloatingToolButton(
+                        icon: "globe",
+                        tooltip: "canvas.toolbar.portal".localized,
+                        isActive: activeDrawingTool == "portal"
+                    ) {
+                        toggleDrawingTool("portal")
+                    }
 
-                // 7. 格式（文本标签）
-                FloatingToolButton(
-                    icon: "textformat",
-                    tooltip: "canvas.toolbar.format".localized,
-                    isActive: activeDrawingTool == "text"
-                ) {
-                    toggleDrawingTool("text")
-                }
+                    // 7. 格式（文本标签）
+                    FloatingToolButton(
+                        icon: "textformat",
+                        tooltip: "canvas.toolbar.format".localized,
+                        isActive: activeDrawingTool == "text"
+                    ) {
+                        toggleDrawingTool("text")
+                    }
 
-                // 8. 图形工具（矩形）
-                FloatingToolButton(
-                    icon: "pencil.and.scribble",
-                    tooltip: "canvas.toolbar.shape".localized,
-                    isActive: activeDrawingTool == "shape"
-                ) {
-                    toggleDrawingTool("shape")
+                    // 8. 图形工具（矩形）
+                    FloatingToolButton(
+                        icon: "pencil.and.scribble",
+                        tooltip: "canvas.toolbar.shape".localized,
+                        isActive: activeDrawingTool == "shape"
+                    ) {
+                        toggleDrawingTool("shape")
+                    }
                 }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.white)
+                        .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
+                )
+
+                Spacer()
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
-            )
 
-            Spacer()
+            if activeDrawingTool == "shape" {
+                HStack(spacing: 0) {
+                    Spacer()
+                    ShapeSubtoolbar { subtool in
+                        activeShapeSubtool = subtool
+                    }
+                    Spacer()
+                }
+                .padding(.top, 6)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .animation(.easeInOut(duration: 0.15), value: activeDrawingTool)
+            }
         }
         .sheet(isPresented: $showTerminalSheet) {
             NewTerminalSheet(

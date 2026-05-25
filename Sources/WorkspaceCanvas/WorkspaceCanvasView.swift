@@ -10,6 +10,7 @@ struct WorkspaceCanvasView: View {
     @State private var zoom: CGFloat = 1.0
     @State private var isConnecting = false
     @State private var activeDrawingTool: String? = nil
+    @AppStorage("lastSelectedDrawingSubtool") private var activeShapeSubtool: String = "rect"
     @State private var textNodeEditingId: UUID? = nil
     @State private var showFloorOverview = false
     @State private var terminalToEdit: (nodeId: UUID, content: TerminalContent)? = nil
@@ -37,7 +38,7 @@ struct WorkspaceCanvasView: View {
     private var toolbarOverlay: some View {
         VStack(spacing: 0) {
             // 浮动工具栏（距窗口顶部 8px）
-            CanvasToolbar(workspace: workspace, isConnecting: $isConnecting, activeDrawingTool: $activeDrawingTool)
+            CanvasToolbar(workspace: workspace, isConnecting: $isConnecting, activeDrawingTool: $activeDrawingTool, activeShapeSubtool: $activeShapeSubtool)
                 .padding(.top, 8)
 
             // 二级操作工具栏（选中节点时显示）
@@ -171,7 +172,7 @@ struct WorkspaceCanvasView: View {
                 workspace: workspace,
                 isConnecting: isConnecting,
                 isDrawingMode: activeDrawingTool != nil,
-                drawingNodeType: activeDrawingTool ?? "terminal",
+                drawingNodeType: activeDrawingTool == "shape" ? activeShapeSubtool : (activeDrawingTool ?? "terminal"),
                 onViewportChanged: { origin, z in
                     canvasOrigin = origin
                     zoom = z
