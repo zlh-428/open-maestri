@@ -482,6 +482,20 @@ extension CanvasViewportView {
                     window?.makeFirstResponder(webView)
                 }
             }
+            // freehand 节点：内容区点击 → 启动拖动（无文字编辑，直接可拖）
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .freehand = node.content {
+                let startFrame = nodeCanvasFrames[id] ?? .zero
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+                return
+            }
+            // stroke 节点：内容区点击 → 启动拖动（控制点拖拽已在 mouseDown 最顶部处理）
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .stroke = node.content {
+                let startFrame = nodeCanvasFrames[id] ?? .zero
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+                return
+            }
             // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
 
         case .nodeRotateHandle(let id):
@@ -688,8 +702,11 @@ extension CanvasViewportView {
             needsDisplay = true
 
         // --- stroke 节点绘制模式（直线/箭头）---
-        case .drawingStroke:
+        case .drawingStroke(let start):
             drawingCurrentPoint = loc
+            // 实时同步起终点到 snapGuideView 绘制预览
+            snapGuideView?.strokePreviewStart = start
+            snapGuideView?.strokePreviewEnd = loc
             needsDisplay = true
 
         // --- freehand 节点绘制模式（自由笔，采样间距 4pt）---
@@ -702,6 +719,8 @@ extension CanvasViewportView {
                 interaction = .drawingFreehand(points: pts)
             }
             drawingCurrentPoint = loc
+            // 实时同步采样点到 snapGuideView 绘制预览
+            snapGuideView?.freehandPreviewPoints = pts
             needsDisplay = true
 
         // --- 节点绘制模式（网格吸附 + haptic）---
@@ -992,6 +1011,9 @@ extension CanvasViewportView {
             needsDisplay = true
 
         case .drawingStroke(let start):
+            // 清除 stroke 预览
+            snapGuideView?.strokePreviewStart = nil
+            snapGuideView?.strokePreviewEnd = nil
             let canvasStart = screenToCanvas(start)
             guard let current = drawingCurrentPoint else {
                 needsDisplay = true
@@ -1027,6 +1049,8 @@ extension CanvasViewportView {
             needsDisplay = true
 
         case .drawingFreehand(let pts):
+            // 清除 freehand 预览
+            snapGuideView?.freehandPreviewPoints = []
             guard pts.count >= 2 else {
                 drawingCurrentPoint = nil
                 needsDisplay = true

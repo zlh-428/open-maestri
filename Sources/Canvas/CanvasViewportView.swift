@@ -808,7 +808,9 @@ final class CanvasViewportView: NSView {
     // MARK: - 节点绘制模式状态
 
     var isInDrawingMode: Bool = false
-    var drawingNodeType: String = "terminal"
+    var drawingNodeType: String = "terminal" {
+        didSet { snapGuideView?.drawingNodeType = drawingNodeType }
+    }
     var onNodeDrawn: ((String, CGRect) -> Void)?
     /// freehand 绘制完成回调（nodeType, 归一化点序列, 边界矩形画布坐标）
     var onFreehandDrawn: ((String, [CGPoint], CGRect) -> Void)?
