@@ -129,6 +129,18 @@ struct TextFieldRepresentable: NSViewRepresentable {
         if tf.font != newFont { tf.font = newFont }
         let newColor = NSColor(hex: content.color) ?? NSColor.labelColor
         if tf.textColor != newColor { tf.textColor = newColor }
+
+        // 编辑中：同步更新 field editor（NSTextView）的 typingAttributes，
+        // 否则 tf.font/textColor 修改对正在编辑的文字不可见
+        if let editor = tf.currentEditor() as? NSTextView {
+            var attrs = editor.typingAttributes
+            attrs[.font] = newFont
+            attrs[.foregroundColor] = newColor
+            editor.typingAttributes = attrs
+            // 对已有文字全量应用新样式
+            let range = NSRange(location: 0, length: editor.string.count)
+            editor.textStorage?.addAttributes([.font: newFont, .foregroundColor: newColor], range: range)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -156,7 +168,7 @@ struct TextFieldRepresentable: NSViewRepresentable {
             NotificationCenter.default.post(
                 name: .textNodeDidEndEditing,
                 object: nil,
-                userInfo: ["nodeId": nodeId, "text": tf.stringValue]
+                userInfo: ["nodeId": nodeId, "text": tf.stringValue, "textField": tf]
             )
         }
     }
