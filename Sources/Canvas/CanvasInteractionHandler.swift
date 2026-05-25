@@ -324,6 +324,15 @@ extension CanvasViewportView {
                 object: nil,
                 userInfo: ["nodeId": id]
             )
+            // shape 节点：启动 mayDragNode 以支持拖拽；
+            // contentTarget 非 nil 标记"已选中状态下点击"，mouseUp 据此触发编辑
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .shape = node.content {
+                let startFrame = nodeCanvasFrames[id] ?? .zero
+                let target: NSView? = wasAlreadySelected ? (nodesHostingView ?? self) : nil
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: target)
+                return
+            }
             // 如果节点已经处于选中状态，将鼠标事件路由给终端视图（支持文字选中）
             if wasAlreadySelected,
                let provider = TerminalManager.shared.providers[id],
@@ -799,7 +808,7 @@ extension CanvasViewportView {
 
         switch interaction {
 
-        case .mayDragNode(let id, _, _, _):
+        case .mayDragNode(let id, _, _, let contentTarget):
             // 没有发生拖动 = 点击，发送节点激活通知
             NotificationCenter.default.post(
                 name: .canvasNodeActivated,
@@ -816,8 +825,8 @@ extension CanvasViewportView {
                     userInfo: ["nodeId": id]
                 )
             }
-            // shape 节点：已选中时再次单击 → 进入文字编辑态
-            if selectedNodeIds.contains(id),
+            // shape 节点：contentTarget != nil 表示"已选中状态下再次点击" → 进入文字编辑态
+            if contentTarget != nil,
                let node = currentNodes.first(where: { $0.id == id }),
                case .shape = node.content {
                 NotificationCenter.default.post(
@@ -896,8 +905,10 @@ extension CanvasViewportView {
                 height: abs(snappedCurrentY - snappedStartY)
             )
 
+            // text 节点只允许点击创建，不允许拖拽绘制
+            let forceClickCreate = (drawingNodeType == "text")
             // 最小绘制尺寸判定（画布坐标 20pt）
-            if snappedRect.width > 20 && snappedRect.height > 20 {
+            if !forceClickCreate && snappedRect.width > 20 && snappedRect.height > 20 {
                 onNodeDrawn?(drawingNodeType, snappedRect)
             } else {
                 // 点击创建：使用吸附后的起点作为中心

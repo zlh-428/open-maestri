@@ -303,9 +303,9 @@ struct TextContent: Codable, Equatable {
 
     init(text: String = "") {
         self.text = text
-        self.fontSize = 16
+        self.fontSize = 18
         self.fontWeight = "regular"
-        self.color = "#000000"
+        self.color = "#1a1a1a"
         self.alignment = "left"
         self.fontFamily = "sans"
     }

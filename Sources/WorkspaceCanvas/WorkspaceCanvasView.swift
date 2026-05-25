@@ -424,21 +424,33 @@ struct WorkspaceCanvasView: View {
                   let idx    = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
                   case .text(var tc) = workspace.nodes[idx].content else { return }
             tc.text = text
-            workspace.nodes[idx].content = .text(tc)
-            let measured = tf.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: tc.fontSize + 24))
-            let newWidth  = max(60, measured.width + 16)
-            let newHeight = tc.fontSize + 12
+            // 重新赋值整个 nodes 数组元素，触发 @Observable 更新
+            var updated = workspace.nodes[idx]
+            updated.content = .text(tc)
+            workspace.nodes[idx] = updated
+            let measured = tf.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: tc.fontSize + 32))
+            let newWidth  = max(80, measured.width + 20)
+            let newHeight = tc.fontSize + 16
             workspace.updateNodeFrame(id: nodeId, frame: CGRect(
                 origin: workspace.nodes[idx].frame.origin,
                 size: CGSize(width: newWidth, height: newHeight)
             ))
         }
         .onReceive(NotificationCenter.default.publisher(for: .textNodeDidEndEditing)) { notif in
-            guard let nodeId = notif.userInfo?["nodeId"] as? UUID else { return }
-            if let node = workspace.nodes.first(where: { $0.id == nodeId }),
-               case .text(let tc) = node.content, tc.text.isEmpty {
-                workspace.removeNode(id: nodeId)
-                selectedNodeIds.removeAll()
+            guard let nodeId = notif.userInfo?["nodeId"] as? UUID,
+                  let text   = notif.userInfo?["text"] as? String else { return }
+            if let idx = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+               case .text(var tc) = workspace.nodes[idx].content {
+                if text.isEmpty {
+                    workspace.removeNode(id: nodeId)
+                    selectedNodeIds.removeAll()
+                } else {
+                    // 确保最终文字写回 model（防止 textNodeDidChange 遗漏最后一次输入）
+                    tc.text = text
+                    var updated = workspace.nodes[idx]
+                    updated.content = .text(tc)
+                    workspace.nodes[idx] = updated
+                }
                 Task { try? await workspace.save() }
             }
             textNodeEditingId = nil

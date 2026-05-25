@@ -34,7 +34,7 @@ extension WorkspaceCanvasView {
               case .text(var tc) = workspace.nodes[idx].content else { return }
         tc.fontSize = size
         workspace.nodes[idx].content = .text(tc)
-        let newHeight = tc.fontSize + 12
+        let newHeight = tc.fontSize + 16
         workspace.updateNodeFrame(id: nodeId, frame: CGRect(
             origin: workspace.nodes[idx].frame.origin,
             size: CGSize(width: workspace.nodes[idx].frame.width, height: newHeight)

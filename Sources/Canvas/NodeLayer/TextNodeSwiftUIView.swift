@@ -30,18 +30,23 @@ struct TextNodeSwiftUIView: View {
 
             if isEditing {
                 TextFieldRepresentable(nodeId: nodeId, content: content)
-                    .padding(6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
             } else if showPlaceholder {
                 Text("Text")
                     .font(resolvedFont)
-                    .foregroundStyle(Color.gray.opacity(0.5))
-                    .padding(6)
+                    .tracking(0.3)
+                    .foregroundStyle(Color.gray.opacity(0.4))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             } else {
                 Text(content.text)
                     .font(resolvedFont)
+                    .tracking(0.3)
                     .foregroundStyle(Color(hex: content.color) ?? .primary)
-                    .padding(6)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     .lineLimit(1)
             }
@@ -89,9 +94,11 @@ struct TextFieldRepresentable: NSViewRepresentable {
     }
 
     func updateNSView(_ tf: NSTextField, context: Context) {
+        // 样式（字体/颜色）始终应用，即使编辑中
+        applyStyle(to: tf)
+        // 文字内容只在非编辑中同步（避免覆盖用户正在输入的内容）
         if tf.currentEditor() == nil {
             tf.stringValue = content.text
-            applyStyle(to: tf)
         }
     }
 
