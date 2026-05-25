@@ -8,12 +8,12 @@ enum NodeContent: Codable, Equatable {
     case portal(PortalContent)
     case fileTree(FileTreeContent)
     case text(TextContent)
-    case drawing(DrawingContent)
+    case shape(ShapeContent)
 
     // MARK: - Codable
 
     private enum TypeKeys: String, CodingKey {
-        case terminal, stickyNote, portal, fileTree, text, drawing
+        case terminal, stickyNote, portal, fileTree, text, shape
     }
 
     private enum InnerKey: String, CodingKey {
@@ -37,9 +37,9 @@ enum NodeContent: Codable, Equatable {
         } else if container.contains(.text) {
             let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .text)
             self = .text(try inner.decode(TextContent.self, forKey: ._0))
-        } else if container.contains(.drawing) {
-            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .drawing)
-            self = .drawing(try inner.decode(DrawingContent.self, forKey: ._0))
+        } else if container.contains(.shape) {
+            let inner = try container.nestedContainer(keyedBy: InnerKey.self, forKey: .shape)
+            self = .shape(try inner.decode(ShapeContent.self, forKey: ._0))
         } else {
             throw DecodingError.dataCorruptedError(
                 forKey: TypeKeys.terminal,
@@ -67,8 +67,8 @@ enum NodeContent: Codable, Equatable {
         case .text(let c):
             var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .text)
             try inner.encode(c, forKey: ._0)
-        case .drawing(let c):
-            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .drawing)
+        case .shape(let c):
+            var inner = container.nestedContainer(keyedBy: InnerKey.self, forKey: .shape)
             try inner.encode(c, forKey: ._0)
         }
     }
@@ -82,7 +82,7 @@ enum NodeContent: Codable, Equatable {
     var isConnectable: Bool {
         switch self {
         case .terminal, .stickyNote, .portal: return true
-        case .fileTree, .text, .drawing:      return false
+        case .fileTree, .text, .shape:         return false
         }
     }
 }
@@ -321,28 +321,41 @@ struct TextContent: Codable, Equatable {
     }
 }
 
-// MARK: - Drawing Content
+// MARK: - Shape Content
 
-/// 画布手绘区域节点
-struct DrawingContent: Codable, Equatable {
-    var strokes: [DrawingStroke]
-    var backgroundColor: String // hex, 默认透明
+struct ShapeContent: Codable, Equatable {
+    var shapeType: ShapeType
+    var fillColor: String
+    var strokeColor: String
+    var strokeWidth: CGFloat
+    var strokeStyle: ShapeStrokeStyle
+    var fillStyle: ShapeFillStyle
+    var text: String
+    var fontSize: CGFloat
+    var rotation: CGFloat
 
     init() {
-        self.strokes = []
-        self.backgroundColor = "#FFFFFF00"
+        self.shapeType   = .rect
+        self.fillColor   = "#FFE4E4"
+        self.strokeColor = "#3B82F6"
+        self.strokeWidth = 2.0
+        self.strokeStyle = .solid
+        self.fillStyle   = .solid
+        self.text        = ""
+        self.fontSize    = 16
+        self.rotation    = 0
     }
 }
 
-/// 单条笔画
-struct DrawingStroke: Codable, Equatable {
-    var points: [[CGFloat]]     // [[x, y], [x, y], ...]
-    var color: String           // hex
-    var width: CGFloat
+enum ShapeType: String, Codable {
+    case rect
+    // 未来扩展：case ellipse, diamond, triangle
+}
 
-    init(points: [[CGFloat]] = [], color: String = "#000000", width: CGFloat = 2) {
-        self.points = points
-        self.color = color
-        self.width = width
-    }
+enum ShapeStrokeStyle: String, Codable {
+    case solid, dashed, dotted
+}
+
+enum ShapeFillStyle: String, Codable {
+    case solid, none, hatched, crossHatched
 }
