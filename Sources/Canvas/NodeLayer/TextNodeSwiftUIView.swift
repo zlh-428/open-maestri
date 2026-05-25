@@ -81,18 +81,17 @@ struct TextFieldRepresentable: NSViewRepresentable {
         tf.cell?.isScrollable = true
         tf.cell?.wraps = false
         tf.delegate = context.coordinator
+        // 首次创建时请求聚焦，仅触发一次
+        DispatchQueue.main.async {
+            tf.window?.makeFirstResponder(tf)
+        }
         return tf
     }
 
     func updateNSView(_ tf: NSTextField, context: Context) {
         if tf.currentEditor() == nil {
             tf.stringValue = content.text
-        }
-        applyStyle(to: tf)
-        DispatchQueue.main.async {
-            if tf.currentEditor() == nil {
-                tf.window?.makeFirstResponder(tf)
-            }
+            applyStyle(to: tf)
         }
     }
 
@@ -115,17 +114,14 @@ struct TextFieldRepresentable: NSViewRepresentable {
                 .withDesign(.monospaced) ?? NSFont.systemFont(ofSize: size).fontDescriptor
         default:
             baseDescriptor = NSFontDescriptor.preferredFontDescriptor(forTextStyle: .body)
-                .withDesign(.default) ?? NSFont.systemFont(ofSize: size).fontDescriptor
         }
         let weightedDescriptor = baseDescriptor.addingAttributes(
             [.traits: [NSFontDescriptor.TraitKey.weight: weight]]
         )
-        tf.font = NSFont(descriptor: weightedDescriptor, size: size) ?? NSFont.systemFont(ofSize: size)
-        if let hexColor = NSColor(hex: content.color) {
-            tf.textColor = hexColor
-        } else {
-            tf.textColor = .labelColor
-        }
+        let newFont = NSFont(descriptor: weightedDescriptor, size: size) ?? NSFont.systemFont(ofSize: size)
+        if tf.font != newFont { tf.font = newFont }
+        let newColor = NSColor(hex: content.color) ?? NSColor.labelColor
+        if tf.textColor != newColor { tf.textColor = newColor }
     }
 
     func makeCoordinator() -> Coordinator {
