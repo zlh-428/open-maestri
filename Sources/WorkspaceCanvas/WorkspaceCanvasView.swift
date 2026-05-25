@@ -111,6 +111,34 @@ struct WorkspaceCanvasView: View {
                     .contentShape(Rectangle())
                     .transition(.opacity.combined(with: .move(edge: .top)))
                     .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeContentType == "stroke",
+                          let strokeId = selectedNodeIds.first,
+                          let sc = strokeContent(nodeId: strokeId) {
+                    StrokeContextToolbar(
+                        nodeId: strokeId,
+                        content: sc,
+                        onContentChange: { newContent in setStrokeContent(nodeId: strokeId, content: newContent) },
+                        onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeContentType == "freehand",
+                          let freehandId = selectedNodeIds.first,
+                          let fc = freehandContent(nodeId: freehandId) {
+                    FreehandContextToolbar(
+                        nodeId: freehandId,
+                        content: fc,
+                        onContentChange: { newContent in setFreehandContent(nodeId: freehandId, content: newContent) },
+                        onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
                 } else {
                     NodeContextToolbar(
                         onEdit: { editSelectedNode() },
