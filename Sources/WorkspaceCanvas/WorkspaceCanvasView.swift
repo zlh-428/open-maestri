@@ -10,6 +10,7 @@ struct WorkspaceCanvasView: View {
     @State private var zoom: CGFloat = 1.0
     @State private var isConnecting = false
     @State private var activeDrawingTool: String? = nil
+    @State private var textNodeEditingId: UUID? = nil
     @State private var showFloorOverview = false
     @State private var terminalToEdit: (nodeId: UUID, content: TerminalContent)? = nil
     @State private var selectedNodeIds: Set<UUID> = []
@@ -71,6 +72,25 @@ struct WorkspaceCanvasView: View {
                         onToggleFormatted: { toggleNoteFormatted(nodeId: noteId) },
                         onDelete: { deleteSelectedNodes() },
                         onSaveAs: { saveNoteAs(nodeId: noteId) }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeContentType == "text",
+                          let textId = selectedNodeIds.first {
+                    TextContextToolbar(
+                        nodeId: textId,
+                        fontSize: textFontSize(nodeId: textId),
+                        fontWeight: textFontWeight(nodeId: textId),
+                        fontFamily: textFontFamily(nodeId: textId),
+                        currentColor: textCurrentColor(nodeId: textId),
+                        onFontSize: { size in setTextFontSize(nodeId: textId, size: size) },
+                        onFontWeight: { weight in setTextFontWeight(nodeId: textId, weight: weight) },
+                        onFontFamily: { family in setTextFontFamily(nodeId: textId, family: family) },
+                        onColor: { color in setTextColor(nodeId: textId, color: color) },
+                        onDelete: { deleteSelectedNodes() }
                     )
                     .fixedSize()
                     .padding(.bottom, 36)
@@ -183,6 +203,9 @@ struct WorkspaceCanvasView: View {
                 onSelectionChanged: { ids, frame in
                     selectedNodeIds = ids
                     selectedNodeScreenFrame = frame
+                    if let editingId = textNodeEditingId, !ids.contains(editingId) {
+                        textNodeEditingId = nil
+                    }
                 },
                 onFilesDropped: { paths, canvasPoint in
                     handleFilesDropped(paths: paths, at: canvasPoint)
@@ -380,7 +403,34 @@ struct WorkspaceCanvasView: View {
             }
             .environment(\.locale, LocalizationManager.shared.locale)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .textNodeDidChange)) { notif in
+            guard let nodeId = notif.userInfo?["nodeId"] as? UUID,
+                  let text   = notif.userInfo?["text"] as? String,
+                  let tf     = notif.userInfo?["textField"] as? NSTextField,
+                  let idx    = workspace.nodes.firstIndex(where: { $0.id == nodeId }),
+                  case .text(var tc) = workspace.nodes[idx].content else { return }
+            tc.text = text
+            workspace.nodes[idx].content = .text(tc)
+            let measured = tf.sizeThatFits(CGSize(width: CGFloat.greatestFiniteMagnitude, height: tc.fontSize + 24))
+            let newWidth  = max(60, measured.width + 16)
+            let newHeight = tc.fontSize + 12
+            workspace.updateNodeFrame(id: nodeId, frame: CGRect(
+                origin: workspace.nodes[idx].frame.origin,
+                size: CGSize(width: newWidth, height: newHeight)
+            ))
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .textNodeDidEndEditing)) { notif in
+            guard let nodeId = notif.userInfo?["nodeId"] as? UUID else { return }
+            if let node = workspace.nodes.first(where: { $0.id == nodeId }),
+               case .text(let tc) = node.content, tc.text.isEmpty {
+                workspace.removeNode(id: nodeId)
+                selectedNodeIds.removeAll()
+                Task { try? await workspace.save() }
+            }
+            textNodeEditingId = nil
+        }
         .autosave(workspace: workspace)
+        .environment(\.textNodeEditingId, textNodeEditingId)
     }
 
     // MARK: - 拖拽绘制创建节点
