@@ -64,7 +64,7 @@ struct FreehandNodeSwiftUIView: View {
         return path
     }
 
-    // MARK: - 选中控制点层（8个 resize 控制点 + 旋转手柄，与 ShapeNodeSwiftUIView 一致）
+    // MARK: - 选中控制点层（8个 resize 控制点；旋转手柄暂不显示，待旋转交互实现后启用）
 
     private var controlPointsLayer: some View {
         GeometryReader { geo in
@@ -82,7 +82,7 @@ struct FreehandNodeSwiftUIView: View {
                     controlDot(at: CGPoint(x: 0,   y: h/2), r: r)
                     controlDot(at: CGPoint(x: w,   y: h/2), r: r)
                 }
-                rotationHandle(w: w)
+                // 旋转手柄暂不显示，待旋转交互实现后启用
             }
         }
     }
@@ -93,22 +93,6 @@ struct FreehandNodeSwiftUIView: View {
             .overlay(Circle().strokeBorder(Color.blue, lineWidth: 1.5))
             .frame(width: r * 2, height: r * 2)
             .position(point)
-    }
-
-    private func rotationHandle(w: CGFloat) -> some View {
-        let lineLength: CGFloat = 20
-        let dotR: CGFloat = 5
-        return ZStack {
-            Rectangle()
-                .fill(Color.blue)
-                .frame(width: 1, height: lineLength)
-                .position(x: w/2, y: -(lineLength/2))
-            Circle()
-                .fill(.white)
-                .overlay(Circle().strokeBorder(Color.blue, lineWidth: 1.5))
-                .frame(width: dotR * 2, height: dotR * 2)
-                .position(x: w/2, y: -lineLength - dotR)
-        }
     }
 
     // MARK: - 颜色解析

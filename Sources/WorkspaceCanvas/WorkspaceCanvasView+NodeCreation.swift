@@ -57,7 +57,6 @@ extension WorkspaceCanvasView {
         sc.shapeType = shapeType
         if let color = UserDefaults.standard.string(forKey: "drawingDefaultColor") {
             sc.strokeColor = color
-            sc.fillColor = color
         }
         if let width = UserDefaults.standard.object(forKey: "drawingDefaultStrokeWidth") as? Double {
             sc.strokeWidth = CGFloat(width)

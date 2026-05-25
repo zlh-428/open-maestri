@@ -1033,10 +1033,15 @@ extension CanvasViewportView {
                 break
             }
             let canvasPts = pts.map { screenToCanvas($0) }
-            let minX = canvasPts.map(\.x).min()!
-            let minY = canvasPts.map(\.y).min()!
-            let maxX = canvasPts.map(\.x).max()!
-            let maxY = canvasPts.map(\.y).max()!
+            guard let minX = canvasPts.map(\.x).min(),
+                  let minY = canvasPts.map(\.y).min(),
+                  let maxX = canvasPts.map(\.x).max(),
+                  let maxY = canvasPts.map(\.y).max() else {
+                drawingCurrentPoint = nil
+                interaction = .idle
+                needsDisplay = true
+                break
+            }
             let padding: CGFloat = 8
             let boundingRect = CGRect(
                 x: minX - padding, y: minY - padding,
