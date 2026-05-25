@@ -403,12 +403,20 @@ struct CanvasNodesSwiftUIView: View {
                 onActivated: onActivated, onClose: onClose,
                 onRename: onRename, onDuplicate: onDuplicate, onLockToggle: onLockToggle
             )
-        case .drawing(let dc):
-            DrawingNodeSwiftUIView(
-                nodeId: node.id, content: dc, isSelected: isSelected, isLocked: isLocked,
+        case .shape(let sc):
+            ShapeNodeSwiftUIView(
+                nodeId: node.id,
+                content: sc,
+                isSelected: isSelected,
                 zoom: zoom,
-                onActivated: onActivated, onClose: onClose,
-                onLockToggle: onLockToggle
+                onContentChange: { newContent in
+                    NotificationCenter.default.post(
+                        name: .canvasNodeContentChanged,
+                        object: nil,
+                        userInfo: ["nodeId": node.id, "content": NodeContent.shape(newContent)]
+                    )
+                },
+                onClose: onClose
             )
         }
     }
