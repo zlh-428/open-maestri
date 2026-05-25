@@ -484,6 +484,7 @@ struct WorkspaceCanvasView: View {
             guard let _ = notif.userInfo?["nodeId"] as? UUID else { return }
             Task { try? await workspace.save() }
         }
+        .strokePointDragHandler(workspace: workspace)
         .autosave(workspace: workspace)
         .environment(\.textNodeEditingId, textNodeEditingId)
     }
@@ -1019,6 +1020,31 @@ private struct AutosaveModifier: ViewModifier {
 private extension View {
     func autosave(workspace: WorkspaceManager) -> some View {
         modifier(AutosaveModifier(workspace: workspace))
+    }
+}
+
+// MARK: - Stroke Point Drag Modifier
+
+/// 处理 stroke 控制点拖拽结束时的 workspace 持久化。
+/// 独立提取为 ViewModifier，避免 body 链过长导致 Swift 编译器类型推断超时。
+private struct StrokePointDragModifier: ViewModifier {
+    @Bindable var workspace: WorkspaceManager
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .strokePointDragDidEnd)) { notif in
+                guard let id = notif.userInfo?["nodeId"] as? UUID,
+                      let nodeContent = notif.userInfo?["content"] as? NodeContent,
+                      let idx = workspace.nodes.firstIndex(where: { $0.id == id }) else { return }
+                workspace.nodes[idx].content = nodeContent
+                Task { try? await workspace.save() }
+            }
+    }
+}
+
+private extension View {
+    func strokePointDragHandler(workspace: WorkspaceManager) -> some View {
+        modifier(StrokePointDragModifier(workspace: workspace))
     }
 }
 

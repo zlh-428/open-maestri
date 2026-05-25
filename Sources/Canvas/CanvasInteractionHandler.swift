@@ -34,6 +34,8 @@ enum CanvasInteraction {
     case drawingStroke(start: CGPoint)
     /// 正在绘制 freehand（自由笔）节点；points 为屏幕坐标采样序列
     case drawingFreehand(points: [CGPoint])
+    /// 正在拖拽 stroke 控制点（起点/终点/贝塞尔控制点）
+    case draggingStrokePoint(UUID, pointRole: String, startContent: StrokeContent)
     /// 鼠标正在与节点内容区交互（如终端文字选中）；事件转发给 contentTarget
     case contentInteraction(UUID, contentTarget: NSView)
 }
@@ -247,6 +249,31 @@ extension CanvasViewportView {
 
     override func mouseDown(with event: NSEvent) {
         let loc = convert(event.locationInWindow, from: nil)
+
+        // 0. stroke 控制点优先命中检测（必须在选中状态下，且最高优先级）
+        for node in currentNodes.reversed() {
+            guard selectedNodeIds.contains(node.id),
+                  case .stroke(let sc) = node.content,
+                  let frame = nodeCanvasFrames[node.id] else { continue }
+            let screenFrame = canvasRectToScreen(frame)
+            var candidates: [(role: String, pt: CGPoint)] = [
+                ("start", CGPoint(x: screenFrame.minX + sc.startPoint.x * screenFrame.width,
+                                   y: screenFrame.minY + sc.startPoint.y * screenFrame.height)),
+                ("end",   CGPoint(x: screenFrame.minX + sc.endPoint.x * screenFrame.width,
+                                   y: screenFrame.minY + sc.endPoint.y * screenFrame.height)),
+            ]
+            if let cp = sc.controlPoint {
+                candidates.append(("control",
+                    CGPoint(x: screenFrame.minX + cp.x * screenFrame.width,
+                             y: screenFrame.minY + cp.y * screenFrame.height)))
+            }
+            for (role, pt) in candidates {
+                if hypot(loc.x - pt.x, loc.y - pt.y) < 8 {
+                    interaction = .draggingStrokePoint(node.id, pointRole: role, startContent: sc)
+                    return
+                }
+            }
+        }
 
         // 1. Space+点击 → 平移模式
         if isSpaceHeld {
@@ -737,6 +764,30 @@ extension CanvasViewportView {
                 contentTarget.mouseDragged(with: syntheticEvent)
             }
 
+        // --- stroke 控制点拖拽 ---
+        case .draggingStrokePoint(let id, let role, let origContent):
+            guard let frame = nodeCanvasFrames[id] else { break }
+            let canvasLoc = screenToCanvas(loc)
+            let w = frame.width
+            let h = frame.height
+            let normalized = CGPoint(
+                x: w > 0 ? (canvasLoc.x - frame.minX) / w : 0.5,
+                y: h > 0 ? (canvasLoc.y - frame.minY) / h : 0.5
+            )
+            var updated = origContent
+            switch role {
+            case "start":   updated.startPoint = normalized
+            case "end":     updated.endPoint = normalized
+            case "control": updated.controlPoint = normalized
+            default: break
+            }
+            let newContent = NodeContent.stroke(updated)
+            NotificationCenter.default.post(
+                name: .canvasNodeContentChanged,
+                object: nil,
+                userInfo: ["nodeId": id, "content": newContent]
+            )
+
         // --- idle（连线工具跟踪）---
         case .idle:
             if connectingFromNodeId != nil {
@@ -1062,6 +1113,31 @@ extension CanvasViewportView {
             ) {
                 contentTarget.mouseUp(with: syntheticEvent)
             }
+
+        case .draggingStrokePoint(let id, let role, let origContent):
+            // 计算最终归一化坐标（与 mouseDragged 逻辑一致）
+            let loc2 = convert(event.locationInWindow, from: nil)
+            var finalContent = origContent
+            if let frame = nodeCanvasFrames[id] {
+                let canvasLoc2 = screenToCanvas(loc2)
+                let w = frame.width
+                let h = frame.height
+                let normalized = CGPoint(
+                    x: w > 0 ? (canvasLoc2.x - frame.minX) / w : 0.5,
+                    y: h > 0 ? (canvasLoc2.y - frame.minY) / h : 0.5
+                )
+                switch role {
+                case "start":   finalContent.startPoint = normalized
+                case "end":     finalContent.endPoint = normalized
+                case "control": finalContent.controlPoint = normalized
+                default: break
+                }
+            }
+            NotificationCenter.default.post(
+                name: .strokePointDragDidEnd,
+                object: nil,
+                userInfo: ["nodeId": id, "content": NodeContent.stroke(finalContent)]
+            )
 
         case .panCanvas:
             if isSpaceHeld { NSCursor.openHand.set() } else { NSCursor.arrow.set() }
