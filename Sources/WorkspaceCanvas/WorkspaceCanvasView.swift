@@ -540,8 +540,14 @@ struct WorkspaceCanvasView: View {
             createFileTreeAtFrame(frame)
         case "text":
             createTextAtFrame(frame)
+        case "rect":
+            createShapeAtFrame(frame, shapeType: .rect)
+        case "ellipse":
+            createShapeAtFrame(frame, shapeType: .ellipse)
+        case "diamond":
+            createShapeAtFrame(frame, shapeType: .diamond)
         case "shape":
-            createShapeAtFrame(frame)
+            createShapeAtFrame(frame, shapeType: .rect)
         default:
             break
         }

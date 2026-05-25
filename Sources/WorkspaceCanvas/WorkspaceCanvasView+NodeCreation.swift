@@ -52,12 +52,78 @@ extension WorkspaceCanvasView {
         )
     }
 
-    func createShapeAtFrame(_ frame: CGRect) {
-        let sc = ShapeContent()
+    func createShapeAtFrame(_ frame: CGRect, shapeType: ShapeType = .rect) {
+        var sc = ShapeContent()
+        sc.shapeType = shapeType
+        if let color = UserDefaults.standard.string(forKey: "drawingDefaultColor") {
+            sc.strokeColor = color
+            sc.fillColor = color
+        }
+        if let width = UserDefaults.standard.object(forKey: "drawingDefaultStrokeWidth") as? Double {
+            sc.strokeWidth = CGFloat(width)
+        }
+        if let styleRaw = UserDefaults.standard.string(forKey: "drawingDefaultStrokeStyle"),
+           let style = ShapeStrokeStyle(rawValue: styleRaw) {
+            sc.strokeStyle = style
+        }
+        if let fillRaw = UserDefaults.standard.string(forKey: "drawingDefaultFillStyle"),
+           let fill = ShapeFillStyle(rawValue: fillRaw) {
+            sc.fillStyle = fill
+        }
         let node = CanvasNode(
             frame: frame,
             content: .shape(sc)
         )
+        workspace.addNode(node)
+        Task { try? await workspace.save() }
+    }
+
+    func createStrokeAtFrame(_ frame: CGRect, strokeType: StrokeType,
+                              startCanvas: CGPoint, endCanvas: CGPoint) {
+        var sc = StrokeContent(strokeType: strokeType)
+        let w = frame.width
+        let h = frame.height
+        sc.startPoint = CGPoint(
+            x: w > 0 ? (startCanvas.x - frame.minX) / w : 0,
+            y: h > 0 ? (startCanvas.y - frame.minY) / h : 0.5
+        )
+        sc.endPoint = CGPoint(
+            x: w > 0 ? (endCanvas.x - frame.minX) / w : 1,
+            y: h > 0 ? (endCanvas.y - frame.minY) / h : 0.5
+        )
+        if strokeType == .arrow {
+            sc.controlPoint = CGPoint(
+                x: (sc.startPoint.x + sc.endPoint.x) / 2,
+                y: (sc.startPoint.y + sc.endPoint.y) / 2
+            )
+        }
+        if let color = UserDefaults.standard.string(forKey: "drawingDefaultColor") {
+            sc.strokeColor = color
+        }
+        if let width = UserDefaults.standard.object(forKey: "drawingDefaultStrokeWidth") as? Double {
+            sc.strokeWidth = CGFloat(width)
+        }
+        if let styleRaw = UserDefaults.standard.string(forKey: "drawingDefaultStrokeStyle"),
+           let style = ShapeStrokeStyle(rawValue: styleRaw) {
+            sc.strokeStyle = style
+        }
+        let node = CanvasNode(frame: frame, content: .stroke(sc))
+        workspace.addNode(node)
+        Task { try? await workspace.save() }
+    }
+
+    func createFreehandFromPoints(_ normalizedPoints: [CGPoint],
+                                   boundingFrame: CGRect,
+                                   freehandType: FreehandType) {
+        var fc = FreehandContent(freehandType: freehandType)
+        fc.points = normalizedPoints
+        if let color = UserDefaults.standard.string(forKey: "drawingDefaultColor") {
+            fc.strokeColor = color
+        }
+        if let width = UserDefaults.standard.object(forKey: "drawingDefaultStrokeWidth") as? Double {
+            fc.strokeWidth = CGFloat(width)
+        }
+        let node = CanvasNode(frame: boundingFrame, content: .freehand(fc))
         workspace.addNode(node)
         Task { try? await workspace.save() }
     }
@@ -111,6 +177,9 @@ extension WorkspaceCanvasView {
         case "fileTree": return CGSize(width: 360, height: 480)
         case "text": return CGSize(width: 45, height: 35)
         case "linkedFile": return CGSize(width: 300, height: 240)
+        case "ellipse", "diamond": return CGSize(width: 200, height: 160)
+        case "stroke_line", "stroke_arrow": return CGSize(width: 200, height: 60)
+        case "freehand_pen", "freehand_highlighter": return CGSize(width: 200, height: 100)
         default: return CGSize(width: 400, height: 300)
         }
     }
