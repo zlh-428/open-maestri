@@ -67,4 +67,8 @@ extension Notification.Name {
     static let portalURLDidChange        = Notification.Name("OpenMaestri.portalURLDidChange")
     /// Note 格式化模式切换：userInfo 含 "nodeId" UUID, "isPreviewing" Bool
     static let noteFormattedToggled      = Notification.Name("OpenMaestri.noteFormattedToggled")
+    /// Text 节点内容变更（实时）：userInfo 含 "nodeId" UUID, "text" String, "textField" NSTextField
+    static let textNodeDidChange         = Notification.Name("OpenMaestri.textNodeDidChange")
+    /// Text 节点编辑结束：userInfo 含 "nodeId" UUID, "text" String
+    static let textNodeDidEndEditing     = Notification.Name("OpenMaestri.textNodeDidEndEditing")
 }
