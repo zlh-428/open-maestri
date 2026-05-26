@@ -350,8 +350,8 @@ struct ShapeContent: Codable, Equatable {
 
     init() {
         self.shapeType   = .rect
-        self.fillColor   = "#FFE4E4"
-        self.strokeColor = "#3B82F6"
+        self.fillColor   = "blue"
+        self.strokeColor = "blue"
         self.strokeWidth = 2.0
         self.strokeStyle = .solid
         self.fillStyle   = .solid
@@ -391,7 +391,7 @@ struct StrokeContent: Codable, Equatable {
         self.startPoint = CGPoint(x: 0, y: 0.5)
         self.endPoint = CGPoint(x: 1, y: 0.5)
         self.controlPoint = strokeType == .arrow ? CGPoint(x: 0.5, y: 0.5) : nil
-        self.strokeColor = "#3B82F6"
+        self.strokeColor = "blue"
         self.strokeWidth = 2.0
         self.strokeStyle = .solid
     }
@@ -415,7 +415,7 @@ struct FreehandContent: Codable, Equatable {
     init(freehandType: FreehandType) {
         self.freehandType = freehandType
         self.points = []
-        self.strokeColor = "#3B82F6"
+        self.strokeColor = "blue"
         self.strokeWidth = freehandType == .highlighter ? 12.0 : 3.0
         self.opacity = freehandType == .highlighter ? 0.4 : 1.0
         self.rotation = 0
