@@ -386,6 +386,14 @@ final class CenteredTextScrollView: NSScrollView {
     }
 
     func recenterText() {
+        // Defer to next runloop to avoid triggering setNeedsLayout inside a drawRect/layout pass,
+        // which causes an NSException on macOS 26 (_postWindowNeedsLayout assertion).
+        DispatchQueue.main.async { [weak self] in
+            self?.applyRecenter()
+        }
+    }
+
+    private func applyRecenter() {
         guard let tv = documentView as? NSTextView,
               let lm = tv.layoutManager,
               let tc = tv.textContainer else { return }
@@ -398,6 +406,6 @@ final class CenteredTextScrollView: NSScrollView {
 
     override func layout() {
         super.layout()
-        recenterText()
+        applyRecenter()
     }
 }

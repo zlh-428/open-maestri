@@ -68,7 +68,7 @@ struct TextContextToolbar: View {
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 11, weight: .medium))
-                    .frame(width: 24, height: 28)
+                    .frame(width: 30, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -84,7 +84,7 @@ struct TextContextToolbar: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .medium))
-                    .frame(width: 24, height: 28)
+                    .frame(width: 30, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
