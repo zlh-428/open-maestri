@@ -61,6 +61,13 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
         }
 
         let loc = canvas.convert(event.locationInWindow, from: nil)
+
+        // Portal 节点导航栏按钮处理（后退/前进/刷新）
+        if handlePortalNavBarClick(at: loc, event: event, canvas: canvas) {
+            nextResponder?.mouseDown(with: event)  // 允许 canvas 继续选中节点
+            return
+        }
+
         if let (nodeId, hitKind) = fileTreeHitKind(at: loc, canvas: canvas) {
             switch hitKind {
             case .navBar:
@@ -91,6 +98,50 @@ final class CanvasNodesView: NSHostingView<CanvasNodesSwiftUIView> {
         }
 
         nextResponder?.mouseDown(with: event)
+    }
+
+    /// 检测并处理 Portal 节点导航栏中的按钮点击（后退 / 前进 / 刷新）。
+    /// 返回 true 表示命中了导航栏按钮并已处理，调用方应继续将事件传给 canvas 以完成节点选中。
+    @discardableResult
+    private func handlePortalNavBarClick(
+        at loc: CGPoint, event: NSEvent, canvas: CanvasViewportView
+    ) -> Bool {
+        for node in canvas.currentNodes {
+            guard case .portal = node.content else { continue }
+            let sf = canvas.canvasRectToScreen(node.frame)
+            guard sf.contains(loc) else { continue }
+
+            // 导航栏区域：header(32) + navBar padding(6 top + 6 bottom) + navBar content(28) = 约 72pt 缩放后高度
+            // 但 PortalNavBarView 实际放在 content 区域的最顶部，content 从 header(32) 下方开始
+            // PortalNavBarView 高度 = padding(6) + 28 + padding(6) = 40pt（canvas 单位）
+            let headerH  = CanvasNodeConstants.headerHeight * canvas.zoom
+            let navBarH  = 40.0 * canvas.zoom
+            let localY   = loc.y - sf.minY
+            guard localY > headerH && localY <= headerH + navBarH else { continue }
+
+            // x 坐标（还原 zoom）
+            // PortalNavBarView 左侧胶囊布局：padding(.horizontal, 8) + padding(.horizontal, 4) 内部
+            // = leading 12pt，然后后退(26) 前进(26) 刷新(26)
+            let localX = (loc.x - sf.minX) / canvas.zoom
+            let backRange    = 12.0...38.0  as ClosedRange<CGFloat>
+            let forwardRange = 38.0...64.0  as ClosedRange<CGFloat>
+            let refreshRange = 64.0...90.0  as ClosedRange<CGFloat>
+
+            guard let wv = PortalWebViewStore.shared.webView(for: node.id) else { return false }
+
+            if backRange.contains(localX) {
+                wv.goBack()
+                return true
+            } else if forwardRange.contains(localX) {
+                wv.goForward()
+                return true
+            } else if refreshRange.contains(localX) {
+                if wv.isLoading { wv.stopLoading() } else { wv.reload() }
+                return true
+            }
+            return false
+        }
+        return false
     }
 
     /// 处理 navBar 区域点击：根据 x 坐标精确分发到后退/前进/菜单按钮。
