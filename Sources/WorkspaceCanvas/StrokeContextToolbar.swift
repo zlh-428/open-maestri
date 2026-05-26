@@ -39,16 +39,11 @@ struct StrokeContextToolbar: View {
 
     private var themeColorButton: some View {
         Button { showThemeColorPicker = true } label: {
-            ZStack {
-                Circle()
-                    .strokeBorder(themeColor, lineWidth: 3)
-                    .frame(width: 22, height: 22)
-                Circle()
-                    .fill(themeColor.opacity(0.3))
-                    .frame(width: 14, height: 14)
-            }
-            .frame(width: 30, height: 30)
-            .contentShape(Rectangle())
+            Circle()
+                .fill(themeColor)
+                .frame(width: 18, height: 18)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Theme Color")
@@ -96,7 +91,9 @@ struct StrokeContextToolbar: View {
 
     private var strokeStyleButton: some View {
         Button { showStrokeStylePicker = true } label: {
-            strokeStylePreview(content.strokeStyle)
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Color(white: 0.3))
                 .frame(width: 30, height: 26)
                 .contentShape(Rectangle())
         }
@@ -109,22 +106,6 @@ struct StrokeContextToolbar: View {
                 onContentChange(updated)
                 showStrokeStylePicker = false
             }
-        }
-    }
-
-    @ViewBuilder
-    private func strokeStylePreview(_ style: ShapeStrokeStyle) -> some View {
-        Canvas { ctx, size in
-            var path = Path()
-            path.move(to: CGPoint(x: 4, y: size.height/2))
-            path.addLine(to: CGPoint(x: size.width - 4, y: size.height/2))
-            let ss: StrokeStyle
-            switch style {
-            case .solid:  ss = StrokeStyle(lineWidth: 2)
-            case .dashed: ss = StrokeStyle(lineWidth: 2, dash: [6, 3])
-            case .dotted: ss = StrokeStyle(lineWidth: 2, dash: [2, 3])
-            }
-            ctx.stroke(path, with: .color(.primary), style: ss)
         }
     }
 

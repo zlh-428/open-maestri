@@ -59,18 +59,11 @@ struct ShapeContextToolbar: View {
         Button {
             showThemeColorPicker = true
         } label: {
-            ZStack {
-                // 外圈：描边色（代表边框）
-                Circle()
-                    .strokeBorder(themeColor, lineWidth: 3)
-                    .frame(width: 22, height: 22)
-                // 内圈：填充色（30% 透明度）
-                Circle()
-                    .fill(themeColor.opacity(0.3))
-                    .frame(width: 14, height: 14)
-            }
-            .frame(width: 30, height: 30)
-            .contentShape(Rectangle())
+            Circle()
+                .fill(themeColor)
+                .frame(width: 18, height: 18)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Theme Color")
@@ -125,7 +118,9 @@ struct ShapeContextToolbar: View {
         Button {
             showStrokeStylePicker = true
         } label: {
-            strokeStylePreview(content.strokeStyle)
+            Image(systemName: "line.3.horizontal")
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Color(white: 0.3))
                 .frame(width: 30, height: 26)
                 .contentShape(Rectangle())
         }
@@ -141,31 +136,14 @@ struct ShapeContextToolbar: View {
         }
     }
 
-    @ViewBuilder
-    private func strokeStylePreview(_ style: ShapeStrokeStyle) -> some View {
-        let color = Color.primary
-        Canvas { ctx, size in
-            var path = Path()
-            path.move(to: CGPoint(x: 4, y: size.height/2))
-            path.addLine(to: CGPoint(x: size.width - 4, y: size.height/2))
-            let strokeStyle: StrokeStyle
-            switch style {
-            case .solid:  strokeStyle = StrokeStyle(lineWidth: 2)
-            case .dashed: strokeStyle = StrokeStyle(lineWidth: 2, dash: [6, 3])
-            case .dotted: strokeStyle = StrokeStyle(lineWidth: 2, dash: [2, 3])
-            }
-            ctx.stroke(path, with: .color(color), style: strokeStyle)
-        }
-    }
-
     // MARK: - 填充风格
 
     private var fillStyleButton: some View {
         Button {
             showFillStylePicker = true
         } label: {
-            fillStyleIcon(content.fillStyle)
-                .font(.system(size: 13))
+            Image(systemName: "square.on.square.dashed")
+                .font(.system(size: 13, weight: .regular))
                 .foregroundStyle(Color(white: 0.3))
                 .frame(width: 30, height: 26)
                 .contentShape(Rectangle())
@@ -179,16 +157,6 @@ struct ShapeContextToolbar: View {
                 onContentChange(updated)
                 showFillStylePicker = false
             }
-        }
-    }
-
-    @ViewBuilder
-    private func fillStyleIcon(_ style: ShapeFillStyle) -> some View {
-        switch style {
-        case .solid:        Image(systemName: "square.fill")
-        case .none:         Image(systemName: "square")
-        case .hatched:      Image(systemName: "square.lefthalf.filled")
-        case .crossHatched: Image(systemName: "square.grid.2x2")
         }
     }
 

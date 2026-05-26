@@ -36,16 +36,11 @@ struct FreehandContextToolbar: View {
 
     private var themeColorButton: some View {
         Button { showThemeColorPicker = true } label: {
-            ZStack {
-                Circle()
-                    .strokeBorder(themeColor, lineWidth: 3)
-                    .frame(width: 22, height: 22)
-                Circle()
-                    .fill(themeColor.opacity(0.3))
-                    .frame(width: 14, height: 14)
-            }
-            .frame(width: 30, height: 30)
-            .contentShape(Rectangle())
+            Circle()
+                .fill(themeColor)
+                .frame(width: 18, height: 18)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help("Theme Color")
