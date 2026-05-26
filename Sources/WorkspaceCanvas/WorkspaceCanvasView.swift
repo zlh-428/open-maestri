@@ -36,6 +36,7 @@ struct WorkspaceCanvasView: View {
             let strokeType: StrokeType = nodeType == "stroke_arrow" ? .arrow : .line
             createStrokeAtFrame(frame, strokeType: strokeType,
                                 startCanvas: startPoint, endCanvas: endPoint)
+            activeDrawingTool = nil
         }
     }
 
@@ -143,6 +144,30 @@ struct WorkspaceCanvasView: View {
                         content: fc,
                         onContentChange: { newContent in setFreehandContent(nodeId: freehandId, content: newContent) },
                         onDelete: { deleteSelectedNodes() }
+                    )
+                    .fixedSize()
+                    .padding(.bottom, 36)
+                    .contentShape(Rectangle())
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                    .animation(.easeInOut(duration: 0.15), value: selectedNodeIds)
+                } else if selectedNodeIds.count > 1 {
+                    HStack(spacing: 2) {
+                        ContextToolbarButton(
+                            icon: "trash",
+                            tooltip: "tooltip.node.delete".localized,
+                            action: { deleteSelectedNodes() }
+                        )
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .strokeBorder(Color(white: 0.9), lineWidth: 0.5)
                     )
                     .fixedSize()
                     .padding(.bottom, 36)
@@ -393,7 +418,7 @@ struct WorkspaceCanvasView: View {
             FloorOverviewView(workspace: workspace)
                 .environment(\.locale, LocalizationManager.shared.locale)
         }
-        .sheet(isPresented: $showTerminalSheetForDrawing) {
+        .sheet(isPresented: $showTerminalSheetForDrawing, onDismiss: { activeDrawingTool = nil }) {
             NewTerminalSheet(
                 initialPresets: appState.preferences.agentPresets.filter { $0.isActive },
                 initialRoles: appState.preferences.rolePresets,
@@ -403,7 +428,7 @@ struct WorkspaceCanvasView: View {
             }
             .environment(\.locale, LocalizationManager.shared.locale)
         }
-        .sheet(isPresented: $showPortalSheetForDrawing) {
+        .sheet(isPresented: $showPortalSheetForDrawing, onDismiss: { activeDrawingTool = nil }) {
             NewPortalSheet { name, url in
                 createPortalAtFrame(showPortalDrawnFrame, name: name, url: url)
             }
@@ -497,21 +522,28 @@ struct WorkspaceCanvasView: View {
             showTerminalSheetForDrawing = true
         case "stickyNote":
             createNoteAtFrame(frame)
+            activeDrawingTool = nil
         case "portal":
             showPortalDrawnFrame = frame
             showPortalSheetForDrawing = true
         case "fileTree":
             createFileTreeAtFrame(frame)
+            activeDrawingTool = nil
         case "text":
             createTextAtFrame(frame)
+            activeDrawingTool = nil
         case "rect":
             createShapeAtFrame(frame, shapeType: .rect)
+            activeDrawingTool = nil
         case "ellipse":
             createShapeAtFrame(frame, shapeType: .ellipse)
+            activeDrawingTool = nil
         case "diamond":
             createShapeAtFrame(frame, shapeType: .diamond)
+            activeDrawingTool = nil
         case "shape":
             createShapeAtFrame(frame, shapeType: .rect)
+            activeDrawingTool = nil
         default:
             break
         }
@@ -576,6 +608,7 @@ struct WorkspaceCanvasView: View {
     private func handleFreehandDrawn(nodeType: String, points: [CGPoint], frame: CGRect) {
         let freehandType: FreehandType = nodeType == "freehand_highlighter" ? .highlighter : .pen
         createFreehandFromPoints(points, boundingFrame: frame, freehandType: freehandType)
+        activeDrawingTool = nil
     }
 
     // MARK: - Canvas Blank Area Context Menu Handlers
