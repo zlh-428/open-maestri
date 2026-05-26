@@ -24,6 +24,7 @@ final class NoteNodeViewController: NSViewController {
     var onTitleChanged: ((String) -> Void)?
 
     private var notificationObserver: NSObjectProtocol?
+    private var fileChangeObserver: NSObjectProtocol?
 
     init(noteId: UUID, filePath: String) {
         self.noteId = noteId
@@ -55,10 +56,14 @@ final class NoteNodeViewController: NSViewController {
 
         emitInitialTitle()
         observeFormattedToggle()
+        observeFileChange()
     }
 
     deinit {
         if let obs = notificationObserver {
+            NotificationCenter.default.removeObserver(obs)
+        }
+        if let obs = fileChangeObserver {
             NotificationCenter.default.removeObserver(obs)
         }
     }
@@ -76,6 +81,23 @@ final class NoteNodeViewController: NSViewController {
                   id == self.noteId,
                   let isPreviewing = notif.userInfo?["isPreviewing"] as? Bool else { return }
             editorState.isFormatted = isPreviewing
+        }
+    }
+
+    // MARK: - 监听外部文件写入（CLI 写入时同步 editorState）
+
+    private func observeFileChange() {
+        fileChangeObserver = NotificationCenter.default.addObserver(
+            forName: .noteFileDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak self] notif in
+            guard let self,
+                  let changedPath = notif.userInfo?["filePath"] as? String,
+                  changedPath == self.filePath,
+                  let newContent = notif.userInfo?["content"] as? String,
+                  self.editorState.content != newContent else { return }
+            self.editorState.content = newContent
         }
     }
 

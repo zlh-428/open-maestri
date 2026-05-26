@@ -64,6 +64,13 @@ final class NoteFileManager {
         try data.write(to: tmp, options: .atomic)
         _ = try FileManager.default.replaceItem(at: url, withItemAt: tmp, backupItemName: nil, resultingItemURL: nil)
         logger.debug("Note written: \(filePath)")
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: .noteFileDidChange,
+                object: nil,
+                userInfo: ["filePath": filePath, "content": content]
+            )
+        }
     }
 
     /// 局部编辑（替换第一个匹配的文本）
