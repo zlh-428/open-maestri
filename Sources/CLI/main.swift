@@ -15,7 +15,7 @@ guard let terminalId = ProcessInfo.processInfo.environment["MAESTRI_TERMINAL_ID"
 let args = Array(CommandLine.arguments.dropFirst())
 guard let command = args.first else {
     printHelp()
-    exit(0)
+    exit(1)
 }
 
 // 3. 命令分发
@@ -42,7 +42,6 @@ case "-h", "--help", "help":
     printHelp()
     exit(0)
 default:
-    fputs("Unknown command '\(command)'\n", stderr)
-    printHelp()
+    fputs("error: unknown command '\(command)'. Try 'omaestri list' for available commands.\n", stderr)
     exit(1)
 }

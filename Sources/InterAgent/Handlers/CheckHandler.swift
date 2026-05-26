@@ -34,7 +34,54 @@ final class CheckHandler {
             return "error: agent '\(targetName)' not found in connections"
         }
         let output = session.recentOutput(lines: lineCount)
-        return output.isEmpty ? "(no recent output)" : output
+        let cleaned = stripAnsi(output)
+        return cleaned.isEmpty ? "(no recent output)" : cleaned
+    }
+
+    private func stripAnsi(_ text: String) -> String {
+        // 过滤 CSI 序列（ESC [ ... 最终字节）、OSC 序列、单字符 ESC 序列
+        var result = ""
+        result.reserveCapacity(text.count)
+        var i = text.startIndex
+        while i < text.endIndex {
+            let ch = text[i]
+            if ch == "\u{1B}" {
+                let next = text.index(after: i)
+                if next < text.endIndex {
+                    let nc = text[next]
+                    if nc == "[" {
+                        // CSI 序列：跳到参数结束（最终字节 @-~）
+                        var j = text.index(after: next)
+                        while j < text.endIndex && !(text[j] >= "\u{40}" && text[j] <= "\u{7E}") {
+                            j = text.index(after: j)
+                        }
+                        i = j < text.endIndex ? text.index(after: j) : text.endIndex
+                    } else if nc == "]" {
+                        // OSC 序列：跳到 BEL 或 ST（ESC \）
+                        var j = text.index(after: next)
+                        while j < text.endIndex && text[j] != "\u{07}" && text[j] != "\u{1B}" {
+                            j = text.index(after: j)
+                        }
+                        if j < text.endIndex && text[j] == "\u{1B}" {
+                            j = text.index(after: j)
+                            if j < text.endIndex { j = text.index(after: j) }
+                        } else if j < text.endIndex {
+                            j = text.index(after: j)
+                        }
+                        i = j
+                    } else {
+                        // 其他单字符 ESC 序列
+                        i = text.index(after: next)
+                    }
+                } else {
+                    i = text.endIndex
+                }
+            } else {
+                result.append(ch)
+                i = text.index(after: i)
+            }
+        }
+        return result
     }
 
     private func runOnDetached(_ block: @escaping () async -> String) -> String {

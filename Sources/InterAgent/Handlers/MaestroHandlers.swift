@@ -54,12 +54,13 @@ final class MaestroHandlers {
             return "error: recruit can only be called from a Maestro terminal"
         }
 
-        // 验证 isManager 字段（通过磁盘读取活跃工作区节点，只读，不修改实例）
-        if let wsId = (try? PersistenceManager.shared.loadAppState())?.activeWorkspaceId,
-           let doc = try? PersistenceManager.shared.loadWorkspace(id: wsId),
-           let maestroNode = doc.payload.nodes.first(where: { $0.id == maestroId }),
-           case .terminal(let tc) = maestroNode.content,
-           !tc.isManager {
+        // 验证 isManager 字段（fail-closed：任何加载失败均拒绝 recruit）
+        guard let wsId = (try? PersistenceManager.shared.loadAppState())?.activeWorkspaceId,
+              let doc = try? PersistenceManager.shared.loadWorkspace(id: wsId),
+              let maestroNode = doc.payload.nodes.first(where: { $0.id == maestroId }),
+              case .terminal(let maestroTc) = maestroNode.content,
+              maestroTc.isManager
+        else {
             return "error: this terminal is not in Maestro mode. Enable Maestro mode when creating the terminal."
         }
 

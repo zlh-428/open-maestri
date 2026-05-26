@@ -62,7 +62,7 @@ struct AgentPreset: Codable, Identifiable, Equatable {
         AgentPreset(id: UUID(), name: "Codex",       command: "codex",     icon: "brain",                          agentType: "codex",          color: "#5856D6", isActive: true, isBuiltIn: true),
         AgentPreset(id: UUID(), name: "Gemini CLI",  command: "gemini",    icon: "sparkle",                        agentType: "gemini_cli",     color: "#34C759", isActive: true, isBuiltIn: true),
         AgentPreset(id: UUID(), name: "OpenCode",    command: "opencode",  icon: "rectangle.portrait",             agentType: "open_code",      color: "#FF9500", isActive: true, isBuiltIn: true),
-        AgentPreset(id: UUID(), name: "Shell",       command: "",          icon: "terminal",                       agentType: "generic_shell",  color: "#8E8E93", isActive: true, isBuiltIn: true),
+        AgentPreset(id: UUID(), name: "Shell",       command: "bash",      icon: "terminal",                       agentType: "generic_shell",  color: "#8E8E93", isActive: true, isBuiltIn: true),
     ]
 }
 

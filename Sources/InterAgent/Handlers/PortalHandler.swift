@@ -72,6 +72,15 @@ final class PortalHandler {
         let name = args.count >= 4 ? args[3] : "Portal-\(UUID().uuidString.prefix(6))"
         let portalId = UUID()
         await PortalWebViewStore.shared.createWebView(for: portalId, initialURL: url)
+
+        var pc = PortalContent(name: name, url: url)
+        pc.id = portalId
+        let portalNode = CanvasNode(id: portalId, frame: .zero, content: .portal(pc))
+
+        var userInfo: [AnyHashable: Any] = ["portalNode": portalNode]
+        if let tid = terminalId { userInfo["terminalId"] = tid }
+        NotificationCenter.default.post(name: .portalCreatedViaCLI, object: nil, userInfo: userInfo)
+
         return "Created portal '\(name)' [\(portalId.uuidString.prefix(8))]"
     }
 
