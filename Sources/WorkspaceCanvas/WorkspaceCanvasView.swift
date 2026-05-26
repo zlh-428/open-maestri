@@ -1034,6 +1034,9 @@ private struct StrokePointDragModifier: ViewModifier {
                       let nodeContent = notif.userInfo?["content"] as? NodeContent,
                       let idx = workspace.nodes.firstIndex(where: { $0.id == id }) else { return }
                 workspace.nodes[idx].content = nodeContent
+                if let newFrame = notif.userInfo?["frame"] as? CGRect {
+                    workspace.nodes[idx].frame = newFrame
+                }
                 Task { try? await workspace.save() }
             }
     }

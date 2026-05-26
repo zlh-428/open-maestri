@@ -125,6 +125,46 @@ extension CanvasViewportView {
         // Pass 2：正常节点内部命中测试
         for node in sortedNodesByZIndexDesc {
             let screenFrame = canvasRectToScreen(node.frame)
+
+            // stroke/freehand 节点：路径距离命中（不用矩形，只有靠近实际线段才算命中）
+            if case .stroke(let sc) = node.content {
+                let hitRadius: CGFloat = max(6, sc.strokeWidth * zoom * 0.5 + 4)
+                guard screenFrame.insetBy(dx: -hitRadius, dy: -hitRadius).contains(loc) else { continue }
+                let localPt = CGPoint(x: loc.x - screenFrame.minX, y: loc.y - screenFrame.minY)
+                let w = screenFrame.width
+                let h = screenFrame.height
+                let start   = CGPoint(x: sc.startPoint.x * w, y: sc.startPoint.y * h)
+                let end     = CGPoint(x: sc.endPoint.x   * w, y: sc.endPoint.y   * h)
+                let onPath: Bool
+                if sc.strokeType == .arrow, let cp = sc.controlPoint {
+                    let ctrl = CGPoint(x: cp.x * w, y: cp.y * h)
+                    onPath = distanceToQuadBezier(localPt, p0: start, p1: ctrl, p2: end) <= hitRadius
+                } else {
+                    onPath = distanceToSegment(localPt, a: start, b: end) <= hitRadius
+                }
+                guard onPath else { continue }
+                let r = CanvasHitTestResult.nodeContent(node.id, nodesHostingView ?? self)
+                _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                return r
+            }
+
+            if case .freehand(let fc) = node.content {
+                let hitRadius: CGFloat = max(6, fc.strokeWidth * zoom * 0.5 + 4)
+                guard screenFrame.insetBy(dx: -hitRadius, dy: -hitRadius).contains(loc) else { continue }
+                let localPt = CGPoint(x: loc.x - screenFrame.minX, y: loc.y - screenFrame.minY)
+                let w = screenFrame.width
+                let h = screenFrame.height
+                let pts = fc.points.map { CGPoint(x: $0.x * w, y: $0.y * h) }
+                var hit = false
+                for i in 0..<pts.count - 1 {
+                    if distanceToSegment(localPt, a: pts[i], b: pts[i + 1]) <= hitRadius { hit = true; break }
+                }
+                guard hit else { continue }
+                let r = CanvasHitTestResult.nodeContent(node.id, nodesHostingView ?? self)
+                _hitTestCachedPoint = loc; _hitTestCachedResult = r
+                return r
+            }
+
             guard screenFrame.contains(loc) else { continue }
 
             let localPt = CGPoint(
@@ -780,25 +820,63 @@ extension CanvasViewportView {
         // --- stroke 控制点拖拽 ---
         case .draggingStrokePoint(let id, let role, let origContent, let startFrame):
             let canvasLoc = screenToCanvas(loc)
-            let w = startFrame.width
-            let h = startFrame.height
-            let normalized = CGPoint(
-                x: w > 0 ? (canvasLoc.x - startFrame.minX) / w : 0.5,
-                y: h > 0 ? (canvasLoc.y - startFrame.minY) / h : 0.5
-            )
-            var updated = origContent
-            switch role {
-            case "start":   updated.startPoint = normalized
-            case "end":     updated.endPoint = normalized
-            case "control": updated.controlPoint = normalized
-            default: break
+
+            if role == "control" {
+                // 拖动贝塞尔控制点：frame 跟随扩展，start/end 画布绝对坐标保持不变
+                let absStart = CGPoint(
+                    x: startFrame.minX + origContent.startPoint.x * startFrame.width,
+                    y: startFrame.minY + origContent.startPoint.y * startFrame.height
+                )
+                let absEnd = CGPoint(
+                    x: startFrame.minX + origContent.endPoint.x * startFrame.width,
+                    y: startFrame.minY + origContent.endPoint.y * startFrame.height
+                )
+                let absControl = canvasLoc
+                let padding: CGFloat = 20
+                let newMinX = min(absStart.x, absEnd.x, absControl.x) - padding
+                let newMinY = min(absStart.y, absEnd.y, absControl.y) - padding
+                let newMaxX = max(absStart.x, absEnd.x, absControl.x) + padding
+                let newMaxY = max(absStart.y, absEnd.y, absControl.y) + padding
+                let newFrame = CGRect(x: newMinX, y: newMinY,
+                                     width: newMaxX - newMinX,
+                                     height: newMaxY - newMinY)
+                let nw = newFrame.width
+                let nh = newFrame.height
+                var updated = origContent
+                updated.startPoint   = CGPoint(x: nw > 0 ? (absStart.x   - newMinX) / nw : 0.5,
+                                               y: nh > 0 ? (absStart.y   - newMinY) / nh : 0.5)
+                updated.endPoint     = CGPoint(x: nw > 0 ? (absEnd.x     - newMinX) / nw : 0.5,
+                                               y: nh > 0 ? (absEnd.y     - newMinY) / nh : 0.5)
+                updated.controlPoint = CGPoint(x: nw > 0 ? (absControl.x - newMinX) / nw : 0.5,
+                                               y: nh > 0 ? (absControl.y - newMinY) / nh : 0.5)
+                nodeCanvasFrames[id] = newFrame
+                let newContent = NodeContent.stroke(updated)
+                NotificationCenter.default.post(
+                    name: .canvasNodeContentChanged,
+                    object: nil,
+                    userInfo: ["nodeId": id, "content": newContent, "frame": newFrame]
+                )
+            } else {
+                // 拖动 start/end：仅归一化坐标更新，frame 不变
+                let w = startFrame.width
+                let h = startFrame.height
+                let normalized = CGPoint(
+                    x: w > 0 ? (canvasLoc.x - startFrame.minX) / w : 0.5,
+                    y: h > 0 ? (canvasLoc.y - startFrame.minY) / h : 0.5
+                )
+                var updated = origContent
+                switch role {
+                case "start": updated.startPoint = normalized
+                case "end":   updated.endPoint   = normalized
+                default: break
+                }
+                let newContent = NodeContent.stroke(updated)
+                NotificationCenter.default.post(
+                    name: .canvasNodeContentChanged,
+                    object: nil,
+                    userInfo: ["nodeId": id, "content": newContent]
+                )
             }
-            let newContent = NodeContent.stroke(updated)
-            NotificationCenter.default.post(
-                name: .canvasNodeContentChanged,
-                object: nil,
-                userInfo: ["nodeId": id, "content": newContent]
-            )
 
         // --- idle（连线工具跟踪）---
         case .idle:
@@ -1137,23 +1215,57 @@ extension CanvasViewportView {
         case .draggingStrokePoint(let id, let role, let origContent, let startFrame):
             let loc2 = convert(event.locationInWindow, from: nil)
             let canvasLoc2 = screenToCanvas(loc2)
-            let w = startFrame.width
-            let h = startFrame.height
-            let normalized = CGPoint(
-                x: w > 0 ? (canvasLoc2.x - startFrame.minX) / w : 0.5,
-                y: h > 0 ? (canvasLoc2.y - startFrame.minY) / h : 0.5
-            )
+
             var finalContent = origContent
-            switch role {
-            case "start":   finalContent.startPoint = normalized
-            case "end":     finalContent.endPoint = normalized
-            case "control": finalContent.controlPoint = normalized
-            default: break
+            var finalFrame: CGRect? = nil
+
+            if role == "control" {
+                let absStart = CGPoint(
+                    x: startFrame.minX + origContent.startPoint.x * startFrame.width,
+                    y: startFrame.minY + origContent.startPoint.y * startFrame.height
+                )
+                let absEnd = CGPoint(
+                    x: startFrame.minX + origContent.endPoint.x * startFrame.width,
+                    y: startFrame.minY + origContent.endPoint.y * startFrame.height
+                )
+                let absControl = canvasLoc2
+                let padding: CGFloat = 20
+                let newMinX = min(absStart.x, absEnd.x, absControl.x) - padding
+                let newMinY = min(absStart.y, absEnd.y, absControl.y) - padding
+                let newMaxX = max(absStart.x, absEnd.x, absControl.x) + padding
+                let newMaxY = max(absStart.y, absEnd.y, absControl.y) + padding
+                let newFrame = CGRect(x: newMinX, y: newMinY,
+                                     width: newMaxX - newMinX,
+                                     height: newMaxY - newMinY)
+                let nw = newFrame.width
+                let nh = newFrame.height
+                finalContent.startPoint   = CGPoint(x: nw > 0 ? (absStart.x   - newMinX) / nw : 0.5,
+                                                    y: nh > 0 ? (absStart.y   - newMinY) / nh : 0.5)
+                finalContent.endPoint     = CGPoint(x: nw > 0 ? (absEnd.x     - newMinX) / nw : 0.5,
+                                                    y: nh > 0 ? (absEnd.y     - newMinY) / nh : 0.5)
+                finalContent.controlPoint = CGPoint(x: nw > 0 ? (absControl.x - newMinX) / nw : 0.5,
+                                                    y: nh > 0 ? (absControl.y - newMinY) / nh : 0.5)
+                finalFrame = newFrame
+            } else {
+                let w = startFrame.width
+                let h = startFrame.height
+                let normalized = CGPoint(
+                    x: w > 0 ? (canvasLoc2.x - startFrame.minX) / w : 0.5,
+                    y: h > 0 ? (canvasLoc2.y - startFrame.minY) / h : 0.5
+                )
+                switch role {
+                case "start": finalContent.startPoint = normalized
+                case "end":   finalContent.endPoint   = normalized
+                default: break
+                }
             }
+
+            var userInfo: [String: Any] = ["nodeId": id, "content": NodeContent.stroke(finalContent)]
+            if let f = finalFrame { userInfo["frame"] = f }
             NotificationCenter.default.post(
                 name: .strokePointDragDidEnd,
                 object: nil,
-                userInfo: ["nodeId": id, "content": NodeContent.stroke(finalContent)]
+                userInfo: userInfo
             )
 
         case .panCanvas:
@@ -1303,4 +1415,33 @@ extension CanvasViewportView {
 
         return textView.convert(CGPoint(x: localX, y: localY), to: nil)
     }
+}
+
+// MARK: - 几何辅助：路径距离命中检测
+
+/// 点到线段的最短距离
+private func distanceToSegment(_ p: CGPoint, a: CGPoint, b: CGPoint) -> CGFloat {
+    let dx = b.x - a.x
+    let dy = b.y - a.y
+    let lenSq = dx * dx + dy * dy
+    if lenSq == 0 { return hypot(p.x - a.x, p.y - a.y) }
+    let t = max(0, min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq))
+    return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+/// 点到二次贝塞尔曲线的近似最短距离（20 段线性采样）
+private func distanceToQuadBezier(_ p: CGPoint, p0: CGPoint, p1: CGPoint, p2: CGPoint) -> CGFloat {
+    let steps = 20
+    var minDist = CGFloat.greatestFiniteMagnitude
+    var prev = p0
+    for i in 1...steps {
+        let t = CGFloat(i) / CGFloat(steps)
+        let mt = 1 - t
+        let cur = CGPoint(x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+                          y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y)
+        let d = distanceToSegment(p, a: prev, b: cur)
+        if d < minDist { minDist = d }
+        prev = cur
+    }
+    return minDist
 }
