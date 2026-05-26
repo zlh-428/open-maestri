@@ -36,7 +36,6 @@ struct WorkspaceCanvasView: View {
             let strokeType: StrokeType = nodeType == "stroke_arrow" ? .arrow : .line
             createStrokeAtFrame(frame, strokeType: strokeType,
                                 startCanvas: startPoint, endCanvas: endPoint)
-            activeDrawingTool = nil
         }
     }
 
@@ -55,8 +54,8 @@ struct WorkspaceCanvasView: View {
             // 与一级工具栏间距加大
             Spacer().frame(height: 12)
 
-            // 仅当选中的节点确实存在于 workspace 中时才显示
-            if !selectedNodeIds.isEmpty && selectedNodeIds.contains(where: { id in
+            // 绘制工具激活时隐藏节点工具栏（二级工具栏唯一实例）
+            if activeDrawingTool == nil && !selectedNodeIds.isEmpty && selectedNodeIds.contains(where: { id in
                 workspace.nodes.contains { $0.id == id }
             }) {
                 if selectedNodeContentType == "fileTree" {
@@ -516,7 +515,6 @@ struct WorkspaceCanvasView: View {
         default:
             break
         }
-        activeDrawingTool = nil
     }
 
     private func handleConnectionCreated(idA: UUID, idB: UUID) {
@@ -578,7 +576,6 @@ struct WorkspaceCanvasView: View {
     private func handleFreehandDrawn(nodeType: String, points: [CGPoint], frame: CGRect) {
         let freehandType: FreehandType = nodeType == "freehand_highlighter" ? .highlighter : .pen
         createFreehandFromPoints(points, boundingFrame: frame, freehandType: freehandType)
-        activeDrawingTool = nil
     }
 
     // MARK: - Canvas Blank Area Context Menu Handlers

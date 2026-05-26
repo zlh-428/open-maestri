@@ -35,7 +35,7 @@ enum CanvasInteraction {
     /// 正在绘制 freehand（自由笔）节点；points 为屏幕坐标采样序列
     case drawingFreehand(points: [CGPoint])
     /// 正在拖拽 stroke 控制点（起点/终点/贝塞尔控制点）
-    case draggingStrokePoint(UUID, pointRole: String, startContent: StrokeContent)
+    case draggingStrokePoint(UUID, pointRole: String, startContent: StrokeContent, startFrame: CGRect)
     /// 鼠标正在与节点内容区交互（如终端文字选中）；事件转发给 contentTarget
     case contentInteraction(UUID, contentTarget: NSView)
 }
@@ -269,7 +269,7 @@ extension CanvasViewportView {
             }
             for (role, pt) in candidates {
                 if hypot(loc.x - pt.x, loc.y - pt.y) < 8 {
-                    interaction = .draggingStrokePoint(node.id, pointRole: role, startContent: sc)
+                    interaction = .draggingStrokePoint(node.id, pointRole: role, startContent: sc, startFrame: frame)
                     return
                 }
             }
@@ -482,7 +482,16 @@ extension CanvasViewportView {
                     window?.makeFirstResponder(webView)
                 }
             }
-            // 内容区域点击：仅选中节点，不启动拖动（允许用户选中文本、滚动内容）
+            // stroke/freehand 节点：内容区也支持拖动（无文字选择需求）
+            if let node = currentNodes.first(where: { $0.id == id }) {
+                switch node.content {
+                case .stroke, .freehand:
+                    let startFrame = nodeCanvasFrames[id] ?? .zero
+                    interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+                default:
+                    break
+                }
+            }
 
         case .nodeRotateHandle(let id):
             guard !isNodeLocked(id) else { return }
@@ -688,8 +697,9 @@ extension CanvasViewportView {
             needsDisplay = true
 
         // --- stroke 节点绘制模式（直线/箭头）---
-        case .drawingStroke:
+        case .drawingStroke(let start):
             drawingCurrentPoint = loc
+            snapGuideView?.strokePreviewPath = (start: start, end: loc, type: drawingNodeType)
             needsDisplay = true
 
         // --- freehand 节点绘制模式（自由笔，采样间距 4pt）---
@@ -702,6 +712,9 @@ extension CanvasViewportView {
                 interaction = .drawingFreehand(points: pts)
             }
             drawingCurrentPoint = loc
+            // 传递当前累积点（若未追加当前点则附加，保证预览实时跟手）
+            let previewPts = pts.last == loc ? pts : pts + [loc]
+            snapGuideView?.freehandPreviewPoints = previewPts
             needsDisplay = true
 
         // --- 节点绘制模式（网格吸附 + haptic）---
@@ -765,14 +778,13 @@ extension CanvasViewportView {
             }
 
         // --- stroke 控制点拖拽 ---
-        case .draggingStrokePoint(let id, let role, let origContent):
-            guard let frame = nodeCanvasFrames[id] else { break }
+        case .draggingStrokePoint(let id, let role, let origContent, let startFrame):
             let canvasLoc = screenToCanvas(loc)
-            let w = frame.width
-            let h = frame.height
+            let w = startFrame.width
+            let h = startFrame.height
             let normalized = CGPoint(
-                x: w > 0 ? (canvasLoc.x - frame.minX) / w : 0.5,
-                y: h > 0 ? (canvasLoc.y - frame.minY) / h : 0.5
+                x: w > 0 ? (canvasLoc.x - startFrame.minX) / w : 0.5,
+                y: h > 0 ? (canvasLoc.y - startFrame.minY) / h : 0.5
             )
             var updated = origContent
             switch role {
@@ -994,6 +1006,7 @@ extension CanvasViewportView {
         case .drawingStroke(let start):
             let canvasStart = screenToCanvas(start)
             guard let current = drawingCurrentPoint else {
+                snapGuideView?.strokePreviewPath = nil
                 needsDisplay = true
                 break
             }
@@ -1024,11 +1037,13 @@ extension CanvasViewportView {
                 )
             }
             drawingCurrentPoint = nil
+            snapGuideView?.strokePreviewPath = nil
             needsDisplay = true
 
         case .drawingFreehand(let pts):
             guard pts.count >= 2 else {
                 drawingCurrentPoint = nil
+                snapGuideView?.freehandPreviewPoints = nil
                 needsDisplay = true
                 break
             }
@@ -1038,6 +1053,7 @@ extension CanvasViewportView {
                   let maxX = canvasPts.map(\.x).max(),
                   let maxY = canvasPts.map(\.y).max() else {
                 drawingCurrentPoint = nil
+                snapGuideView?.freehandPreviewPoints = nil
                 interaction = .idle
                 needsDisplay = true
                 break
@@ -1056,6 +1072,7 @@ extension CanvasViewportView {
             }
             onFreehandDrawn?(drawingNodeType, normalized, boundingRect)
             drawingCurrentPoint = nil
+            snapGuideView?.freehandPreviewPoints = nil
             needsDisplay = true
 
         case .drawing(let start):
@@ -1076,13 +1093,8 @@ extension CanvasViewportView {
                 height: abs(snappedCurrentY - snappedStartY)
             )
 
-            // text 节点只允许点击创建，不允许拖拽绘制
-            let forceClickCreate = (drawingNodeType == "text")
-            // 最小绘制尺寸判定（画布坐标 20pt）
-            if !forceClickCreate && snappedRect.width > 20 && snappedRect.height > 20 {
-                onNodeDrawn?(drawingNodeType, snappedRect)
-            } else {
-                // 点击创建：使用吸附后的起点作为中心
+            if drawingNodeType == "text" {
+                // text 节点：点击即创建，使用默认尺寸居中于点击点
                 let defaultSize = defaultNodeSize(for: drawingNodeType)
                 let canvasRect = CGRect(
                     x: snappedStartX - defaultSize.width / 2,
@@ -1091,6 +1103,9 @@ extension CanvasViewportView {
                     height: defaultSize.height
                 )
                 onNodeDrawn?(drawingNodeType, canvasRect)
+            } else if snappedRect.width > 20 && snappedRect.height > 20 {
+                // 其余节点：必须拖拽超过 20pt 才创建
+                onNodeDrawn?(drawingNodeType, snappedRect)
             }
             NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
             drawingCurrentPoint = nil
@@ -1119,24 +1134,21 @@ extension CanvasViewportView {
                 contentTarget.mouseUp(with: syntheticEvent)
             }
 
-        case .draggingStrokePoint(let id, let role, let origContent):
-            // 计算最终归一化坐标（与 mouseDragged 逻辑一致）
+        case .draggingStrokePoint(let id, let role, let origContent, let startFrame):
             let loc2 = convert(event.locationInWindow, from: nil)
+            let canvasLoc2 = screenToCanvas(loc2)
+            let w = startFrame.width
+            let h = startFrame.height
+            let normalized = CGPoint(
+                x: w > 0 ? (canvasLoc2.x - startFrame.minX) / w : 0.5,
+                y: h > 0 ? (canvasLoc2.y - startFrame.minY) / h : 0.5
+            )
             var finalContent = origContent
-            if let frame = nodeCanvasFrames[id] {
-                let canvasLoc2 = screenToCanvas(loc2)
-                let w = frame.width
-                let h = frame.height
-                let normalized = CGPoint(
-                    x: w > 0 ? (canvasLoc2.x - frame.minX) / w : 0.5,
-                    y: h > 0 ? (canvasLoc2.y - frame.minY) / h : 0.5
-                )
-                switch role {
-                case "start":   finalContent.startPoint = normalized
-                case "end":     finalContent.endPoint = normalized
-                case "control": finalContent.controlPoint = normalized
-                default: break
-                }
+            switch role {
+            case "start":   finalContent.startPoint = normalized
+            case "end":     finalContent.endPoint = normalized
+            case "control": finalContent.controlPoint = normalized
+            default: break
             }
             NotificationCenter.default.post(
                 name: .strokePointDragDidEnd,
