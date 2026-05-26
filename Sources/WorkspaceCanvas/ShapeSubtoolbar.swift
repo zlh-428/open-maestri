@@ -28,7 +28,7 @@ struct ShapeSubtoolbar: View {
         ("freehand_pen",         "pencil",              "钢笔"),
         ("stroke_arrow",         "arrow.up.right",      "箭头"),
         ("freehand_highlighter", "highlighter",         "荧光笔"),
-        ("stroke_line",          "minus",               "线条"),
+        ("stroke_line",          "line.diagonal",       "线条"),
         ("rect",                 "rectangle",           "矩形"),
         ("ellipse",              "circle",              "圆形"),
         ("diamond",              "diamond",             "菱形"),
