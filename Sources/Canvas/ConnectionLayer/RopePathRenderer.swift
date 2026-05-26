@@ -25,10 +25,7 @@ struct RopePathRenderer {
     }
 
     static func isDashed(for status: ConnectionStatus) -> Bool {
-        switch status {
-        case .communicating: return false
-        case .idle, .disconnected, .error: return true
-        }
+        return true
     }
 
     // MARK: - 路径生成
