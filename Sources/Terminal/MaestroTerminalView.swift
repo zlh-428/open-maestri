@@ -39,10 +39,11 @@ extension MaestroTerminalView {
     func attach(provider: SwiftTermProvider) {
         if let existing = provider.terminalView {
             if existing.superview != self {
+                // re-attach：先清除占位背景色，再移入终端视图，避免"背景色闪一帧"
+                layer?.backgroundColor = nil
                 existing.removeFromSuperview()
                 existing.frame = bounds
                 existing.autoresizingMask = [.width, .height]
-                updateBackgroundFromTheme()
                 addSubview(existing)
             }
             terminalView = existing
@@ -66,7 +67,8 @@ extension MaestroTerminalView {
     /// removeFromSuperview，不停止 PTY（工作区切换用）。
     func detach() {
         terminalView?.removeFromSuperview()
-        isInitialLayout = true
+        // 不重置 isInitialLayout：re-attach 时 terminalView 已有正确 frame，
+        // 不需要再走首次 layout 的 firePendingStart 路径，避免不必要的 frame 重设。
         logger.debug("Detached terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
@@ -81,7 +83,8 @@ extension MaestroTerminalView {
         layer?.backgroundColor = nil
     }
 
-    /// 用当前主题的背景色填充 layer，作为 PTY attach 前的占位色防止闪烁
+    /// 用当前主题的背景色填充 layer，作为 PTY attach 前的占位色防止闪烁。
+    /// 仅在 provider 尚未就绪（首次创建）时调用，re-attach 场景跳过。
     func updateBackgroundFromTheme() {
         let prefs = (try? PersistenceManager.shared.loadPreferences()) ?? Preferences()
         let themeId = TerminalThemeRegistry.resolveThemeId(from: prefs.terminalTheme)

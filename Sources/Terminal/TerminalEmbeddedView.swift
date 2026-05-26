@@ -81,7 +81,14 @@ struct TerminalEmbeddedView: NSViewRepresentable {
         let maestroView = MaestroTerminalView(terminalId: terminalId)
         maestroView.autoresizingMask = [.width, .height]
         context.coordinator.setupObservers(terminalId: terminalId, maestroView: maestroView)
-        // provider 可能已就绪（工作区切换回来）
+
+        // 如果 provider 已就绪（工作区切换回来），直接 attach；
+        // 此时跳过占位背景色设置，因为 attach() 内部会立刻清除 layer.backgroundColor，
+        // 避免"背景色 → 终端内容"的一帧闪烁。
+        let providerReady = TerminalManager.shared.providers[terminalId] != nil
+        if !providerReady {
+            maestroView.updateBackgroundFromTheme()
+        }
         context.coordinator.attachIfNeeded(to: maestroView, terminalId: terminalId)
         return maestroView
     }
