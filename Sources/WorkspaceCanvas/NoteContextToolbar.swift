@@ -315,10 +315,10 @@ struct NoteFontSizePopover: View {
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 12, weight: .medium))
-                    .frame(width: 24, height: 24)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
 
             Text("\(fontSize)")
                 .font(.system(size: 14, weight: .medium, design: .monospaced))
@@ -331,10 +331,10 @@ struct NoteFontSizePopover: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 12, weight: .medium))
-                    .frame(width: 24, height: 24)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

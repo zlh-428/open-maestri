@@ -68,10 +68,10 @@ struct FreehandContextToolbar: View {
             } label: {
                 Image(systemName: "minus")
                     .font(.system(size: 11, weight: .medium))
-                    .frame(width: 22, height: 26)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
 
             Text("\(Int(content.strokeWidth))pt")
                 .font(.system(size: 12, weight: .medium, design: .monospaced))
@@ -84,10 +84,10 @@ struct FreehandContextToolbar: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 11, weight: .medium))
-                    .frame(width: 22, height: 26)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .contentShape(Rectangle())
         }
     }
 
