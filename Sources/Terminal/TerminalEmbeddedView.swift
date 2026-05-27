@@ -114,6 +114,11 @@ struct TerminalEmbeddedView: NSViewRepresentable {
             tv.font = resolveTerminalFont(family: effectiveFamily, size: effectiveSize)
             context.coordinator.lastFontName = effectiveFamily
             context.coordinator.lastFontSize = effectiveSize
+            // resetFont() 用 frame.width 算 cols（含 scrollerWidth ~17pt），比
+            // processSizeChange 多 ~2 列。触发 setFrameSize 修正。
+            if tv.frame.size != .zero {
+                tv.setFrameSize(tv.frame.size)
+            }
         }
     }
 

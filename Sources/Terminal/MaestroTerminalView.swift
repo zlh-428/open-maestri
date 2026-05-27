@@ -49,6 +49,12 @@ extension MaestroTerminalView {
             terminalView = existing
             isRunning = provider.isRunning
             applyThemeAndFont(to: existing, provider: provider)
+            // SwiftTerm v1.13.0 的 resetFont() 用 frame.width 计算 cols，包含了
+            // scrollerWidth（~17pt），比 processSizeChange 的 getEffectiveWidth 多算
+            // 约 2 列。强制触发 setFrameSize 让 processSizeChange 用正确宽度修正 cols。
+            if existing.frame.size != .zero {
+                existing.setFrameSize(existing.frame.size)
+            }
             return
         }
 
