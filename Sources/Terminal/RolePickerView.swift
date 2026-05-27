@@ -12,7 +12,7 @@ struct RolePickerView: View {
 
     @State private var searchText: String = ""
     @State private var showNewRoleSheet = false
-    @State private var roleToEdit: RolePreset? = nil
+    @State private var roleToEdit: RolePreset?
 
     private var filteredRoles: [RolePreset] {
         guard !searchText.isEmpty else { return roles }
@@ -51,7 +51,7 @@ struct RolePickerView: View {
 
                 ScrollView {
                     LazyVGrid(
-                        columns: Array(repeating: GridItem(.fixed(80), spacing: 8), count: 4),
+                        columns: [GridItem(.adaptive(minimum: 80, maximum: 80), spacing: 8)],
                         spacing: 8
                     ) {
                         NewRoleCard { showNewRoleSheet = true }
@@ -158,6 +158,7 @@ struct RolePickerView: View {
             .padding(.horizontal, 24)
             .padding(.bottom, 8)
         }
+        .environment(\.locale, LocalizationManager.shared.locale)
         .sheet(isPresented: $showNewRoleSheet) {
             RoleEditSheet(role: nil) { newRole in
                 onCreateRole(newRole)
@@ -227,9 +228,9 @@ private struct NewRoleCard: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 10)
                         .strokeBorder(
+                            Color(nsColor: .separatorColor),
                             style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
                         )
-                        .foregroundStyle(Color(nsColor: .separatorColor))
                         .frame(width: 80, height: 80)
                     Image(systemName: "plus")
                         .font(.system(size: 18))
