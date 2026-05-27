@@ -11,7 +11,7 @@ struct NewTerminalSheet: View {
 
     // 选中状态
     @State private var selectedIdx: Int = 0
-    @State private var selectedRoleIdx: Int? = nil
+    @State private var selectedRoleId: UUID? = nil
 
     // Tab 切换: 0=详细信息, 1=外观, 2=角色
     @State private var selectedTab: Int = 0
@@ -83,9 +83,7 @@ struct NewTerminalSheet: View {
                         appearanceTabContent
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 12) {
-                        roleTabContent(roles: rs)
-                    }
+                    roleTabContent
                 }
             }
             .padding(.horizontal, 20)
@@ -139,7 +137,7 @@ struct NewTerminalSheet: View {
         if !command.isEmpty {
             finalPreset.command = command
         }
-        let role: RolePreset? = selectedRoleIdx.map { roles[$0] }
+        let role: RolePreset? = selectedRoleId.flatMap { id in initialRoles.first { $0.id == id } }
         let dir = workingDirectory.isEmpty ? defaultWorkingDirectory : workingDirectory
         onConfirm(finalPreset, role, isMaestroMode, dir)
         dismiss()
@@ -287,30 +285,25 @@ struct NewTerminalSheet: View {
     // MARK: - 角色 Tab
 
     @ViewBuilder
-    private func roleTabContent(roles: [RolePreset]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            // 无角色选项
-            Button { selectedRoleIdx = nil } label: {
-                RoleOptionRow(name: "role.none".localized, icon: "xmark.circle", color: "#8E8E93",
-                        isSelected: selectedRoleIdx == nil)
-            }
-            .buttonStyle(.plain)
-
-            if roles.isEmpty {
-                Text("role.no_custom_roles")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.tertiary)
-                    .padding(.top, 8)
-            } else {
-                ForEach(Array(roles.enumerated()), id: \.offset) { idx, role in
-                    Button { selectedRoleIdx = idx } label: {
-                        RoleOptionRow(name: role.name, icon: role.icon, color: role.color,
-                                isSelected: selectedRoleIdx == idx)
-                    }
-                    .buttonStyle(.plain)
+    private var roleTabContent: some View {
+        ScrollView {
+            RolePickerView(
+                roles: initialRoles,
+                selectedRoleId: $selectedRoleId,
+                onCreateRole: { _ in
+                    // NewTerminalSheet 不直接修改全局偏好，新建角色请通过 Settings 管理
+                },
+                onEditRole: { _ in },
+                onUnassign: {
+                    selectedRoleId = nil
+                },
+                onDiscover: {
+                    NotificationCenter.default.post(name: .openSettingsAgents, object: nil)
                 }
-            }
+            )
+            .padding(.top, 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
