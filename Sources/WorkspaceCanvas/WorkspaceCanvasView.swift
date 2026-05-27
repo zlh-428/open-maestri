@@ -941,7 +941,7 @@ struct WorkspaceCanvasView: View {
         let workDir = tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory
         RoleInjector.shared.prepareRoleDirectory(
             roleId: role.id,
-            rolePrompt: role.prompt,
+            rolePreset: role,
             workingDirectory: workDir
         )
 
@@ -999,7 +999,7 @@ struct WorkspaceCanvasView: View {
             return false
         }), case .terminal(let tc) = node.content else { return }
 
-        // 重新创建终端（RoleInjector 已在 applyRole 中写入文件）
+        // 重新创建终端（RoleInjector 已在调用方写入文件）
         _ = TerminalManager.shared.createTerminal(
             id: terminalId,
             command: tc.command,
