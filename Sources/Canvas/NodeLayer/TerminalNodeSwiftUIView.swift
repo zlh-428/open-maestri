@@ -28,7 +28,8 @@ struct TerminalNodeSwiftUIView: View {
             zoom: zoom,
             headerIcon: content.icon,
             headerColor: Color(hex: content.color),
-            headerAccessory: { headerAccessoryContent },
+            headerTitleAccessory: { roleBadge },
+            headerAccessory: { headerRightAccessory },
             footer: {
                 if !currentDirectory.isEmpty {
                     TerminalFooterView(directory: currentDirectory)
@@ -85,22 +86,17 @@ struct TerminalNodeSwiftUIView: View {
         }
     }
 
-    // MARK: - Header Accessory（角色徽章 + 注意力圆点）
+    // MARK: - Header Accessory
 
+    /// 最右侧：Maestro 标记 + 注意力圆点
     @ViewBuilder
-    private var headerAccessoryContent: some View {
+    private var headerRightAccessory: some View {
         HStack(spacing: 4) {
-            // 角色徽章
-            if content.assignedRoleId != nil {
-                roleBadge
-            }
-            // Maestro 标记
             if content.isManager {
                 Image(systemName: "sparkles")
                     .font(.system(size: 9))
                     .foregroundStyle(.purple)
             }
-            // 注意力圆点
             if needsAttention {
                 Circle()
                     .fill(.red)

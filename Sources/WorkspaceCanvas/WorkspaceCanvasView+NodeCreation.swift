@@ -137,6 +137,11 @@ extension WorkspaceCanvasView {
             workingDirectory: dir
         )
         tc.isManager = isManager
+        if let role {
+            tc.assignedRoleId = role.id
+            tc.color = role.color
+            tc.icon = role.icon
+        }
         let node = CanvasNode(
             id: tc.id,
             frame: frame,
@@ -145,13 +150,22 @@ extension WorkspaceCanvasView {
         workspace.addNode(node)
         let wsId = workspace.id
         Task { @MainActor in
+            // 有角色时写入 role 文件并在 role 子目录启动
+            let startDir: String
+            if let role {
+                RoleInjector.shared.prepareRoleDirectory(roleId: role.id, rolePreset: role, workingDirectory: dir)
+                startDir = RoleInjector.shared.roleDirPath(roleId: role.id, workingDirectory: dir)
+            } else {
+                startDir = dir
+            }
             _ = TerminalManager.shared.createTerminal(
                 id: tc.id,
                 command: preset.command,
-                workingDirectory: tc.workingDirectory,
+                workingDirectory: startDir,
                 workspaceId: wsId,
                 roleName: role?.name,
-                displayName: tc.name
+                displayName: tc.name,
+                agentType: preset.agentType
             )
         }
         Task { try? await workspace.save() }

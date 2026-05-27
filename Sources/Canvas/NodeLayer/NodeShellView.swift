@@ -31,7 +31,7 @@ struct VibrancyBackground: NSViewRepresentable {
 
 /// 所有节点的通用外壳，替代 BaseNodeView（NSView 子类）。
 /// 提供：背景/阴影/圆角、Header 栏、可选 Footer 栏、选中蓝色虚线边框、右键菜单。
-struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
+struct NodeShellView<Content: View, TitleAccessory: View, Accessory: View, Footer: View>: View {
     let nodeId: UUID
     let title: String
     let isSelected: Bool
@@ -42,6 +42,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
     let headerColor: Color?
     /// Note 节点专用：应用到 header 背景和节点整体背景的主题色。其他节点类型保持 nil。
     let themeColor: Color?
+    let headerTitleAccessory: TitleAccessory
     let headerAccessory: Accessory
     let footer: Footer
     var onClose: (() -> Void)?
@@ -60,6 +61,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         headerIcon: String?,
         headerColor: Color?,
         themeColor: Color? = nil,
+        @ViewBuilder headerTitleAccessory: () -> TitleAccessory = { EmptyView() },
         @ViewBuilder headerAccessory: () -> Accessory = { EmptyView() },
         @ViewBuilder footer: () -> Footer = { EmptyView() },
         onClose: (() -> Void)? = nil,
@@ -77,6 +79,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
         self.headerIcon = headerIcon
         self.headerColor = headerColor
         self.themeColor = themeColor
+        self.headerTitleAccessory = headerTitleAccessory()
         self.headerAccessory = headerAccessory()
         self.footer = footer()
         self.onClose = onClose
@@ -122,6 +125,7 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
                     color: headerColor,
                     themeColor: themeColor,
                     isLocked: isLocked,
+                    titleAccessory: { headerTitleAccessory },
                     accessory: { headerAccessory }
                 )
                 .frame(height: CanvasNodeConstants.headerHeight)
@@ -167,13 +171,16 @@ struct NodeShellView<Content: View, Accessory: View, Footer: View>: View {
 }
 
 /// Header 栏（标题 + 图标 + 锁定徽章 + 可选配件）
-struct NodeHeaderSwiftUIView<Accessory: View>: View {
+/// - `titleAccessory`：紧跟 title 右侧，在 Spacer 之前（如角色徽章）
+/// - `accessory`：最右侧，在 Spacer 之后（如注意力圆点、Maestro 标记）
+struct NodeHeaderSwiftUIView<TitleAccessory: View, Accessory: View>: View {
     let title: String
     let icon: String?
     let color: Color?
     /// Note 节点专用：header 背景叠加颜色（其他节点传 nil 保持原样）
     let themeColor: Color?
     let isLocked: Bool
+    let titleAccessory: TitleAccessory
     let accessory: Accessory
 
     init(
@@ -182,6 +189,7 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
         color: Color?,
         themeColor: Color? = nil,
         isLocked: Bool,
+        @ViewBuilder titleAccessory: () -> TitleAccessory = { EmptyView() },
         @ViewBuilder accessory: () -> Accessory = { EmptyView() }
     ) {
         self.title = title
@@ -189,6 +197,7 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
         self.color = color
         self.themeColor = themeColor
         self.isLocked = isLocked
+        self.titleAccessory = titleAccessory()
         self.accessory = accessory()
     }
 
@@ -203,7 +212,9 @@ struct NodeHeaderSwiftUIView<Accessory: View>: View {
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            Spacer()
+                .layoutPriority(-1)
+            titleAccessory
+            Spacer(minLength: 4)
             accessory
             if isLocked {
                 Image(systemName: "lock.fill")
