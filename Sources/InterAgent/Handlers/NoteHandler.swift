@@ -24,18 +24,16 @@ final class NoteHandler {
 
     private func handleRead(args: [String], terminalId: UUID?) -> String {
         guard args.count >= 3 else {
-            return "error: usage: omaestri note read \"NoteName\" [offset] [limit]"
+            return "error: usage: omaestri note read \"NoteName\""
         }
         let noteName = args[2]
-        let offset = args.count >= 4 ? Int(args[3]) : nil
-        let limit  = args.count >= 5 ? Int(args[4]) : nil
 
         guard let filePath = resolveNotePath(name: noteName, terminalId: terminalId) else {
             return "error: note '\(noteName)' not found in connections"
         }
 
         do {
-            return try nm.readWithLineRange(filePath: filePath, offset: offset, limit: limit)
+            return try nm.read(filePath: filePath)
         } catch {
             return "error: \(error.localizedDescription)"
         }
