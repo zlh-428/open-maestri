@@ -77,7 +77,7 @@ final class RoleInjector {
 
     // MARK: - Private Helpers
 
-    private func roleDirPath(roleId: UUID, workingDirectory: String) -> String {
+    func roleDirPath(roleId: UUID, workingDirectory: String) -> String {
         let base = workingDirectory.isEmpty
             ? PersistenceManager.shared.appDataURL.appendingPathComponent("roles").path
             : URL(fileURLWithPath: workingDirectory).appendingPathComponent(".maestri/roles").path

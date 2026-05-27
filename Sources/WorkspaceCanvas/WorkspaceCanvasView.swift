@@ -751,10 +751,18 @@ struct WorkspaceCanvasView: View {
             let role: RolePreset? = tc.assignedRoleId.flatMap { roleId in
                 rolePresets.first { $0.id == roleId }
             }
+            let baseDir = tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory
+            // 有角色时在 role 子目录启动，agent 读取 CLAUDE.md 后得知真实工作区
+            let startDir: String
+            if let role {
+                startDir = RoleInjector.shared.roleDirPath(roleId: role.id, workingDirectory: baseDir)
+            } else {
+                startDir = baseDir
+            }
             _ = TerminalManager.shared.createTerminal(
                 id: tc.id,
                 command: tc.command,
-                workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
+                workingDirectory: startDir,
                 workspaceId: wsId,
                 roleName: role?.name,
                 displayName: tc.name,
@@ -914,7 +922,8 @@ struct WorkspaceCanvasView: View {
            let role = appState.preferences.rolePresets.first(where: { $0.id == newRoleId }) {
             let workDir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
             RoleInjector.shared.prepareRoleDirectory(roleId: role.id, rolePreset: role, workingDirectory: workDir)
-            restartTerminalWithRole(terminalId: newTc.id, role: role, workingDirectory: workDir)
+            let roleDir = RoleInjector.shared.roleDirPath(roleId: role.id, workingDirectory: workDir)
+            restartTerminalWithRole(terminalId: newTc.id, role: role, workingDirectory: roleDir)
         } else {
             // assignedRoleId == nil 或 role 已不存在（orphan id），均重启回原始目录
             let dir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
@@ -946,8 +955,9 @@ struct WorkspaceCanvasView: View {
             workingDirectory: workDir
         )
 
-        // 重启终端以应用新角色（在角色目录下启动）
-        restartTerminalWithRole(terminalId: tc.id, role: role, workingDirectory: workDir)
+        // 重启终端，在 role 目录下启动（agent 读取 CLAUDE.md 后得知真实工作区）
+        let roleDir = RoleInjector.shared.roleDirPath(roleId: role.id, workingDirectory: workDir)
+        restartTerminalWithRole(terminalId: tc.id, role: role, workingDirectory: roleDir)
 
         Task { try? await workspace.save() }
     }

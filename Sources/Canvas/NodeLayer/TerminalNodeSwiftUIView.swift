@@ -112,27 +112,36 @@ struct TerminalNodeSwiftUIView: View {
 
     @ViewBuilder
     private var roleBadge: some View {
-        if let roleName = resolvedRoleName {
-            Text(roleName)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
-                .background(
-                    Capsule()
-                        .fill(Color(hex: content.color) ?? .blue)
-                )
+        if let (name, color) = resolvedRoleInfo {
+            HStack(spacing: 3) {
+                Image(systemName: "person.text.rectangle")
+                    .font(.system(size: 8, weight: .medium))
+                Text(name)
+                    .font(.system(size: 9, weight: .medium))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule()
+                    .fill(Color(hex: color) ?? .blue)
+            )
         }
     }
 
-    /// 解析角色名称（从 AppState 中查找）
-    private var resolvedRoleName: String? {
+    /// 解析角色名称和颜色（从 preferences 缓存读取，确保颜色与角色设置一致）
+    private var resolvedRoleInfo: (name: String, color: String)? {
         guard let roleId = content.assignedRoleId else { return nil }
-        // 从 TerminalManager session 中获取 roleName
-        if let session = TerminalManager.shared.terminals[content.id] {
-            return session.roleName
+        // 从 preferences 缓存查找角色完整信息（PersistenceManager 内部有缓存，不触发 IO）
+        let prefs = PersistenceManager.shared.loadPreferencesSync()
+        if let role = prefs.rolePresets.first(where: { $0.id == roleId }) {
+            return (role.name, role.color)
         }
-        // 回退：显示简短的 Role ID
-        return String(roleId.uuidString.prefix(4))
+        // 回退：从 session roleName + content.color
+        if let session = TerminalManager.shared.terminals[content.id],
+           let name = session.roleName {
+            return (name, content.color)
+        }
+        return nil
     }
 }
