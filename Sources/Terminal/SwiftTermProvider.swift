@@ -358,13 +358,14 @@ final class SwiftTermProvider: NSObject {
     func applyCurrentFont(to view: LocalProcessTerminalView) {
         if let prefs = try? PersistenceManager.shared.loadPreferences() {
             view.font = resolveTerminalFont(family: prefs.terminalFontFamily, size: prefs.terminalFontSize)
+            view.setFrameSize(view.frame.size)
         }
     }
 
     func applyFont(family: String, size: CGFloat) {
         guard let view = terminalView else { return }
         view.font = resolveTerminalFont(family: family, size: size)
-        logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
+        view.setFrameSize(view.frame.size)
         logger.debug("Font updated to \(family) \(size)pt for terminal \(self.terminalId.uuidString.prefix(8))")
     }
 
@@ -548,12 +549,9 @@ final class OmLocalProcessTerminalView: LocalProcessTerminalView {
     var onDataReceived: ((String) -> Void)?
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
-        // 先调用 super 让 SwiftTerm 正常 feed 数据到终端 buffer
         super.dataReceived(slice: slice)
-        // 将原始字节转为 UTF-8 文本，回调给 provider
         if let text = String(bytes: slice, encoding: .utf8) {
             onDataReceived?(text)
         }
     }
-
 }

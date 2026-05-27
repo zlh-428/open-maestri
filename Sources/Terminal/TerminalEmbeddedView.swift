@@ -114,11 +114,10 @@ struct TerminalEmbeddedView: NSViewRepresentable {
             tv.font = resolveTerminalFont(family: effectiveFamily, size: effectiveSize)
             context.coordinator.lastFontName = effectiveFamily
             context.coordinator.lastFontSize = effectiveSize
-            // resetFont() 用 frame.width 算 cols（含 scrollerWidth ~17pt），比
-            // processSizeChange 多 ~2 列。触发 setFrameSize 修正。
-            if tv.frame.size != .zero {
-                tv.setFrameSize(tv.frame.size)
-            }
+            // SwiftTerm's resetFont() calculates cols as frame.width / cellWidth, omitting
+            // scrollerWidth. Re-trigger setFrameSize so processSizeChange corrects cols
+            // (cols = (width - scrollerWidth) / cellWidth), fixing cursor x offset.
+            tv.setFrameSize(tv.frame.size)
         }
     }
 
