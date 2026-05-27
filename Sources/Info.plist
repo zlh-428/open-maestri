@@ -16,6 +16,10 @@
 	<string>APPL</string>
 	<key>CFBundleExecutable</key>
 	<string>open-maestri</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 open-maestri contributors. All rights reserved.</string>
 	<key>LSMinimumSystemVersion</key>
