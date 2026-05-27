@@ -3441,6 +3441,118 @@
         }
       }
     },
+    "role.picker.description" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Assign a role to define this agent's focus."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "分配一个角色来定义此代理的工作重点。"
+          }
+        }
+      }
+    },
+    "role.picker.discover" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discover Roles"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发现角色"
+          }
+        }
+      }
+    },
+    "role.picker.footer" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Role settings are managed by open-maestri. A copy of the instructions will be placed in your project's .maestri folder for agents to read at startup. Consider adding .maestri to your .gitignore."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角色设置由 open-maestri 管理。指令副本将放置在项目的 .maestri 文件夹中，以便代理启动时读取。建议将 .maestri 添加到 .gitignore。"
+          }
+        }
+      }
+    },
+    "role.picker.new" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "New"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建"
+          }
+        }
+      }
+    },
+    "role.picker.prompt_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select a role to see its instructions"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择一个角色以查看其指令"
+          }
+        }
+      }
+    },
+    "role.picker.search_placeholder" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search..."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索..."
+          }
+        }
+      }
+    },
+    "role.picker.unassign" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassign Role"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消分配角色"
+          }
+        }
+      }
+    },
     "role.section": {
       "localizations": {
         "en": {
