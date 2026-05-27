@@ -915,7 +915,8 @@ struct WorkspaceCanvasView: View {
             let workDir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
             RoleInjector.shared.prepareRoleDirectory(roleId: role.id, rolePreset: role, workingDirectory: workDir)
             restartTerminalWithRole(terminalId: newTc.id, role: role, workingDirectory: workDir)
-        } else if newTc.assignedRoleId == nil {
+        } else {
+            // assignedRoleId == nil 或 role 已不存在（orphan id），均重启回原始目录
             let dir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
             restartTerminalInOriginalDir(terminalId: newTc.id, workingDirectory: dir)
         }
@@ -983,7 +984,8 @@ struct WorkspaceCanvasView: View {
         }
 
         // 重启终端在原始工作目录
-        restartTerminalInOriginalDir(terminalId: tc.id, workingDirectory: tc.workingDirectory)
+        let dir = tc.workingDirectory.isEmpty ? workspace.workingDirectory : tc.workingDirectory
+        restartTerminalInOriginalDir(terminalId: tc.id, workingDirectory: dir)
 
         Task { try? await workspace.save() }
     }

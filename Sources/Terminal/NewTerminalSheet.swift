@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - 新建 Terminal Sheet
 
 struct NewTerminalSheet: View {
+    @Environment(AppState.self) private var appState
     let initialPresets: [AgentPreset]
     let initialRoles: [RolePreset]
     let defaultWorkingDirectory: String
@@ -290,8 +291,9 @@ struct NewTerminalSheet: View {
             RolePickerView(
                 roles: initialRoles,
                 selectedRoleId: $selectedRoleId,
-                onCreateRole: { _ in
-                    // NewTerminalSheet 不直接修改全局偏好，新建角色请通过 Settings 管理
+                onCreateRole: { newRole in
+                    appState.preferences.rolePresets.append(newRole)
+                    try? PersistenceManager.shared.savePreferences(appState.preferences)
                 },
                 onEditRole: { _ in },
                 onUnassign: {
@@ -346,37 +348,3 @@ struct AgentIconButton: View {
     }
 }
 
-// MARK: - 角色选择行
-
-struct RoleOptionRow: View {
-    let name: String
-    let icon: String
-    let color: String
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(Color(hex: color) ?? .gray)
-                .frame(width: 8, height: 8)
-            Image(systemName: icon)
-                .font(.system(size: 12))
-                .frame(width: 18)
-            Text(name)
-                .font(.system(size: 12))
-            Spacer()
-            if isSelected {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.tint)
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(isSelected ? Color.accentColor.opacity(0.08) : Color.clear)
-        )
-        .contentShape(Rectangle())
-    }
-}
