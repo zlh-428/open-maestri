@@ -414,6 +414,15 @@ struct WorkspaceCanvasView: View {
             set: { if $0 == nil { terminalToEdit = nil } }
         )) { item in
             EditTerminalSheet(nodeId: item.id, content: item.content, workspace: workspace) {
+                guard let savedNode = workspace.nodes.first(where: { $0.id == item.id }) else {
+                    terminalToEdit = nil
+                    return
+                }
+                handleRoleChangeIfNeeded(
+                    nodeId: item.id,
+                    oldContent: .terminal(item.content),
+                    newContent: savedNode.content
+                )
                 terminalToEdit = nil
             }
             .environment(\.locale, LocalizationManager.shared.locale)
@@ -748,7 +757,8 @@ struct WorkspaceCanvasView: View {
                 workingDirectory: tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory,
                 workspaceId: wsId,
                 roleName: role?.name,
-                displayName: tc.name
+                displayName: tc.name,
+                agentType: tc.agentType
             )
         }
     }
@@ -894,6 +904,23 @@ struct WorkspaceCanvasView: View {
         return tc.assignedRoleId
     }
 
+    /// EditTerminalSheet dismiss 时检测 assignedRoleId 是否变化，若变化则重启终端
+    private func handleRoleChangeIfNeeded(nodeId: UUID, oldContent: NodeContent, newContent: NodeContent) {
+        guard case .terminal(let oldTc) = oldContent,
+              case .terminal(let newTc) = newContent else { return }
+        guard oldTc.assignedRoleId != newTc.assignedRoleId else { return }
+
+        if let newRoleId = newTc.assignedRoleId,
+           let role = appState.preferences.rolePresets.first(where: { $0.id == newRoleId }) {
+            let workDir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
+            RoleInjector.shared.prepareRoleDirectory(roleId: role.id, rolePreset: role, workingDirectory: workDir)
+            restartTerminalWithRole(terminalId: newTc.id, role: role, workingDirectory: workDir)
+        } else if newTc.assignedRoleId == nil {
+            let dir = newTc.workingDirectory.isEmpty ? workspace.workingDirectory : newTc.workingDirectory
+            restartTerminalInOriginalDir(terminalId: newTc.id, workingDirectory: dir)
+        }
+    }
+
     /// 为终端节点分配角色，同时调用 RoleInjector 写入文件
     private func applyRole(_ role: RolePreset, toNodeId nodeId: UUID?) {
         guard let nodeId,
@@ -979,7 +1006,8 @@ struct WorkspaceCanvasView: View {
             workingDirectory: workingDirectory,
             workspaceId: workspace.id,
             roleName: role.name,
-            displayName: tc.name
+            displayName: tc.name,
+            agentType: tc.agentType
         )
     }
 
@@ -1000,7 +1028,8 @@ struct WorkspaceCanvasView: View {
             workingDirectory: dir,
             workspaceId: workspace.id,
             roleName: nil,
-            displayName: tc.name
+            displayName: tc.name,
+            agentType: tc.agentType
         )
     }
 
