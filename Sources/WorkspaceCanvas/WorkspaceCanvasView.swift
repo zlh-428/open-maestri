@@ -82,7 +82,9 @@ struct WorkspaceCanvasView: View {
                         onConnect: { startConnectionFromSelected() },
                         onToggleFormatted: { toggleNoteFormatted(nodeId: noteId) },
                         onDelete: { deleteSelectedNodes() },
-                        onSaveAs: { saveNoteAs(nodeId: noteId) }
+                        onSaveAs: { saveNoteAs(nodeId: noteId) },
+                        connections: selectedNodeConnections,
+                        onDeleteConnection: { deleteConnection(id: $0) }
                     )
                     .fixedSize()
                     .padding(.bottom, 36)
@@ -179,7 +181,9 @@ struct WorkspaceCanvasView: View {
                         onEdit: { editSelectedNode() },
                         onConnect: { startConnectionFromSelected() },
                         onRefresh: { /* 预留刷新操作 */ },
-                        onDelete: { deleteSelectedNodes() }
+                        onDelete: { deleteSelectedNodes() },
+                        connections: selectedNodeConnections,
+                        onDeleteConnection: { deleteConnection(id: $0) }
                     )
                     .fixedSize()
                     .padding(.bottom, 36)
@@ -804,6 +808,66 @@ struct WorkspaceCanvasView: View {
     private func startConnectionFromSelected() {
         guard !selectedNodeIds.isEmpty else { return }
         isConnecting = true
+    }
+
+    /// 当前选中节点的所有连接（用于工具栏徽章）
+    private var selectedNodeConnections: [ToolbarConnectionItem] {
+        guard let nodeId = selectedNodeIds.first else { return [] }
+        var items: [ToolbarConnectionItem] = []
+
+        func peerName(_ peerId: UUID) -> String {
+            guard let node = workspace.nodes.first(where: { $0.id == peerId }) else { return "Node" }
+            switch node.content {
+            case .terminal(let tc): return tc.name
+            case .stickyNote(let nc):
+                return nc.fileName.map { $0.hasSuffix(".md") ? String($0.dropLast(3)) : $0 } ?? "便签"
+            case .portal(let pc): return pc.name
+            default: return "Node"
+            }
+        }
+
+        func peerIcon(_ peerId: UUID) -> String {
+            guard let node = workspace.nodes.first(where: { $0.id == peerId }) else { return "circle" }
+            switch node.content {
+            case .terminal: return "terminal"
+            case .stickyNote: return "note.text"
+            case .portal: return "globe"
+            default: return "circle"
+            }
+        }
+
+        for c in workspace.connections where c.terminalIdA == nodeId || c.terminalIdB == nodeId {
+            let peerId = c.terminalIdA == nodeId ? c.terminalIdB : c.terminalIdA
+            items.append(ToolbarConnectionItem(id: c.id, peerName: peerName(peerId), peerIcon: peerIcon(peerId)))
+        }
+        for c in workspace.noteConnections where c.terminalId == nodeId || c.noteNodeId == nodeId {
+            let peerId = c.terminalId == nodeId ? c.noteNodeId : c.terminalId
+            items.append(ToolbarConnectionItem(id: c.id, peerName: peerName(peerId), peerIcon: peerIcon(peerId)))
+        }
+        for c in workspace.portalConnections where c.terminalId == nodeId || c.portalNodeId == nodeId {
+            let peerId = c.terminalId == nodeId ? c.portalNodeId : c.terminalId
+            items.append(ToolbarConnectionItem(id: c.id, peerName: peerName(peerId), peerIcon: peerIcon(peerId)))
+        }
+        for c in workspace.portalToPortalConnections where c.portalIdA == nodeId || c.portalIdB == nodeId {
+            let peerId = c.portalIdA == nodeId ? c.portalIdB : c.portalIdA
+            items.append(ToolbarConnectionItem(id: c.id, peerName: peerName(peerId), peerIcon: peerIcon(peerId)))
+        }
+        for c in workspace.noteToNoteConnections where c.noteNodeIdA == nodeId || c.noteNodeIdB == nodeId {
+            let peerId = c.noteNodeIdA == nodeId ? c.noteNodeIdB : c.noteNodeIdA
+            items.append(ToolbarConnectionItem(id: c.id, peerName: peerName(peerId), peerIcon: peerIcon(peerId)))
+        }
+        return items
+    }
+
+    /// 删除单条连接
+    private func deleteConnection(id connId: UUID) {
+        workspace.connections.removeAll { $0.id == connId }
+        workspace.noteConnections.removeAll { $0.id == connId }
+        workspace.portalConnections.removeAll { $0.id == connId }
+        workspace.portalToPortalConnections.removeAll { $0.id == connId }
+        workspace.noteToNoteConnections.removeAll { $0.id == connId }
+        ConnectionManager.shared.disconnect(id: connId)
+        Task { try? await workspace.save() }
     }
 
     /// 切换终端节点的 Maestro 模式

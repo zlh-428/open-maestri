@@ -15,6 +15,8 @@ struct NoteContextToolbar: View {
     let onToggleFormatted: () -> Void
     let onDelete: () -> Void
     let onSaveAs: () -> Void
+    var connections: [ToolbarConnectionItem] = []
+    var onDeleteConnection: (UUID) -> Void = { _ in }
 
     @State private var showColorPicker = false
     @State private var showFontSizeMenu = false
@@ -55,6 +57,9 @@ struct NoteContextToolbar: View {
 
             // 组5：节点操作
             noteButton("arrow.trianglehead.branch", tooltip: "Connect") { onConnect() }
+            if !connections.isEmpty {
+                ConnectionBadgeButton(connections: connections, onDelete: onDeleteConnection)
+            }
             noteButton("character.textbox",
                        tooltip: isFormatted ? "Edit Mode" : "Preview Mode",
                        isActive: isFormatted)                           { onToggleFormatted() }
