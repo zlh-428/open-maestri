@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import AppKit
 
@@ -291,14 +292,13 @@ struct EditTerminalSheet: View {
             )
             .padding(.top, 8)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func savePreferences() {
         do {
             try PersistenceManager.shared.savePreferences(appState.preferences)
         } catch {
-            // 静默失败，偏好不影响核心功能
+            Logger.make(category: "EditTerminalSheet").error("savePreferences failed: \(error.localizedDescription)")
         }
     }
 
