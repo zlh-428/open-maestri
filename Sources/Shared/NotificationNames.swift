@@ -87,4 +87,6 @@ extension Notification.Name {
     static let strokeNodeDrawn = Notification.Name("OpenMaestri.strokeNodeDrawn")
     /// stroke 控制点拖拽结束（mouseUp）：userInfo 含 "nodeId" UUID
     static let strokePointDragDidEnd = Notification.Name("OpenMaestri.strokePointDragDidEnd")
+    /// 打开设置 → Agents 面板
+    static let openSettingsAgents    = Notification.Name("OpenMaestri.openSettingsAgents")
 }

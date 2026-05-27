@@ -40,6 +40,9 @@ struct EditTerminalSheet: View {
     @State private var fontFamily: String
     @State private var fontSize: CGFloat
 
+    // 角色 Tab
+    @State private var selectedRoleId: UUID?
+
     enum Field: Hashable { case name, command }
     @FocusState private var focusedField: Field?
 
@@ -59,6 +62,7 @@ struct EditTerminalSheet: View {
         _themeId = State(initialValue: content.themeId ?? "system")
         _fontFamily = State(initialValue: content.fontFamily ?? "SF Mono")
         _fontSize = State(initialValue: content.fontSize ?? 13)
+        _selectedRoleId = State(initialValue: content.assignedRoleId)
     }
 
     var body: some View {
@@ -260,21 +264,42 @@ struct EditTerminalSheet: View {
         }
     }
 
-    // MARK: - 角色 Tab（占位）
+    // MARK: - 角色 Tab
 
     @ViewBuilder
     private var roleTabView: some View {
-        VStack(spacing: 12) {
-            Spacer()
-            Image(systemName: "person.crop.circle.badge.questionmark")
-                .font(.system(size: 40))
-                .foregroundStyle(.tertiary)
-            Text("terminal.edit.role_placeholder")
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-            Spacer()
+        ScrollView {
+            RolePickerView(
+                roles: appState.preferences.rolePresets,
+                selectedRoleId: $selectedRoleId,
+                onCreateRole: { newRole in
+                    appState.preferences.rolePresets.append(newRole)
+                    savePreferences()
+                },
+                onEditRole: { updated in
+                    if let idx = appState.preferences.rolePresets.firstIndex(where: { $0.id == updated.id }) {
+                        appState.preferences.rolePresets[idx] = updated
+                        savePreferences()
+                    }
+                },
+                onUnassign: {
+                    selectedRoleId = nil
+                },
+                onDiscover: {
+                    NotificationCenter.default.post(name: .openSettingsAgents, object: nil)
+                }
+            )
+            .padding(.top, 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func savePreferences() {
+        do {
+            try PersistenceManager.shared.savePreferences(appState.preferences)
+        } catch {
+            // 静默失败，偏好不影响核心功能
+        }
     }
 
     // MARK: - Helpers
@@ -312,6 +337,7 @@ struct EditTerminalSheet: View {
         tc.themeId = themeId
         tc.fontFamily = fontFamily
         tc.fontSize = fontSize
+        tc.assignedRoleId = selectedRoleId
         let newContent = NodeContent.terminal(tc)
         workspace.nodes[idx].content = newContent
         NotificationCenter.default.post(
