@@ -9,17 +9,26 @@ final class RoleInjector {
     private let logger = Logger.make(category: "RoleInjector")
     private init() {}
 
+    private static let roleJsonSchemaVersion = 1
+
+    private struct RoleJsonPayload: Encodable {
+        let color: String
+        let icon: String
+        let id: String
+        let name: String
+        let prompt: String
+        let schemaVersion: Int
+    }
+
     // MARK: - Public API
 
-    /// 准备 Role 目录，返回 terminal 应该启动的目录路径
+    /// 准备 Role 目录（完整版），写入 role.json + CLAUDE.md + AGENTS.md
     @discardableResult
     func prepareRoleDirectory(roleId: UUID, rolePreset: RolePreset, workingDirectory: String) -> String {
         let roleDir = roleDirPath(roleId: roleId, workingDirectory: workingDirectory)
-        let instructionContent = buildInstructionContent(rolePrompt: rolePreset.prompt, workingDirectory: workingDirectory)
+        let content = buildInstructionContent(rolePrompt: rolePreset.prompt, workingDirectory: workingDirectory)
         do {
-            try FileManager.default.createDirectory(atPath: roleDir, withIntermediateDirectories: true)
-            try instructionContent.write(toFile: "\(roleDir)/CLAUDE.md", atomically: true, encoding: .utf8)
-            try instructionContent.write(toFile: "\(roleDir)/AGENTS.md", atomically: true, encoding: .utf8)
+            try writeInstructionFiles(content: content, to: roleDir)
             try writeRoleJson(rolePreset: rolePreset, to: roleDir)
             logger.debug("Role files written to \(roleDir)")
         } catch {
@@ -28,15 +37,13 @@ final class RoleInjector {
         return roleDir
     }
 
-    /// 兼容旧调用签名（prompt-only），不写 role.json（内部使用）
+    /// 兼容旧调用签名（prompt-only），只写 CLAUDE.md + AGENTS.md，不写 role.json
     @discardableResult
     func prepareRoleDirectory(roleId: UUID, rolePrompt: String, workingDirectory: String) -> String {
         let roleDir = roleDirPath(roleId: roleId, workingDirectory: workingDirectory)
         let content = buildInstructionContent(rolePrompt: rolePrompt, workingDirectory: workingDirectory)
         do {
-            try FileManager.default.createDirectory(atPath: roleDir, withIntermediateDirectories: true)
-            try content.write(toFile: "\(roleDir)/CLAUDE.md", atomically: true, encoding: .utf8)
-            try content.write(toFile: "\(roleDir)/AGENTS.md", atomically: true, encoding: .utf8)
+            try writeInstructionFiles(content: content, to: roleDir)
             logger.debug("Role instruction files written to \(roleDir)")
         } catch {
             logger.error("Failed to write role instruction files: \(error)")
@@ -47,25 +54,40 @@ final class RoleInjector {
     /// 移除 Role 目录（从指定工作区）
     func removeRoleDirectory(roleId: UUID, workingDirectory: String) {
         let roleDir = roleDirPath(roleId: roleId, workingDirectory: workingDirectory)
-        try? FileManager.default.removeItem(atPath: roleDir)
-        logger.debug("Role dir removed: \(roleDir)")
+        do {
+            try FileManager.default.removeItem(atPath: roleDir)
+            logger.debug("Role dir removed: \(roleDir)")
+        } catch {
+            logger.error("Failed to remove role dir: \(error)")
+        }
     }
 
-    /// 旧签名兼容：不知道工作区时从全局路径删（向后兼容，新代码应传 workingDirectory）
+    /// 旧签名兼容：不知道工作区时从全局路径删（向后兼容）
     func removeRoleDirectory(roleId: UUID) {
         let globalDir = PersistenceManager.shared.appDataURL
             .appendingPathComponent("roles/\(roleId.uuidString)")
             .path
-        try? FileManager.default.removeItem(atPath: globalDir)
+        do {
+            try FileManager.default.removeItem(atPath: globalDir)
+            logger.debug("Legacy role dir removed: \(globalDir)")
+        } catch {
+            logger.error("Failed to remove legacy role dir: \(error)")
+        }
     }
 
-    // MARK: - Helpers
+    // MARK: - Private Helpers
 
-    func roleDirPath(roleId: UUID, workingDirectory: String) -> String {
+    private func roleDirPath(roleId: UUID, workingDirectory: String) -> String {
         let base = workingDirectory.isEmpty
             ? PersistenceManager.shared.appDataURL.appendingPathComponent("roles").path
-            : (workingDirectory as NSString).appendingPathComponent(".maestri/roles")
-        return (base as NSString).appendingPathComponent(roleId.uuidString)
+            : URL(fileURLWithPath: workingDirectory).appendingPathComponent(".maestri/roles").path
+        return URL(fileURLWithPath: base).appendingPathComponent(roleId.uuidString).path
+    }
+
+    private func writeInstructionFiles(content: String, to roleDir: String) throws {
+        try FileManager.default.createDirectory(atPath: roleDir, withIntermediateDirectories: true)
+        try content.write(toFile: "\(roleDir)/CLAUDE.md", atomically: true, encoding: .utf8)
+        try content.write(toFile: "\(roleDir)/AGENTS.md", atomically: true, encoding: .utf8)
     }
 
     private func buildInstructionContent(rolePrompt: String, workingDirectory: String) -> String {
@@ -82,21 +104,13 @@ final class RoleInjector {
     }
 
     private func writeRoleJson(rolePreset: RolePreset, to dir: String) throws {
-        struct RoleJsonPayload: Encodable {
-            let color: String
-            let icon: String
-            let id: String
-            let name: String
-            let prompt: String
-            let schemaVersion: Int
-        }
         let payload = RoleJsonPayload(
             color: rolePreset.color,
             icon: rolePreset.icon,
             id: rolePreset.id.uuidString.uppercased(),
             name: rolePreset.name,
             prompt: rolePreset.prompt,
-            schemaVersion: 1
+            schemaVersion: Self.roleJsonSchemaVersion
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
