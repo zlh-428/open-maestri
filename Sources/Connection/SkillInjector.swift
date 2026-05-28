@@ -15,25 +15,37 @@ final class SkillInjector {
         // no-op: skill 写入已在 applicationDidFinishLaunching 完成
     }
 
-    /// 按需写入：skill 文件不存在时写入，已存在则跳过（用户可自行编辑）
+    /// 按需写入：将内置 skill 写入用户配置的所有活跃 skillPaths，已存在则跳过
     func installSkillsIfNeeded() {
+        let prefs = PersistenceManager.shared.loadPreferencesSync()
+        let activePaths = prefs.skillPaths.filter { $0.isActive }.map { $0.path }
+        guard !activePaths.isEmpty else { return }
+
         let fm = FileManager.default
         let homeDir = fm.homeDirectoryForCurrentUser.path
-        let skillsRoot = "\(homeDir)/.claude/skills"
 
+        for rawPath in activePaths {
+            let skillsRoot = rawPath.hasPrefix("~/")
+                ? homeDir + "/" + rawPath.dropFirst(2)
+                : rawPath
+            installSkills(to: skillsRoot, fm: fm)
+        }
+    }
+
+    private func installSkills(to skillsRoot: String, fm: FileManager) {
         for skill in Self.skills {
             let dir = "\(skillsRoot)/\(skill.name)"
             let file = "\(dir)/SKILL.md"
             guard !fm.fileExists(atPath: file) else {
-                logger.debug("SkillInjector: '\(skill.name)' already exists, skipping")
+                logger.debug("SkillInjector: '\(skill.name)' already exists at \(skillsRoot), skipping")
                 continue
             }
             do {
                 try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
                 try skill.content.write(toFile: file, atomically: true, encoding: .utf8)
-                logger.info("SkillInjector: installed skill '\(skill.name)'")
+                logger.info("SkillInjector: installed '\(skill.name)' to \(skillsRoot)")
             } catch {
-                logger.error("SkillInjector: failed to write '\(skill.name)': \(error)")
+                logger.error("SkillInjector: failed to write '\(skill.name)' to \(skillsRoot): \(error)")
             }
         }
     }

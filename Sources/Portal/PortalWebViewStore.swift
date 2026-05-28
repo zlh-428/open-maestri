@@ -240,4 +240,16 @@ final class PortalWebViewStore {
             }
         }
     }
+
+    // MARK: - 全局存储管理
+
+    /// 清除全局 Portal 存储（Cookie、缓存、本地数据）
+    /// 对应 Maestri "清除全局存储..." 功能
+    func clearGlobalStorage() async {
+        let dataStore = WKWebsiteDataStore.default()
+        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        let records = await dataStore.dataRecords(ofTypes: dataTypes)
+        await dataStore.removeData(ofTypes: dataTypes, for: records)
+        logger.info("Global portal storage cleared (\(records.count) records removed)")
+    }
 }

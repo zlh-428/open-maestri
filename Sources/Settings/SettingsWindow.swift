@@ -9,16 +9,19 @@ struct SettingsWindow: View {
             GeneralSettingsView()
                 .environment(appState)
                 .tabItem { Label("settings.tab.general", systemImage: "gearshape") }
-            AgentsSettingsView()
-                .environment(appState)
-                .tabItem { Label("settings.tab.agents", systemImage: "cpu") }
             TerminalSettingsView()
                 .environment(appState)
                 .tabItem { Label("settings.tab.terminal", systemImage: "terminal") }
+            AgentsSettingsView()
+                .environment(appState)
+                .tabItem { Label("settings.tab.agents", systemImage: "person.crop.rectangle.stack") }
             ShortcutsSettingsView()
                 .environment(appState)
                 .tabItem { Label("settings.tab.shortcuts", systemImage: "keyboard") }
+            DataSettingsView()
+                .environment(appState)
+                .tabItem { Label("settings.tab.data", systemImage: "externaldrive") }
         }
-        .frame(width: 560, height: 420)
+        .frame(width: 560, height: 520)
     }
 }
