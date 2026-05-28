@@ -5350,6 +5350,150 @@
         }
       }
     },
+    "shortcut.connect_nodes.desc": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start a connection from the selected node to another."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从选中节点开始连线到另一个节点。"
+          }
+        }
+      }
+    },
+    "shortcut.filter_placeholder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "筛选"
+          }
+        }
+      }
+    },
+    "shortcut.focus_terminal.desc": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jump to a terminal by its index number."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按序号跳转到指定终端。"
+          }
+        }
+      }
+    },
+    "shortcut.group.canvas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Canvas"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "画布"
+          }
+        }
+      }
+    },
+    "shortcut.group.element_nav": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Element Navigation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "元素导航"
+          }
+        }
+      }
+    },
+    "shortcut.group.workspace_nav": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Workspace Navigation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作区导航"
+          }
+        }
+      }
+    },
+    "shortcut.restore_defaults": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore Defaults"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复默认设置"
+          }
+        }
+      }
+    },
+    "shortcut.zoom_scroll_modifier": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zoom Scroll Modifier"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缩放滚动修饰键"
+          }
+        }
+      }
+    },
+    "shortcut.zoom_scroll_modifier.desc": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold this modifier key while scrolling to zoom the canvas."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住此修饰键并滚动以缩放画布。"
+          }
+        }
+      }
+    },
     "shortcut.center_node": {
       "localizations": {
         "en": {
@@ -6182,6 +6326,38 @@
         }
       }
     },
+    "terminal.theme.custom_title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom Theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义主题"
+          }
+        }
+      }
+    },
+    "terminal.theme.preview_placeholder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a theme to preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择一个主题以预览"
+          }
+        }
+      }
+    },
     "terminal.theme.dark": {
       "localizations": {
         "en": {
@@ -6900,6 +7076,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "未选择"
+          }
+        }
+      }
+    },
+    "workspace.open_in_finder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Finder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在访达中打开"
           }
         }
       }
