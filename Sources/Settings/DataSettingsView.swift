@@ -76,15 +76,6 @@ struct DataSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            // 显示非工作区部分（配置文件、备份等）
-            let workspacesTotal = workspaceSizes.reduce(Int64(0)) { $0 + $1.size }
-            let otherSize = max(0, totalSize - workspacesTotal)
-            if otherSize > 0 {
-                LabeledContent("data.usage.other") {
-                    Text(formattedSize(otherSize))
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
     }
 
@@ -233,8 +224,8 @@ struct DataSettingsView: View {
 
     private func refreshStorageInfo() {
         Task.detached(priority: .background) {
-            let total = BackupManager.shared.totalStorageSize()
             let sizes = BackupManager.shared.workspaceStorageSizes()
+            let total = sizes.reduce(Int64(0)) { $0 + $1.size }
             let backup = BackupManager.shared.lastBackupDate()
             await MainActor.run {
                 totalSize = total
