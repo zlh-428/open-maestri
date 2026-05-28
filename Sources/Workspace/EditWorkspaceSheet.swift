@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 编辑工作区 Sheet（FR1 扩展：名称/目录/图标/Agent 指令/同步配置）
+/// 编辑工作区 Sheet（名称 / 图标 / 颜色 / 工作目录）
 struct EditWorkspaceSheet: View {
     @Environment(\.dismiss) private var dismiss
     let entry: WorkspaceEntry
@@ -9,20 +9,32 @@ struct EditWorkspaceSheet: View {
     @State private var name: String
     @State private var workingDirectory: String
     @State private var selectedIcon: String
-    @State private var syncConfigFiles: Bool
+    @State private var selectedColor: String
 
-    // Agent 指令 Tab 状态
-    @State private var claudeMdContent: String = ""
-    @State private var agentsMdContent: String = ""
-    @State private var selectedTab: EditTab = .general
-    @State private var agentFilesDirty = false
+    // 扩展图标列表（对应截图中 9×3 的网格）
+    private let iconOptions: [String] = [
+        // Row 1
+        "photo.on.rectangle.angled", "face.smiling", "terminal.fill", "star.fill",
+        "theatermasks", "gear", "bubble.left.and.bubble.right", "cpu",
+        // Row 2
+        "rectangle", "list.bullet.rectangle", "globe", "hammer.fill",
+        "wrench.and.screwdriver", "bolt.fill", "square.on.square", "folder",
+        // Row 3
+        "laptopcomputer", "desktopcomputer", "paintbrush.fill", "folder.fill",
+        "doc.text", "shippingbox", "cube", "eye"
+    ]
 
-    enum EditTab { case general, agentInstructions }
-
-    private let iconOptions = [
-        "folder", "folder.fill", "terminal.fill", "cpu",
-        "brain", "desktopcomputer", "network", "server.rack",
-        "doc.text", "swift", "wrench", "gear"
+    // 颜色选项（对应截图中的 9 个色圆）
+    private let colorOptions: [(id: String, color: Color)] = [
+        ("blue", .blue),
+        ("red", .red),
+        ("green", .green),
+        ("orange", .orange),
+        ("purple", .purple),
+        ("pink", .pink),
+        ("cyan", .cyan),
+        ("yellow", .yellow),
+        ("rainbow", .clear) // rainbow 用特殊渲染
     ]
 
     init(entry: WorkspaceEntry, onSave: @escaping (WorkspaceEntry) -> Void) {
@@ -31,159 +43,156 @@ struct EditWorkspaceSheet: View {
         _name = State(initialValue: entry.name)
         _workingDirectory = State(initialValue: entry.workingDirectory)
         _selectedIcon = State(initialValue: entry.icon)
-        _syncConfigFiles = State(initialValue: false)
+        _selectedColor = State(initialValue: entry.color)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            // 标题栏
-            HStack {
-                Text("workspace.edit.title")
-                    .font(.headline)
-                Spacer()
-                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+            // 标题
+            Text("workspace.edit.title")
+                .font(.title2.weight(.semibold))
+                .padding(.top, 24)
+                .padding(.bottom, 16)
+
+            // 内容区域
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // 名称输入框
+                    TextField("workspace.name", text: $name)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.title3)
+                        .padding(.horizontal)
+
+                    // 图标选择
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("workspace.section.icon")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 8), spacing: 10) {
+                            ForEach(iconOptions, id: \.self) { icon in
+                                Button {
+                                    selectedIcon = icon
+                                } label: {
+                                    Image(systemName: icon)
+                                        .font(.title3)
+                                        .frame(width: 36, height: 36)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .fill(selectedIcon == icon ? Color.accentColor.opacity(0.15) : Color.clear)
+                                        )
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 8)
+                                                .stroke(selectedIcon == icon ? Color.accentColor : Color.clear, lineWidth: 2)
+                                        )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    // 颜色选择
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("workspace.section.color")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+
+                        HStack(spacing: 12) {
+                            ForEach(colorOptions, id: \.id) { option in
+                                Button {
+                                    selectedColor = option.id
+                                } label: {
+                                    ZStack {
+                                        if option.id == "rainbow" {
+                                            // 彩虹色用渐变圆
+                                            Circle()
+                                                .fill(
+                                                    AngularGradient(
+                                                        colors: [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .red],
+                                                        center: .center
+                                                    )
+                                                )
+                                                .frame(width: 28, height: 28)
+                                        } else {
+                                            Circle()
+                                                .fill(option.color)
+                                                .frame(width: 28, height: 28)
+                                        }
+                                        // 选中指示器
+                                        if selectedColor == option.id {
+                                            Circle()
+                                                .stroke(Color.primary, lineWidth: 2.5)
+                                                .frame(width: 34, height: 34)
+                                        }
+                                    }
+                                    .frame(width: 36, height: 36)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+
+                    // 工作目录
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("workspace.section.working_dir")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal)
+
+                        HStack(spacing: 8) {
+                            Text(abbreviatedPath(workingDirectory))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                )
+
+                            Button("button.browse") {
+                                pickDirectory()
+                            }
+                            .controlSize(.regular)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+
+            Divider()
+                .padding(.top, 8)
+
+            // 底部按钮
+            HStack(spacing: 12) {
+                Button("button.cancel") { dismiss() }
+                    .keyboardShortcut(.escape)
+                    .controlSize(.large)
+
                 Button("button.save") { save() }
                     .keyboardShortcut(.return)
                     .disabled(name.isEmpty || workingDirectory.isEmpty)
                     .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
             }
-            .padding()
-
-            Divider()
-
-            // Tab 选择器
-            Picker("", selection: $selectedTab) {
-                Text("workspace.tab.general").tag(EditTab.general)
-                Text("workspace.tab.agent_instructions").tag(EditTab.agentInstructions)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            // Tab 内容
-            switch selectedTab {
-            case .general:
-                generalTab
-            case .agentInstructions:
-                agentInstructionsTab
-            }
+            .padding(.vertical, 16)
         }
-        .frame(width: 560, height: 520)
-        .onAppear { loadAgentFiles() }
-        .onChange(of: workingDirectory) { _, _ in loadAgentFiles() }
+        .frame(width: 500, height: 560)
     }
 
-    // MARK: - 常规 Tab
+    // MARK: - Private
 
-    private var generalTab: some View {
-        Form {
-            Section("workspace.section.basic_info") {
-                TextField("workspace.name", text: $name).textFieldStyle(.roundedBorder)
-                HStack {
-                    TextField("workspace.working_dir", text: $workingDirectory).textFieldStyle(.roundedBorder)
-                    Button("button.choose_directory") { pickDirectory() }
-                }
-            }
-
-            Section("workspace.section.icon") {
-                LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 8), spacing: 8) {
-                    ForEach(iconOptions, id: \.self) { icon in
-                        Button { selectedIcon = icon } label: {
-                            Image(systemName: icon)
-                                .frame(width: 32, height: 32)
-                                .background(selectedIcon == icon ? Color.accentColor.opacity(0.2) : Color.clear)
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .padding(.horizontal)
+    private func abbreviatedPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return path.hasPrefix(home) ? "~" + path.dropFirst(home.count) : path
     }
-
-    // MARK: - Agent 指令 Tab（内联编辑 CLAUDE.md / AGENTS.md）
-
-    private var agentInstructionsTab: some View {
-        VStack(spacing: 0) {
-            // 同步开关
-            HStack {
-                Toggle("filetree.sync_config", isOn: $syncConfigFiles)
-                    .help("filetree.sync_config.help".localized)
-                    .onChange(of: syncConfigFiles) { _, sync in
-                        if sync { agentsMdContent = claudeMdContent }
-                    }
-                Spacer()
-                if agentFilesDirty {
-                    Button("button.save_files") { saveAgentFiles() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            // 编辑区：同步时单栏，非同步时双栏
-            if syncConfigFiles {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("filetree.claude_agents_label", systemImage: "doc.text")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                        .padding(.top, 8)
-                    TextEditor(text: Binding(
-                        get: { claudeMdContent },
-                        set: { v in
-                            claudeMdContent = v
-                            agentsMdContent = v
-                            agentFilesDirty = true
-                        }
-                    ))
-                    .font(.system(.body, design: .monospaced))
-                    .padding(.horizontal, 8)
-                }
-            } else {
-                HStack(alignment: .top, spacing: 0) {
-                    // CLAUDE.md
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("CLAUDE.md", systemImage: "doc.text")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        TextEditor(text: Binding(
-                            get: { claudeMdContent },
-                            set: { v in claudeMdContent = v; agentFilesDirty = true }
-                        ))
-                        .font(.system(.body, design: .monospaced))
-                        .padding(.horizontal, 4)
-                    }
-                    Divider()
-                    // AGENTS.md
-                    VStack(alignment: .leading, spacing: 4) {
-                        Label("AGENTS.md", systemImage: "doc.text")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                        TextEditor(text: Binding(
-                            get: { agentsMdContent },
-                            set: { v in agentsMdContent = v; agentFilesDirty = true }
-                        ))
-                        .font(.system(.body, design: .monospaced))
-                        .padding(.horizontal, 4)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - 私有方法
 
     private func pickDirectory() {
         let panel = NSOpenPanel()
@@ -195,33 +204,12 @@ struct EditWorkspaceSheet: View {
         }
     }
 
-    private func loadAgentFiles() {
-        let claudePath = workingDirectory + "/CLAUDE.md"
-        let agentsPath = workingDirectory + "/AGENTS.md"
-        claudeMdContent = (try? String(contentsOfFile: claudePath, encoding: .utf8)) ?? ""
-        agentsMdContent = (try? String(contentsOfFile: agentsPath, encoding: .utf8)) ?? ""
-        agentFilesDirty = false
-    }
-
-    private func saveAgentFiles() {
-        let claudePath = workingDirectory + "/CLAUDE.md"
-        let agentsPath = workingDirectory + "/AGENTS.md"
-        try? claudeMdContent.write(toFile: claudePath, atomically: true, encoding: .utf8)
-        if syncConfigFiles {
-            try? claudeMdContent.write(toFile: agentsPath, atomically: true, encoding: .utf8)
-        } else {
-            try? agentsMdContent.write(toFile: agentsPath, atomically: true, encoding: .utf8)
-        }
-        agentFilesDirty = false
-    }
-
     private func save() {
-        // 保存 Agent 指令文件
-        if agentFilesDirty { saveAgentFiles() }
         var updated = entry
         updated.name = name
         updated.workingDirectory = workingDirectory
         updated.icon = selectedIcon
+        updated.color = selectedColor
         onSave(updated)
         dismiss()
     }

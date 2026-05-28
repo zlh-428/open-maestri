@@ -529,6 +529,22 @@
         }
       }
     },
+    "button.browse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browse…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览…"
+          }
+        }
+      }
+    },
     "button.cancel": {
       "localizations": {
         "en": {
@@ -4600,13 +4616,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Role settings are managed by open-maestri. A copy of the instructions will be placed in your project's .maestri folder for agents to read at startup. Consider adding .maestri to your .gitignore."
+            "value": "Role settings are managed by open-maestri. A copy of the instructions will be placed in your project's .open-maestri folder for agents to read at startup. Consider adding .open-maestri to your .gitignore."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "角色设置由 open-maestri 管理。指令副本将放置在项目的 .maestri 文件夹中，以便代理启动时读取。建议将 .maestri 添加到 .gitignore。"
+            "value": "角色设置由 open-maestri 管理。指令副本将放置在项目的 .open-maestri 文件夹中，以便代理启动时读取。建议将 .open-maestri 添加到 .gitignore。"
           }
         }
       }
@@ -6756,6 +6772,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "图标"
+          }
+        }
+      }
+    },
+    "workspace.section.color": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Color"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "颜色"
+          }
+        }
+      }
+    },
+    "workspace.section.working_dir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working Directory"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作目录"
           }
         }
       }
