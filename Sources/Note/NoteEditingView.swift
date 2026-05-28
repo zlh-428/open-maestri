@@ -12,8 +12,14 @@ struct NoteEditingView: View {
 
     var body: some View {
         if state.isFormatted {
-            MarkdownPreviewView(markdown: state.content)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            MarkdownLiveEditor(
+                text: $state.content,
+                nodeId: nodeId,
+                onChange: { newValue in
+                    onSave(newValue)
+                }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ZStack(alignment: .topLeading) {
                 NoteImagePasteTextEditor(
@@ -42,47 +48,5 @@ struct NoteEditingView: View {
                 }
             }
         }
-    }
-}
-
-/// Markdown 预览（使用 MarkdownRenderer 渲染，保留所有换行）
-struct MarkdownPreviewView: View {
-    let markdown: String
-    var fontSize: CGFloat = 14
-
-    var body: some View {
-        MarkdownPreviewNSView(markdown: markdown, fontSize: fontSize)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct MarkdownPreviewNSView: NSViewRepresentable {
-    let markdown: String
-    let fontSize: CGFloat
-
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let tv = scrollView.documentView as? NSTextView else { return scrollView }
-        tv.isEditable = false
-        tv.isSelectable = true
-        tv.isRichText = true
-        tv.backgroundColor = .clear
-        tv.drawsBackground = false
-        tv.textContainerInset = NSSize(width: 4, height: 8)
-        tv.isHorizontallyResizable = false
-        tv.isVerticallyResizable = true
-        tv.autoresizingMask = [.width]
-        tv.textContainer?.widthTracksTextView = true
-        tv.textContainer?.containerSize = CGSize(
-            width: scrollView.frame.width,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        return scrollView
-    }
-
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let tv = scrollView.documentView as? NSTextView else { return }
-        let attributed = MarkdownRenderer.render(markdown, fontSize: fontSize)
-        tv.textStorage?.setAttributedString(attributed)
     }
 }
