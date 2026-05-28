@@ -58,8 +58,10 @@ struct TerminalEmbeddedView: NSViewRepresentable {
 
         @MainActor
         func attachIfNeeded(to maestroView: MaestroTerminalView, terminalId: UUID) {
-            guard !isAttached,
-                  let provider = TerminalManager.shared.providers[terminalId] else { return }
+            guard let provider = TerminalManager.shared.providers[terminalId] else { return }
+            // 如果已 attach 且 provider 未变，跳过（正常情况）
+            // 如果 provider 被替换（终端重启），强制重新 attach
+            if isAttached && self.provider === provider { return }
             self.provider = provider
             maestroView.attach(provider: provider)
             isAttached = true

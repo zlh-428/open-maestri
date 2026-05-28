@@ -255,7 +255,15 @@ final class SwiftTermProvider: NSObject {
     // MARK: - 停止
 
     func stop() {
-        guard isRunning else { return }
+        // 即使 PTY 未完成启动（isRunning=false，pendingStart 挂起），也要清理 terminalView
+        pendingStart = nil
+        scrollbackDebounceTask?.cancel()
+        scrollbackDebounceTask = nil
+        guard isRunning else {
+            terminalView?.removeFromSuperview()
+            terminalView = nil
+            return
+        }
         isRunning = false
         // 退出前做最后一次 scrollback 快照（必须在 terminalView 置 nil 之前）
         if let view = terminalView, let wsId = workspaceId {

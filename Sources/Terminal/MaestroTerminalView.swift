@@ -39,12 +39,18 @@ extension MaestroTerminalView {
     func attach(provider: SwiftTermProvider) {
         if let existing = provider.terminalView {
             if existing.superview != self {
-                // re-attach：先清除占位背景色，再移入终端视图，避免"背景色闪一帧"
+                // re-attach / restart：先移除旧的 terminalView（若有），再挂入新的
+                let isRestart = terminalView != nil && terminalView !== existing
+                if let old = terminalView, old !== existing {
+                    old.removeFromSuperview()
+                }
                 layer?.backgroundColor = nil
                 existing.removeFromSuperview()
                 existing.frame = bounds
                 existing.autoresizingMask = [.width, .height]
                 addSubview(existing)
+                // 重启场景：新 terminalView 需要通过 layout() 触发 firePendingStart()
+                if isRestart { isInitialLayout = true }
             }
             terminalView = existing
             isRunning = provider.isRunning
