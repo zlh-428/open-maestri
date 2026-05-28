@@ -242,15 +242,19 @@ extension CanvasViewportView {
                     window?.makeFirstResponder(webView)
                 }
             }
-            // stroke/freehand 节点：内容区也支持拖动（无文字选择需求）
-            if let node = currentNodes.first(where: { $0.id == id }) {
-                switch node.content {
-                case .stroke, .freehand:
-                    let startFrame = nodeCanvasFrames[id] ?? .zero
-                    interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
-                default:
-                    break
-                }
+            // freehand 节点：内容区点击 → 启动拖动（无文字编辑，直接可拖）
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .freehand = node.content {
+                let startFrame = nodeCanvasFrames[id] ?? .zero
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+                return
+            }
+            // stroke 节点：内容区点击 → 启动拖动（控制点拖拽已在 mouseDown 最顶部处理）
+            if let node = currentNodes.first(where: { $0.id == id }),
+               case .stroke = node.content {
+                let startFrame = nodeCanvasFrames[id] ?? .zero
+                interaction = .mayDragNode(id, startMouse: loc, startFrame: startFrame, contentTarget: nil)
+                return
             }
 
         case .nodeRotateHandle(let id):
@@ -726,6 +730,8 @@ extension CanvasViewportView {
             needsDisplay = true
 
         case .drawingFreehand(let pts):
+            // 清除 freehand 预览
+            snapGuideView?.freehandPreviewPoints = []
             guard pts.count >= 2 else {
                 drawingCurrentPoint = nil
                 snapGuideView?.freehandPreviewPoints = nil

@@ -11,6 +11,8 @@ final class MagneticSnapGuideView: NSView {
     var selectionRect: CGRect? { didSet { needsDisplay = true } }
     /// 节点绘制预览矩形（屏幕坐标，nil = 不绘制）
     var drawingRect: CGRect? { didSet { needsDisplay = true } }
+    /// 当前绘制节点类型（由 CanvasViewportView 同步，用于预览样式判断）
+    var drawingNodeType: String = "terminal"
     /// stroke 预览路径（屏幕坐标），包含起点、终点和节点类型
     var strokePreviewPath: (start: CGPoint, end: CGPoint, type: String)? {
         didSet {
