@@ -304,22 +304,7 @@ private struct FileTreeNavigationBar: View {
                 .buttonStyle(.plain)
             }
 
-            // ─── 右侧：白色胶囊菜单按钮（纯视觉，点击由 AppKit 层 showNavBarMenu 处理） ───
-            HStack(spacing: 4) {
-                Image(systemName: "list.dash")
-                    .font(.system(size: 12, weight: .medium))
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .medium))
-            }
-            .foregroundStyle(Color.primary)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(
-                Capsule()
-                    .fill(.white)
-                    .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
-            )
-            .padding(.trailing, 8)
+            // TODO: 后续在此处恢复右上角菜单按钮（白色胶囊，点击由 AppKit 层 showNavBarMenu 处理）
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
