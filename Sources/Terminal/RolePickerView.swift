@@ -33,8 +33,8 @@ struct RolePickerView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 12)
 
-            // 搜索框 + 角色网格
             VStack(spacing: 0) {
+                // 搜索框（深一点的灰色背景）
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 12))
@@ -45,14 +45,20 @@ struct RolePickerView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(nsColor: .controlBackgroundColor))
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color(nsColor: .separatorColor).opacity(0.4))
+                )
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 10)
 
-                Divider()
-
+                // 角色网格
                 ScrollView {
                     LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 80, maximum: 80), spacing: 8)],
-                        spacing: 8
+                        columns: [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)],
+                        alignment: .leading,
+                        spacing: 6
                     ) {
                         NewRoleCard { showNewRoleSheet = true }
 
@@ -65,81 +71,77 @@ struct RolePickerView: View {
                             }
                         }
                     }
-                    .padding(12)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
                 }
-                .frame(maxHeight: 200)
+                .frame(minHeight: 110, maxHeight: 200)
             }
-            .background(Color(nsColor: .controlBackgroundColor))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(Color(nsColor: .separatorColor).opacity(0.8))
+            )
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
             )
             .padding(.horizontal, 24)
             .padding(.bottom, 12)
 
-            // 选中角色 prompt 预览
+            // 选中角色 prompt 预览（灰色背景，与角色网格区域颜色一致）
             if let role = selectedRole {
-                HStack(alignment: .top, spacing: 8) {
-                    Text(role.prompt.isEmpty ? "role.picker.prompt_placeholder".localized : role.prompt)
-                        .font(.system(size: 12))
-                        .foregroundStyle(role.prompt.isEmpty ? .tertiary : .primary)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Button {
-                        roleToEdit = role
-                    } label: {
-                        Image(systemName: "square.and.pencil")
+                VStack(spacing: 0) {
+                    HStack(alignment: .top, spacing: 0) {
+                        Text(role.prompt.isEmpty ? "role.picker.prompt_placeholder".localized : role.prompt)
                             .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(role.prompt.isEmpty ? .tertiary : .primary)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                        Button {
+                            roleToEdit = role
+                        } label: {
+                            Image(systemName: "square.and.pencil")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.secondary)
+                                .padding(10)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .frame(minHeight: 44)
                 .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(Color(nsColor: .separatorColor).opacity(0.8))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color(nsColor: .separatorColor).opacity(0.6), lineWidth: 0.5)
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(Color(nsColor: .separatorColor).opacity(0.3), lineWidth: 0.5)
                 )
                 .padding(.horizontal, 24)
                 .padding(.bottom, 12)
             } else {
                 Color.clear
-                    .frame(height: 44)
+                    .frame(height: 0)
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 4)
             }
 
             // 底部操作行
             HStack {
-                Button {
-                    onDiscover()
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 11))
-                        Text("role.picker.discover")
-                            .font(.system(size: 12))
-                    }
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-
                 Spacer()
 
                 Button {
                     onUnassign()
                 } label: {
                     Text("role.picker.unassign")
-                        .font(.system(size: 12))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
                 .disabled(selectedRoleId == nil)
+                .opacity(selectedRoleId == nil ? 0.4 : 1.0)
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 10)
@@ -187,31 +189,33 @@ private struct RoleGridCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .fill(isSelected
-                              ? (Color(hex: role.color) ?? .blue).opacity(0.12)
-                              : Color(nsColor: .controlBackgroundColor))
-                        .frame(width: 80, height: 80)
+                              ? (Color(hex: role.color) ?? .blue).opacity(0.08)
+                              : Color(nsColor: .windowBackgroundColor))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 8)
                                 .stroke(
-                                    isSelected ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.5),
+                                    isSelected ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.4),
                                     lineWidth: isSelected ? 2 : 0.5
                                 )
                         )
                     Image(systemName: role.icon)
-                        .font(.system(size: 22))
+                        .font(.system(size: 20))
                         .foregroundStyle(Color(hex: role.color) ?? .blue)
                 }
+                .frame(width: 64, height: 56)
                 Text(role.name)
                     .font(.system(size: 10))
                     .foregroundStyle(isSelected ? .primary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .frame(width: 76)
+                    .frame(maxWidth: 80)
             }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -224,23 +228,25 @@ private struct NewRoleCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 8)
                         .strokeBorder(
                             Color(nsColor: .separatorColor),
                             style: StrokeStyle(lineWidth: 1.5, dash: [5, 3])
                         )
-                        .frame(width: 80, height: 80)
                     Image(systemName: "plus")
-                        .font(.system(size: 18))
+                        .font(.system(size: 16))
                         .foregroundStyle(.secondary)
                 }
+                .frame(width: 64, height: 56)
                 Text("role.picker.new")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
-                    .frame(width: 76)
+                    .frame(maxWidth: 80)
             }
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
