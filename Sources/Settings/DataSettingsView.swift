@@ -224,8 +224,8 @@ struct DataSettingsView: View {
 
     private func refreshStorageInfo() {
         Task.detached(priority: .background) {
+            let total = BackupManager.shared.totalStorageSize()
             let sizes = BackupManager.shared.workspaceStorageSizes()
-            let total = sizes.reduce(Int64(0)) { $0 + $1.size }
             let backup = BackupManager.shared.lastBackupDate()
             await MainActor.run {
                 totalSize = total
