@@ -60,8 +60,8 @@ struct NoteContextToolbar: View {
             if !connections.isEmpty {
                 ConnectionBadgeButton(connections: connections, onDelete: onDeleteConnection)
             }
-            noteButton("character.textbox",
-                       tooltip: isFormatted ? "Edit Mode" : "Preview Mode",
+            noteButton("m.square",
+                       tooltip: isFormatted ? "纯文本" : "格式化",
                        isActive: isFormatted)                           { onToggleFormatted() }
             noteButton("trash", tooltip: "Delete", isDestructive: true) { onDelete() }
         }
