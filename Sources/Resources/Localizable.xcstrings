@@ -451,6 +451,12 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总计" } }
       }
     },
+    "data.usage.other" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Other (configs, backups)" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "其他（配置、备份等）" } }
+      }
+    },
     "data.section.autosave" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto Save" } },
