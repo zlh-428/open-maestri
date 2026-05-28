@@ -391,10 +391,106 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "类型" } }
       }
     },
+    "agents.roles.add" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Role" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加角色" } }
+      }
+    },
+    "agents.roles.description" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Create roles with specific instructions for your agents. Once assigned to a terminal, agents will automatically follow these instructions." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "为你的代理创建包含具体指令的角色。分配到终端后，代理会自动遵循这些指令。" } }
+      }
+    },
+    "agents.roles.search" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search roles..." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索角色..." } }
+      }
+    },
+    "agents.roles.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Agent Roles" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "代理角色" } }
+      }
+    },
+    "agents.skills.add_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Add Custom Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "添加自定义路径" } }
+      }
+    },
+    "agents.skills.description" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "These are the install locations of Maestri skills — they are key to agents understanding and using Maestri features." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这些是 Maestri 技能的安装位置 — 它们是智能体理解并使用 Maestri 各项功能的关键。" } }
+      }
+    },
+    "agents.skills.edit_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Skill Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑技能路径" } }
+      }
+    },
+    "agents.skills.empty" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No skill paths configured. Click the button below to add one." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无技能路径，点击下方按钮添加" } }
+      }
+    },
+    "agents.skills.footer" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Changes take effect immediately on this machine. Remote SSH hosts will adopt the new list next time a terminal is opened." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更改会立即在本机生效。远程 SSH 主机会在下次打开终端时采用新列表。" } }
+      }
+    },
+    "agents.skills.new_path" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "New Skill Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "新建技能路径" } }
+      }
+    },
+    "agents.skills.path_location" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Path" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "路径" } }
+      }
+    },
+    "agents.skills.path_name" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Name" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "名称" } }
+      }
+    },
+    "agents.skills.reset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset to Defaults" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复默认设置" } }
+      }
+    },
+    "agents.skills.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skill Locations" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "技能位置" } }
+      }
+    },
+    "agents.subtab.roles" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色" } }
+      }
+    },
+    "agents.subtab.skills" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Skills" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "技能" } }
+      }
+    },
     "settings.tab.agents" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Agents" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Agent" } }
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "代理" } }
       }
     },
     "settings.tab.general" : {
@@ -1985,6 +2081,84 @@
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "(Enter role instructions)" } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "（请输入角色指令）" } }
+      }
+    },
+    "settings.terminal.presets" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Quick Launch Presets" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "快速启动预设" } }
+      }
+    },
+    "settings.terminal.presets.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Up to 5 active presets are shown when creating a terminal." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "创建终端时最多显示 5 个活动预设。" } }
+      }
+    },
+    "settings.terminal.presets.add" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "+ Add Preset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "+ 添加预设" } }
+      }
+    },
+    "settings.terminal.presets.reset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset to Defaults" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "恢复默认设置" } }
+      }
+    },
+    "settings.terminal.presets.edit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Edit Preset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "编辑预设" } }
+      }
+    },
+    "settings.terminal.performance" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Performance" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "性能" } }
+      }
+    },
+    "settings.terminal.metal" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Metal Renderer" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Metal 渲染器" } }
+      }
+    },
+    "settings.terminal.metal.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use GPU acceleration for terminal rendering." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用 GPU 加速终端渲染。" } }
+      }
+    },
+    "settings.terminal.memory_limit" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Per-Terminal Memory Limit" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每个终端的内存限制" } }
+      }
+    },
+    "settings.terminal.memory_limit.help" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Limit scrollback memory usage for each terminal." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "限制每个终端的 scrollback 内存使用。" } }
+      }
+    },
+    "settings.terminal.keyboard" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Keyboard" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "键盘" } }
+      }
+    },
+    "settings.terminal.option_as_meta" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Use Option as Meta Key" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将 Option 用作 Meta 键" } }
+      }
+    },
+    "settings.tab.roles" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Roles" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "角色" } }
       }
     }
   },

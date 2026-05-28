@@ -1,60 +1,147 @@
 import SwiftUI
 
+/// 代理设置主视图 — 包含"角色"和"技能"两个子 Tab
+/// 参考 Maestri 设置 → 代理 页面 UI
 struct AgentsSettingsView: View {
     @Environment(AppState.self) private var appState
-    @State private var showAddPreset = false
+    @State private var selectedSubTab: AgentsSubTab = .roles
+
+    enum AgentsSubTab: String, CaseIterable {
+        case roles
+        case skills
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 子 Tab 切换（Segmented Picker）
+            Picker("", selection: $selectedSubTab) {
+                Text("agents.subtab.roles").tag(AgentsSubTab.roles)
+                Text("agents.subtab.skills").tag(AgentsSubTab.skills)
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 200)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // 内容区域
+            switch selectedSubTab {
+            case .roles:
+                AgentsRolesSubView()
+                    .environment(appState)
+            case .skills:
+                AgentsSkillsSubView()
+                    .environment(appState)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+// MARK: - 角色子视图
+
+struct AgentsRolesSubView: View {
+    @Environment(AppState.self) private var appState
+    @State private var searchText = ""
     @State private var showAddRole = false
     @State private var roleToEdit: RolePreset?
 
-    var body: some View {
-        @Bindable var state = appState
-        Form {
-            // MARK: - Agent 预设
-            Section("agent.section.presets") {
-                ForEach(appState.preferences.agentPresets) { preset in
-                    AgentPresetRow(preset: preset, onToggle: { togglePreset(preset) })
-                        .contextMenu {
-                            if !preset.isBuiltIn {
-                                Button("button.delete", role: .destructive) { deletePreset(preset) }
-                            }
-                        }
-                }
-                Button("button.add_custom_preset") { showAddPreset = true }
-            }
+    private var filteredRoles: [RolePreset] {
+        if searchText.isEmpty {
+            return appState.preferences.rolePresets
+        }
+        return appState.preferences.rolePresets.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.prompt.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
-            // MARK: - 角色管理
-            Section {
-                if appState.preferences.rolePresets.isEmpty {
-                    Text("role.no_roles")
-                        .foregroundStyle(.secondary)
-                        .font(.caption)
-                } else {
-                    ForEach(appState.preferences.rolePresets) { role in
-                        RoleRow(role: role) {
-                            roleToEdit = role
-                        } onDelete: {
-                            deleteRole(role)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 标题 + 说明
+            VStack(alignment: .leading, spacing: 4) {
+                Text("agents.roles.title")
+                    .font(.system(size: 13, weight: .medium))
+                Text("agents.roles.description")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+
+            // 搜索框
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                TextField("agents.roles.search", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+            )
+            .padding(.horizontal, 20)
+
+            // 角色列表
+            ScrollView {
+                VStack(spacing: 0) {
+                    if filteredRoles.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("role.no_roles")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        ForEach(Array(filteredRoles.enumerated()), id: \.element.id) { index, role in
+                            AgentsRoleRow(role: role) {
+                                roleToEdit = role
+                            } onDelete: {
+                                deleteRole(role)
+                            }
+                            if index < filteredRoles.count - 1 {
+                                Divider()
+                                    .padding(.horizontal, 12)
+                            }
                         }
                     }
                 }
-                Button("button.add_role") { showAddRole = true }
-            } header: {
-                Text("role.section")
-            } footer: {
-                Text("agent.role.footer")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .padding(.vertical, 4)
             }
-        }
-        .formStyle(.grouped)
-        .frame(minWidth: 440)
-        .sheet(isPresented: $showAddPreset) {
-            AddAgentPresetSheet { newPreset in
-                appState.preferences.agentPresets.append(newPreset)
-                save()
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+            )
+            .padding(.horizontal, 20)
+
+            // 添加角色按钮
+            Button {
+                showAddRole = true
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 11))
+                    Text("agents.roles.add")
+                        .font(.system(size: 12))
+                }
             }
-            .environment(\.locale, LocalizationManager.shared.locale)
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 16)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .sheet(isPresented: $showAddRole) {
             RoleEditSheet(role: nil) { newRole in
                 appState.preferences.rolePresets.append(newRole)
@@ -66,7 +153,6 @@ struct AgentsSettingsView: View {
             RoleEditSheet(role: role) { updated in
                 if let idx = appState.preferences.rolePresets.firstIndex(where: { $0.id == updated.id }) {
                     appState.preferences.rolePresets[idx] = updated
-                    // 更新已写入的角色文件
                     RoleInjector.shared.prepareRoleDirectory(
                         roleId: updated.id,
                         rolePrompt: updated.prompt,
@@ -77,17 +163,6 @@ struct AgentsSettingsView: View {
             }
             .environment(\.locale, LocalizationManager.shared.locale)
         }
-    }
-
-    private func togglePreset(_ preset: AgentPreset) {
-        guard let idx = appState.preferences.agentPresets.firstIndex(where: { $0.id == preset.id }) else { return }
-        appState.preferences.agentPresets[idx].isActive.toggle()
-        save()
-    }
-
-    private func deletePreset(_ preset: AgentPreset) {
-        appState.preferences.agentPresets.removeAll { $0.id == preset.id }
-        save()
     }
 
     private func deleteRole(_ role: RolePreset) {
@@ -101,65 +176,331 @@ struct AgentsSettingsView: View {
     }
 }
 
-// MARK: - Agent 预设行
+// MARK: - 角色行（匹配参考 UI）
 
-struct AgentPresetRow: View {
-    let preset: AgentPreset
-    let onToggle: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(Color(hex: preset.color) ?? .accentColor)
-                .frame(width: 10, height: 10)
-            Image(systemName: preset.icon)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(preset.name).font(.body)
-                Text(preset.command.isEmpty ? "shell" : preset.command)
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button(action: onToggle) {
-                Toggle("", isOn: .constant(preset.isActive))
-                    .labelsHidden()
-                    .allowsHitTesting(false)
-            }
-            .buttonStyle(.plain)
-        }
-        .opacity(preset.isActive ? 1.0 : 0.5)
-    }
-}
-
-// MARK: - 角色行
-
-struct RoleRow: View {
+struct AgentsRoleRow: View {
     let role: RolePreset
     let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
-            Circle()
+            // 角色颜色图标徽章
+            RoundedRectangle(cornerRadius: 4)
                 .fill(Color(hex: role.color) ?? .blue)
-                .frame(width: 10, height: 10)
-            Image(systemName: role.icon)
-                .frame(width: 20)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(role.name).font(.body)
-                Text(role.prompt.prefix(60) + (role.prompt.count > 60 ? "…" : ""))
-                    .font(.caption).foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .overlay(
+                    Image(systemName: role.icon)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white)
+                )
+
+            // 名称 + 描述
+            VStack(alignment: .leading, spacing: 2) {
+                Text(role.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                Text(role.prompt.prefix(50) + (role.prompt.count > 50 ? "…" : ""))
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
+
             Spacer()
-            Button("button.edit") { onEdit() }.buttonStyle(.bordered).controlSize(.small)
-            Button(role: .destructive) { onDelete() } label: {
-                Image(systemName: "trash")
-            }.buttonStyle(.plain)
+
+            // 编辑按钮
+            Button(action: onEdit) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+
+            // 删除按钮
+            Button(action: onDelete) {
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
     }
 }
 
-// MARK: - 新建 Agent 预设 Sheet
+// MARK: - 技能子视图
+
+struct AgentsSkillsSubView: View {
+    @Environment(AppState.self) private var appState
+    @State private var showAddPath = false
+    @State private var pathToEdit: SkillPath?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // 标题 + 说明
+            VStack(alignment: .leading, spacing: 4) {
+                Text("agents.skills.title")
+                    .font(.system(size: 13, weight: .medium))
+                Text("agents.skills.description")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 20)
+
+            // 技能路径列表
+            ScrollView {
+                VStack(spacing: 0) {
+                    if appState.preferences.skillPaths.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("agents.skills.empty")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                    } else {
+                        ForEach(Array(appState.preferences.skillPaths.enumerated()), id: \.element.id) { index, skillPath in
+                            SkillPathRow(
+                                skillPath: skillPath,
+                                onToggle: { toggleSkillPath(skillPath) },
+                                onEdit: { pathToEdit = skillPath },
+                                onDelete: { deleteSkillPath(skillPath) }
+                            )
+                            if index < appState.preferences.skillPaths.count - 1 {
+                                Divider()
+                                    .padding(.horizontal, 12)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.secondary.opacity(0.2), lineWidth: 0.5)
+            )
+            .padding(.horizontal, 20)
+
+            // 底部按钮行
+            HStack {
+                Button {
+                    showAddPath = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11))
+                        Text("agents.skills.add_path")
+                            .font(.system(size: 12))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Spacer()
+
+                Button("agents.skills.reset") {
+                    resetToDefaults()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 20)
+
+            // 底部提示
+            Text("agents.skills.footer")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .sheet(isPresented: $showAddPath) {
+            SkillPathEditSheet(skillPath: nil) { newPath in
+                appState.preferences.skillPaths.append(newPath)
+                save()
+            }
+            .environment(\.locale, LocalizationManager.shared.locale)
+        }
+        .sheet(item: $pathToEdit) { skillPath in
+            SkillPathEditSheet(skillPath: skillPath) { updated in
+                if let idx = appState.preferences.skillPaths.firstIndex(where: { $0.id == updated.id }) {
+                    appState.preferences.skillPaths[idx] = updated
+                }
+                save()
+            }
+            .environment(\.locale, LocalizationManager.shared.locale)
+        }
+    }
+
+    private func toggleSkillPath(_ skillPath: SkillPath) {
+        guard let idx = appState.preferences.skillPaths.firstIndex(where: { $0.id == skillPath.id }) else { return }
+        appState.preferences.skillPaths[idx].isActive.toggle()
+        save()
+    }
+
+    private func deleteSkillPath(_ skillPath: SkillPath) {
+        appState.preferences.skillPaths.removeAll { $0.id == skillPath.id }
+        save()
+    }
+
+    private func resetToDefaults() {
+        appState.preferences.skillPaths = SkillPath.defaults
+        save()
+    }
+
+    private func save() {
+        try? PersistenceManager.shared.savePreferences(appState.preferences)
+    }
+}
+
+// MARK: - 技能路径行
+
+struct SkillPathRow: View {
+    let skillPath: SkillPath
+    let onToggle: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            // 启用/禁用圆形勾选
+            Button(action: onToggle) {
+                Image(systemName: skillPath.isActive ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 16))
+                    .foregroundStyle(skillPath.isActive ? Color.blue : Color.secondary.opacity(0.5))
+            }
+            .buttonStyle(.plain)
+
+            // 图标
+            Image(systemName: skillPath.icon)
+                .font(.system(size: 14))
+                .frame(width: 20)
+                .foregroundStyle(.primary)
+
+            // 名称 + 路径
+            VStack(alignment: .leading, spacing: 2) {
+                Text(skillPath.name)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(1)
+                Text(skillPath.path)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            // 编辑按钮
+            Button(action: onEdit) {
+                Image(systemName: "square.and.pencil")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+
+            // 删除按钮
+            Button(action: onDelete) {
+                Image(systemName: "minus.circle")
+                    .font(.system(size: 13))
+                    .foregroundStyle(skillPath.isBuiltIn ? .clear : .secondary)
+            }
+            .buttonStyle(.plain)
+            .disabled(skillPath.isBuiltIn)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .opacity(skillPath.isActive ? 1.0 : 0.6)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - 技能路径编辑 Sheet
+
+struct SkillPathEditSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let skillPath: SkillPath?
+    let onSave: (SkillPath) -> Void
+
+    @State private var name: String
+    @State private var path: String
+    @State private var icon: String
+
+    private let iconOptions = [
+        "gearshape", "doc.text", "paperplane", "sparkle",
+        "terminal", "folder", "tray.full", "wrench",
+        "hammer", "bolt", "brain", "cpu"
+    ]
+
+    init(skillPath: SkillPath?, onSave: @escaping (SkillPath) -> Void) {
+        self.skillPath = skillPath
+        self.onSave = onSave
+        _name = State(initialValue: skillPath?.name ?? "")
+        _path = State(initialValue: skillPath?.path ?? "~/")
+        _icon = State(initialValue: skillPath?.icon ?? "folder")
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text(skillPath == nil ? "agents.skills.new_path" : "agents.skills.edit_path")
+                    .font(.headline)
+                Spacer()
+                Button("button.cancel") { dismiss() }.keyboardShortcut(.escape)
+                Button("button.save") { save() }
+                    .disabled(name.isEmpty || path.isEmpty)
+                    .keyboardShortcut(.return)
+                    .buttonStyle(.borderedProminent)
+            }.padding()
+            Divider()
+
+            Form {
+                TextField("agents.skills.path_name", text: $name)
+                TextField("agents.skills.path_location", text: $path)
+                    .font(.system(.body, design: .monospaced))
+
+                Section("agent.icon") {
+                    LazyVGrid(columns: Array(repeating: .init(.flexible()), count: 6), spacing: 6) {
+                        ForEach(iconOptions, id: \.self) { i in
+                            Button { icon = i } label: {
+                                Image(systemName: i)
+                                    .font(.system(size: 13))
+                                    .frame(width: 28, height: 28)
+                                    .background(icon == i ? Color.accentColor.opacity(0.2) : Color.clear)
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .padding(.horizontal, 4)
+        }
+        .frame(width: 420, height: 340)
+    }
+
+    private func save() {
+        let updated = SkillPath(
+            id: skillPath?.id ?? UUID(),
+            name: name,
+            path: path,
+            icon: icon,
+            isActive: skillPath?.isActive ?? true,
+            isBuiltIn: skillPath?.isBuiltIn ?? false
+        )
+        onSave(updated)
+        dismiss()
+    }
+}
+
+// MARK: - 新建 Agent 预设 Sheet（供 TerminalSettingsView 使用）
 
 struct AddAgentPresetSheet: View {
     @Environment(\.dismiss) private var dismiss
