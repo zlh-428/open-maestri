@@ -13,6 +13,8 @@ final class AppState {
     var manifest: WorkspaceManifest = WorkspaceManifest()
     /// 最近访问的工作区 ID（最多 5 个，供⌘⌘数字跳转使用）
     var recentWorkspaceIds: [UUID] = []
+    /// 上次自动保存时间（运行时状态，不持久化）
+    var lastAutosaveTime: Date?
 
     private let logger = Logger.make(category: "AppState")
     private let pm = PersistenceManager.shared
@@ -112,11 +114,17 @@ final class AppState {
 
     func startAutosave() {
         autosaveTimer?.invalidate()
-        autosaveTimer = Timer.scheduledTimer(withTimeInterval: Constants.autosaveInterval, repeats: true) { [weak self] _ in
+        let interval = TimeInterval(preferences.autosaveIntervalSeconds)
+        autosaveTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task.detached(priority: .background) { [weak self] in
                 await self?.autosave()
             }
         }
+    }
+
+    /// 当用户在设置中修改自动保存间隔时调用，重启 timer
+    func restartAutosave() {
+        startAutosave()
     }
 
     func stopAutosave() {
@@ -134,6 +142,9 @@ final class AppState {
             })
             for ws in dirtyWorkspaces {
                 try await ws.save()
+            }
+            await MainActor.run {
+                lastAutosaveTime = Date()
             }
             if !dirtyWorkspaces.isEmpty {
                 logger.debug("Autosave completed (\(dirtyWorkspaces.count) dirty workspaces saved)")

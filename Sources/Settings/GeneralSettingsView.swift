@@ -3,8 +3,6 @@ import AppKit
 
 struct GeneralSettingsView: View {
     @Environment(AppState.self) private var appState
-    @State private var showBackups = false
-    @State private var backupList: [URL] = []
 
     var body: some View {
         @Bindable var state = appState
@@ -69,16 +67,6 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Section("general.section.backup") {
-                LabeledContent("general.auto_backup") {
-                    Text("general.auto_backup.hourly").foregroundStyle(.secondary)
-                }
-                Button("button.view_backups") {
-                    backupList = BackupManager.shared.listBackups()
-                    showBackups = true
-                }
-            }
-
             Section("general.section.update") {
                 Button("button.check_updates") {
                     (NSApp.delegate as? AppDelegate)?.checkForUpdates()
@@ -92,10 +80,6 @@ struct GeneralSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .openInEditor)) { _ in
             openInPreferredIDE()
-        }
-        .sheet(isPresented: $showBackups) {
-            BackupListView(backups: backupList)
-                .environment(\.locale, LocalizationManager.shared.locale)
         }
     }
 
@@ -144,63 +128,3 @@ struct GeneralSettingsView: View {
     }
 }
 
-// MARK: - 备份列表视图
-
-struct BackupListView: View {
-    let backups: [URL]
-    @Environment(\.dismiss) private var dismiss
-    @State private var restoreResult: String?
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("general.backup_list.title")
-                    .font(.headline)
-                Spacer()
-                Button("button.close") { dismiss() }
-            }
-            .padding()
-
-            Divider()
-
-            if backups.isEmpty {
-                Text("general.backup_list.empty")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List(backups, id: \.path) { backup in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(backup.lastPathComponent)
-                                .font(.body)
-                            Text(backup.path)
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        Button("button.restore") {
-                            if let count = try? BackupManager.shared.restoreFromBackup(url: backup) {
-                                restoreResult = "\("general.backup_list.restored".localized) \(count)"
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-            }
-
-            if let result = restoreResult {
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                    Text(result)
-                        .font(.caption)
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-            }
-        }
-        .frame(width: 500, height: 320)
-    }
-}

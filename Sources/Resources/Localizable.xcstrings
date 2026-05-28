@@ -415,6 +415,198 @@
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "终端" } }
       }
     },
+    "settings.tab.data" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "数据" } }
+      }
+    },
+    "data.section.storage_location" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Storage Location" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储位置" } }
+      }
+    },
+    "data.location" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Location" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "位置" } }
+      }
+    },
+    "data.button.reveal_in_finder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reveal in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在访达中显示" } }
+      }
+    },
+    "data.section.storage_usage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Storage Usage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "存储用量" } }
+      }
+    },
+    "data.usage.total" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Total" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总计" } }
+      }
+    },
+    "data.section.autosave" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto Save" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自动保存" } }
+      }
+    },
+    "data.autosave.interval" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Interval" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "间隔" } }
+      }
+    },
+    "data.autosave.last_save" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last Save" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次保存" } }
+      }
+    },
+    "data.autosave.not_yet" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not yet" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "尚未保存" } }
+      }
+    },
+    "data.section.backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backup & Restore" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "备份与恢复" } }
+      }
+    },
+    "data.backup.last_auto_backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Last Auto Backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上次自动备份" } }
+      }
+    },
+    "data.backup.none" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "None" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "无" } }
+      }
+    },
+    "data.button.export_backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Backup…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出完整备份…" } }
+      }
+    },
+    "data.button.import_backup" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import Backup…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入备份…" } }
+      }
+    },
+    "data.export.panel_title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export Backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出备份" } }
+      }
+    },
+    "data.export.panel_prompt" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Export" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导出" } }
+      }
+    },
+    "data.export.success" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Backup exported successfully" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "备份导出成功" } }
+      }
+    },
+    "data.import.panel_title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import Backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入备份" } }
+      }
+    },
+    "data.import.panel_prompt" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Import" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "导入" } }
+      }
+    },
+    "data.import.success" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Restored %d files from backup" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已从备份恢复 %d 个文件" } }
+      }
+    },
+    "data.section.global_storage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Global Storage" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "全局存储" } }
+      }
+    },
+    "data.global_storage.shared_data" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Shared Data" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "共享数据" } }
+      }
+    },
+    "data.global_storage.description" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Cookies, cache, and local data shared by global-scoped Portals" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用全局范围的传送门共享的 Cookie、缓存和本地数据" } }
+      }
+    },
+    "data.button.clear_global_storage" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear Global Storage…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除全局存储…" } }
+      }
+    },
+    "data.alert.clear_storage.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Clear Global Storage?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "清除全局存储？" } }
+      }
+    },
+    "data.alert.clear_storage.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This will remove all cookies, cache, and local data from global-scoped Portals. You may need to log in again on websites." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这将清除全局范围传送门的所有 Cookie、缓存和本地数据。您可能需要重新登录网站。" } }
+      }
+    },
+    "data.section.reset" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置" } }
+      }
+    },
+    "data.button.delete_all_data" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete All Data…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除所有数据…" } }
+      }
+    },
+    "data.alert.delete_all.title" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Delete All Data?" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "删除所有数据？" } }
+      }
+    },
+    "data.alert.delete_all.message" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "This will permanently delete all workspaces, notes, terminals, and settings. Type DELETE to confirm." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "这将永久删除所有工作区、笔记、终端和设置数据。输入 DELETE 确认。" } }
+      }
+    },
+    "data.alert.delete_all.placeholder" : {
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Type DELETE to confirm" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "输入 DELETE 确认" } }
+      }
+    },
     "settings.terminal.font" : {
       "localizations" : {
         "en" : { "stringUnit" : { "state" : "translated", "value" : "Font" } },

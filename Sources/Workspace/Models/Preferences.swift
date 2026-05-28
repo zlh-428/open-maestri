@@ -22,6 +22,7 @@ struct Preferences: Codable, Equatable {
     var sshScriptPath: String
     var sshAddToPath: Bool
     var metalRendererEnabled: Bool
+    var autosaveIntervalSeconds: Int    // 自动保存间隔（秒），与 Maestri preferences 格式对齐
 
     init() {
         self.schemaVersion = 1
@@ -43,6 +44,7 @@ struct Preferences: Codable, Equatable {
         self.sshScriptPath = "~/.local/bin/omaestri"
         self.sshAddToPath = true
         self.metalRendererEnabled = true
+        self.autosaveIntervalSeconds = 30
     }
 }
 

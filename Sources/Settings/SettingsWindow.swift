@@ -18,7 +18,10 @@ struct SettingsWindow: View {
             ShortcutsSettingsView()
                 .environment(appState)
                 .tabItem { Label("settings.tab.shortcuts", systemImage: "keyboard") }
+            DataSettingsView()
+                .environment(appState)
+                .tabItem { Label("settings.tab.data", systemImage: "externaldrive") }
         }
-        .frame(width: 560, height: 420)
+        .frame(width: 560, height: 480)
     }
 }
