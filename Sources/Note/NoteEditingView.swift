@@ -8,6 +8,8 @@ struct NoteEditingView: View {
     let onSave: (String) -> Void
     var onFirstLineChanged: ((String) -> Void)? = nil
 
+    @State private var isFocused = false
+
     var body: some View {
         if state.isFormatted {
             MarkdownPreviewView(markdown: state.content)
@@ -23,16 +25,19 @@ struct NoteEditingView: View {
                     },
                     onFirstLineChanged: { title in
                         onFirstLineChanged?(title)
+                    },
+                    onFocusChanged: { focused in
+                        isFocused = focused
                     }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                if state.content.isEmpty {
+                if state.content.isEmpty && !isFocused {
                     Text("note.placeholder")
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.tertiary)
                         .padding(.top, 8)
-                        .padding(.leading, 5)
+                        .padding(.leading, 4)
                         .allowsHitTesting(false)
                 }
             }

@@ -115,6 +115,8 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
     var onChange: ((String) -> Void)? = nil
     /// 首行变化回调
     var onFirstLineChanged: ((String) -> Void)? = nil
+    /// 焦点变化回调
+    var onFocusChanged: ((Bool) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
@@ -142,6 +144,7 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
             width: scrollView.frame.width,
             height: CGFloat.greatestFiniteMagnitude
         )
+        textView.textContainerInset = NSSize(width: 4, height: 8)
         // 设置 coordinator 弱引用到 textView
         context.coordinator.textView = textView
         // 注册 ScrollView 到全局注册表（供画布路由滚动事件）
@@ -190,6 +193,14 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
             parent.onChange?(newText)
             // 首行标题
             emitFirstLine(newText)
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            parent.onFocusChanged?(true)
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            parent.onFocusChanged?(false)
         }
 
         // MARK: - 粘贴拦截
