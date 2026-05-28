@@ -2,8 +2,8 @@ import Foundation
 import OSLog
 
 /// Role 注入器
-/// 在 Terminal 分配 Role 时写入 role.json + CLAUDE.md + AGENTS.md，路径对标 Maestri：
-/// {workingDirectory}/.maestri/roles/{roleId}/
+/// 在 Terminal 分配 Role 时写入 role.json + CLAUDE.md + AGENTS.md：
+/// {workingDirectory}/.open-maestri/roles/{roleId}/
 final class RoleInjector {
     static let shared = RoleInjector()
     private let logger = Logger.make(category: "RoleInjector")
@@ -80,7 +80,7 @@ final class RoleInjector {
     func roleDirPath(roleId: UUID, workingDirectory: String) -> String {
         let base = workingDirectory.isEmpty
             ? PersistenceManager.shared.appDataURL.appendingPathComponent("roles").path
-            : URL(fileURLWithPath: workingDirectory).appendingPathComponent(".maestri/roles").path
+            : URL(fileURLWithPath: workingDirectory).appendingPathComponent(".open-maestri/roles").path
         return URL(fileURLWithPath: base).appendingPathComponent(roleId.uuidString).path
     }
 
