@@ -752,9 +752,10 @@ struct WorkspaceCanvasView: View {
                 rolePresets.first { $0.id == roleId }
             }
             let baseDir = tc.workingDirectory.isEmpty ? wsDir : tc.workingDirectory
-            // 有角色时在 role 子目录启动，agent 读取 CLAUDE.md 后得知真实工作区
+            // 有角色时在 role 子目录启动，确保 CLAUDE.md/role.json 存在后再启动
             let startDir: String
             if let role {
+                RoleInjector.shared.prepareRoleDirectory(roleId: role.id, rolePreset: role, workingDirectory: baseDir)
                 startDir = RoleInjector.shared.roleDirPath(roleId: role.id, workingDirectory: baseDir)
             } else {
                 startDir = baseDir

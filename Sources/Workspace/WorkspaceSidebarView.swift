@@ -185,6 +185,8 @@ struct WorkspaceSidebarView: View {
         Button("button.edit") { workspaceToEdit = entry; showEditSheet = true }
         Button("button.duplicate") { duplicateWorkspace(entry) }
         Divider()
+        Button("workspace.open_in_finder") { openInFinder(entry) }
+        Divider()
         let pinLabel: LocalizedStringKey = entry.isPinned ? "workspace.unpin" : "workspace.pin"
         Button(pinLabel) { togglePin(entry) }
         Divider()
@@ -256,6 +258,11 @@ struct WorkspaceSidebarView: View {
         }
         appState.manifest = manifest
         try? PersistenceManager.shared.saveManifest(manifest)
+    }
+
+    private func openInFinder(_ entry: WorkspaceEntry) {
+        let url = URL(fileURLWithPath: entry.workingDirectory, isDirectory: true)
+        NSWorkspace.shared.open(url)
     }
 
     private func deleteWorkspace(_ entry: WorkspaceEntry) {
