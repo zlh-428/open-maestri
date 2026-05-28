@@ -16,9 +16,11 @@ final class NoteScrollViewRegistry {
         scrollViews[nodeId] = scrollView
     }
 
-    func unregister(nodeId: UUID) {
+    func unregister(nodeId: UUID, ifMatching scrollView: NSScrollView) {
         lock.lock(); defer { lock.unlock() }
-        scrollViews.removeValue(forKey: nodeId)
+        if scrollViews[nodeId] === scrollView {
+            scrollViews.removeValue(forKey: nodeId)
+        }
     }
 
     func scrollView(for nodeId: UUID) -> NSScrollView? {
@@ -41,9 +43,12 @@ final class NoteTextViewRegistry {
         textViews[nodeId] = textView
     }
 
-    func unregister(nodeId: UUID) {
+    /// 只有当注册表中存储的正是 `textView` 本身时才注销，防止新视图注册后被旧视图的 dismantleNSView 误删
+    func unregister(nodeId: UUID, ifMatching textView: NSTextView) {
         lock.lock(); defer { lock.unlock() }
-        textViews.removeValue(forKey: nodeId)
+        if textViews[nodeId] === textView {
+            textViews.removeValue(forKey: nodeId)
+        }
     }
 
     func textView(for nodeId: UUID) -> NSTextView? {
@@ -101,6 +106,21 @@ final class NoteTextViewRegistry {
     }
 }
 
+// MARK: - 上树感知 ScrollView（viewDidMoveToWindow 回调）
+
+/// 在 viewDidMoveToWindow（首次 window 非 nil）时调用 onWindowAttached
+final class NoteAwareScrollView: NSScrollView {
+    var onWindowAttached: (() -> Void)?
+    private var hasAttached = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, !hasAttached else { return }
+        hasAttached = true
+        onWindowAttached?()
+    }
+}
+
 // MARK: - 支持粘贴图片的 Note 文本编辑器
 
 /// AppKit 包装的文本编辑器，支持从剪贴板粘贴图片
@@ -117,14 +137,16 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
     var onFirstLineChanged: ((String) -> Void)? = nil
     /// 焦点变化回调
     var onFocusChanged: ((Bool) -> Void)? = nil
+    /// view 加入 window hierarchy（viewDidMoveToWindow）时调用，textView 已可接受焦点
+    var onWindowAttached: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else { return scrollView }
+    func makeNSView(context: Context) -> NoteAwareScrollView {
+        let scrollView = NoteAwareScrollView()
+        let textView = NSTextView()
 
         textView.isEditable = true
         textView.isSelectable = true
@@ -135,7 +157,6 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.delegate = context.coordinator
         textView.string = text
-        // 确保宽度跟随容器，光标可点击任意位置
         textView.isHorizontallyResizable = false
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
@@ -145,30 +166,42 @@ struct NoteImagePasteTextEditor: NSViewRepresentable {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.textContainerInset = NSSize(width: 4, height: 8)
-        // 设置 coordinator 弱引用到 textView
+
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.backgroundColor = .clear
+
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        scrollView.documentView = textView
+
         context.coordinator.textView = textView
-        // 注册 ScrollView 到全局注册表（供画布路由滚动事件）
+
         if let nodeId {
             NoteScrollViewRegistry.shared.register(nodeId: nodeId, scrollView: scrollView)
             NoteTextViewRegistry.shared.register(nodeId: nodeId, textView: textView)
         }
+
+        // view 加入 window hierarchy 后再抢焦点（此时 makeFirstResponder 才会成功）
+        scrollView.onWindowAttached = onWindowAttached
         return scrollView
     }
 
-    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
-        if let nodeId = coordinator.parent.nodeId {
-            NoteScrollViewRegistry.shared.unregister(nodeId: nodeId)
-            NoteTextViewRegistry.shared.unregister(nodeId: nodeId)
-        }
+    static func dismantleNSView(_ nsView: NoteAwareScrollView, coordinator: Coordinator) {
+        guard let nodeId = coordinator.parent.nodeId,
+              let textView = coordinator.textView else { return }
+        NoteScrollViewRegistry.shared.unregister(nodeId: nodeId, ifMatching: nsView)
+        NoteTextViewRegistry.shared.unregister(nodeId: nodeId, ifMatching: textView)
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    func updateNSView(_ scrollView: NoteAwareScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         // 只在外部变化时更新，防止光标跳动
         if textView.string != text {
             let selected = textView.selectedRange()
             textView.string = text
-            // 恢复合理的光标位置
             let safeRange = NSRange(location: min(selected.location, textView.string.utf16.count), length: 0)
             textView.setSelectedRange(safeRange)
         }

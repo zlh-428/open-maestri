@@ -10,6 +10,8 @@ private let noteLogger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "open
 final class NoteEditorState {
     var isFormatted: Bool = false
     var content: String = ""
+    /// 模式切换后需要恢复焦点的标志，由 NSViewRepresentable.updateNSView 消费并清除
+    var pendingFocusRestore: Bool = false
 }
 
 // MARK: - Note 节点 NSViewController
@@ -81,6 +83,7 @@ final class NoteNodeViewController: NSViewController {
                   id == self.noteId,
                   let isPreviewing = notif.userInfo?["isPreviewing"] as? Bool else { return }
             editorState.isFormatted = isPreviewing
+            editorState.pendingFocusRestore = true
         }
     }
 

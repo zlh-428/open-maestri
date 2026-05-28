@@ -10,15 +10,25 @@ final class MarkdownTextStorage: NSTextStorage {
     private let backing = NSMutableAttributedString()
     var fontSize: CGFloat = NSFont.systemFontSize
 
-    /// 当前光标所在行的行号（-1 表示无焦点）；由 MarkdownLiveEditor 在每次光标移动后更新
-    var cursorLineIndex: Int = -1 {
-        didSet {
-            guard oldValue != cursorLineIndex else { return }
-            guard backing.length > 0 else { return }
-            beginEditing()
-            applyMarkdownStyles()
-            edited(.editedAttributes, range: NSRange(location: 0, length: backing.length), changeInLength: 0)
-            endEditing()
+    /// 当前光标所在行号（-1 表示无焦点）
+    /// 由 MarkdownLiveEditor Coordinator 在选区变化时调用 updateCursorLine() 更新
+    private(set) var cursorLineIndex: Int = -1
+
+    /// 更新光标行并刷新样式，必须在 NSTextStorage 编辑事务之外调用
+    func updateCursorLine(_ lineIndex: Int) {
+        guard lineIndex != cursorLineIndex else { return }
+        cursorLineIndex = lineIndex
+        guard backing.length > 0 else { return }
+        // 直接重新排版，不走 beginEditing/endEditing（避免重入）
+        let fullRange = NSRange(location: 0, length: backing.length)
+        applyMarkdownStyles()
+        // 通知所有 layoutManager 重新布局
+        for lm in layoutManagers {
+            lm.processEditing(for: self,
+                              edited: .editedAttributes,
+                              range: fullRange,
+                              changeInLength: 0,
+                              invalidatedRange: fullRange)
         }
     }
 
@@ -47,27 +57,26 @@ final class MarkdownTextStorage: NSTextStorage {
         endEditing()
     }
 
+    // processEditing 在每次 endEditing 后由系统自动调用
     override func processEditing() {
         applyMarkdownStyles()
         super.processEditing()
     }
 
-    // MARK: - 全文样式应用
+    // MARK: - 全文样式应用（直接操作 backing，不走 setAttributes 包裹，避免递归）
 
     private func applyMarkdownStyles() {
         let fullRange = NSRange(location: 0, length: backing.length)
         guard fullRange.length > 0 else { return }
 
-        let baseFont = NSFont.systemFont(ofSize: fontSize)
         backing.setAttributes([
-            .font: baseFont,
+            .font: NSFont.systemFont(ofSize: fontSize),
             .foregroundColor: NSColor.labelColor,
         ], range: fullRange)
 
         let text = backing.string
         let lines = text.components(separatedBy: "\n")
         var offset = 0
-
         var inCodeBlock = false
         var codeBlockStartLine = -1
 
@@ -78,13 +87,13 @@ final class MarkdownTextStorage: NSTextStorage {
 
             if line.hasPrefix("```") {
                 if inCodeBlock {
-                    // 关闭代码块：对整个代码块（含首尾```行）应用代码样式
                     let blockStart = offsetForLine(codeBlockStartLine, in: lines)
                     let blockEnd = offset + lineLen
                     let blockRange = NSRange(location: blockStart, length: blockEnd - blockStart)
-                    applyCodeBlock(range: blockRange, cursorLine: cursorLineIndex,
+                    applyCodeBlock(range: blockRange,
                                    blockStartLine: codeBlockStartLine,
-                                   blockEndLine: lineIdx, lines: lines)
+                                   blockEndLine: lineIdx,
+                                   lines: lines)
                     inCodeBlock = false
                     codeBlockStartLine = -1
                 } else {
@@ -108,16 +117,16 @@ final class MarkdownTextStorage: NSTextStorage {
         if inCodeBlock {
             let blockStart = offsetForLine(codeBlockStartLine, in: lines)
             let blockRange = NSRange(location: blockStart, length: max(0, backing.length - blockStart))
-            applyCodeBlock(range: blockRange, cursorLine: cursorLineIndex,
+            applyCodeBlock(range: blockRange,
                            blockStartLine: codeBlockStartLine,
-                           blockEndLine: lines.count - 1, lines: lines)
+                           blockEndLine: lines.count - 1,
+                           lines: lines)
         }
     }
 
     // MARK: - 行级样式
 
     private func applyLineStyles(_ line: String, lineRange: NSRange, isCursorLine: Bool) {
-        // 标题
         if line.hasPrefix("### ") {
             applyHeading(level: 3, line: line, lineRange: lineRange, isCursorLine: isCursorLine)
         } else if line.hasPrefix("## ") {
@@ -141,33 +150,23 @@ final class MarkdownTextStorage: NSTextStorage {
         case 2: (3, fontSize + 6)
         default: (4, fontSize + 3)
         }
-
         let prefixRange = NSRange(location: lineRange.location, length: min(prefixLen, lineRange.length))
-        let textStart = lineRange.location + prefixLen
         let textLen = max(0, lineRange.length - prefixLen)
-        let textRange = NSRange(location: textStart, length: textLen)
+        let textRange = NSRange(location: lineRange.location + prefixLen, length: textLen)
 
         if isCursorLine {
-            // 光标行：前缀淡显，标题文字放大加粗
             backing.addAttributes([
                 .font: NSFont.monospacedSystemFont(ofSize: size, weight: .bold),
                 .foregroundColor: NSColor.tertiaryLabelColor,
             ], range: prefixRange)
-            if textLen > 0 {
-                backing.addAttributes([
-                    .font: NSFont.boldSystemFont(ofSize: size),
-                    .foregroundColor: NSColor.labelColor,
-                ], range: textRange)
-            }
         } else {
-            // 非光标行：隐藏前缀，标题文字放大加粗
-            backing.addAttributes(hiddenAttrs(baseSize: size), range: prefixRange)
-            if textLen > 0 {
-                backing.addAttributes([
-                    .font: NSFont.boldSystemFont(ofSize: size),
-                    .foregroundColor: NSColor.labelColor,
-                ], range: textRange)
-            }
+            backing.addAttributes(hidden(size: size), range: prefixRange)
+        }
+        if textLen > 0 {
+            backing.addAttributes([
+                .font: NSFont.boldSystemFont(ofSize: size),
+                .foregroundColor: NSColor.labelColor,
+            ], range: textRange)
         }
     }
 
@@ -177,11 +176,10 @@ final class MarkdownTextStorage: NSTextStorage {
         let prefixRange = NSRange(location: lineRange.location, length: min(2, lineRange.length))
         let textLen = max(0, lineRange.length - 2)
         let textRange = NSRange(location: lineRange.location + 2, length: textLen)
-
         if isCursorLine {
             backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: prefixRange)
         } else {
-            backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: prefixRange)
+            backing.addAttributes(hidden(size: fontSize), range: prefixRange)
         }
         if textLen > 0 {
             backing.addAttributes([
@@ -195,28 +193,24 @@ final class MarkdownTextStorage: NSTextStorage {
 
     private func applyCodeBlock(
         range: NSRange,
-        cursorLine: Int,
         blockStartLine: Int,
         blockEndLine: Int,
         lines: [String]
     ) {
-        // 统一代码块底色
         backing.addAttributes([
             .font: NSFont.monospacedSystemFont(ofSize: fontSize - 1, weight: .regular),
             .foregroundColor: NSColor.systemTeal,
         ], range: range)
 
-        // ``` 开头行和结尾行在非光标时隐藏
-        let fenceLines = [blockStartLine, blockEndLine]
-        var offset = offsetForLine(blockStartLine, in: lines)
-        for (i, line) in lines[blockStartLine...blockEndLine].enumerated() {
-            let lineLen = (line as NSString).length
-            let lineRange = NSRange(location: offset, length: lineLen)
-            let absLine = blockStartLine + i
-            if fenceLines.contains(absLine) && absLine != cursorLine {
-                backing.addAttributes(hiddenAttrs(baseSize: fontSize - 1), range: lineRange)
+        var off = offsetForLine(blockStartLine, in: lines)
+        for i in blockStartLine ... blockEndLine {
+            let l = lines[i]
+            let lLen = (l as NSString).length
+            let lRange = NSRange(location: off, length: lLen)
+            if (i == blockStartLine || i == blockEndLine) && i != cursorLineIndex {
+                backing.addAttributes(hidden(size: fontSize - 1), range: lRange)
             }
-            offset += lineLen + 1
+            off += lLen + 1
         }
     }
 
@@ -232,50 +226,26 @@ final class MarkdownTextStorage: NSTextStorage {
                nsLine.character(at: pos) == 42, nsLine.character(at: pos + 1) == 42 {
                 let from = pos + 2
                 if from < nsLine.length, let close = findClosing("**", in: nsLine, from: from) {
-                    let markerLen = 2
-                    let openRange  = NSRange(location: lineRange.location + pos, length: markerLen)
-                    let innerRange = NSRange(location: lineRange.location + pos + markerLen,
-                                            length: close.upperBound - pos - markerLen * 2)
-                    let closeRange = NSRange(location: lineRange.location + close.upperBound - markerLen,
-                                            length: markerLen)
-                    let boldFont = NSFont.boldSystemFont(ofSize: fontSize)
-                    if isCursorLine {
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor, .font: boldFont], range: openRange)
-                        backing.addAttributes([.font: boldFont], range: innerRange)
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor, .font: boldFont], range: closeRange)
-                    } else {
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: openRange)
-                        backing.addAttributes([.font: boldFont], range: innerRange)
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: closeRange)
-                    }
-                    pos = close.upperBound
-                    continue
+                    applyWrap(lineRange: lineRange, pos: pos, close: close,
+                              markerLen: 2, isCursorLine: isCursorLine,
+                              innerAttrs: [.font: NSFont.boldSystemFont(ofSize: fontSize)])
+                    pos = close.upperBound; continue
                 }
             }
 
-            // 斜体 *text*（排除 **）
+            // 斜체 *text*（排除 **）
             if nsLine.character(at: pos) == 42 {
                 let next = pos + 1
                 if next >= nsLine.length || nsLine.character(at: next) != 42 {
                     if let close = findClosingSingle("*", in: nsLine, from: pos + 1) {
-                        let openRange  = NSRange(location: lineRange.location + pos, length: 1)
-                        let innerRange = NSRange(location: lineRange.location + pos + 1,
-                                                length: close.upperBound - pos - 2)
-                        let closeRange = NSRange(location: lineRange.location + close.upperBound - 1, length: 1)
-                        let italicFont = NSFont(descriptor: NSFont.systemFont(ofSize: fontSize)
-                            .fontDescriptor.withSymbolicTraits(.italic), size: fontSize)
-                            ?? NSFont.systemFont(ofSize: fontSize)
-                        if isCursorLine {
-                            backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: openRange)
-                            if innerRange.length > 0 { backing.addAttributes([.font: italicFont], range: innerRange) }
-                            backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: closeRange)
-                        } else {
-                            backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: openRange)
-                            if innerRange.length > 0 { backing.addAttributes([.font: italicFont], range: innerRange) }
-                            backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: closeRange)
-                        }
-                        pos = close.upperBound
-                        continue
+                        let italicFont = NSFont(
+                            descriptor: NSFont.systemFont(ofSize: fontSize)
+                                .fontDescriptor.withSymbolicTraits(.italic),
+                            size: fontSize) ?? NSFont.systemFont(ofSize: fontSize)
+                        applyWrap(lineRange: lineRange, pos: pos, close: close,
+                                  markerLen: 1, isCursorLine: isCursorLine,
+                                  innerAttrs: [.font: italicFont])
+                        pos = close.upperBound; continue
                     }
                 }
             }
@@ -285,65 +255,28 @@ final class MarkdownTextStorage: NSTextStorage {
                nsLine.character(at: pos) == 126, nsLine.character(at: pos + 1) == 126 {
                 let from = pos + 2
                 if from < nsLine.length, let close = findClosing("~~", in: nsLine, from: from) {
-                    let openRange  = NSRange(location: lineRange.location + pos, length: 2)
-                    let innerRange = NSRange(location: lineRange.location + pos + 2,
-                                            length: close.upperBound - pos - 4)
-                    let closeRange = NSRange(location: lineRange.location + close.upperBound - 2, length: 2)
-                    if isCursorLine {
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: openRange)
-                        if innerRange.length > 0 {
-                            backing.addAttributes([
+                    applyWrap(lineRange: lineRange, pos: pos, close: close,
+                              markerLen: 2, isCursorLine: isCursorLine,
+                              innerAttrs: [
                                 .strikethroughStyle: NSUnderlineStyle.single.rawValue,
                                 .foregroundColor: NSColor.secondaryLabelColor,
-                            ], range: innerRange)
-                        }
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: closeRange)
-                    } else {
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: openRange)
-                        if innerRange.length > 0 {
-                            backing.addAttributes([
-                                .strikethroughStyle: NSUnderlineStyle.single.rawValue,
-                                .foregroundColor: NSColor.secondaryLabelColor,
-                            ], range: innerRange)
-                        }
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: closeRange)
-                    }
-                    pos = close.upperBound
-                    continue
+                              ])
+                    pos = close.upperBound; continue
                 }
             }
 
             // 行内代码 `code`
             if nsLine.character(at: pos) == 96 {
                 if let close = findClosingSingle("`", in: nsLine, from: pos + 1) {
-                    let openRange  = NSRange(location: lineRange.location + pos, length: 1)
-                    let innerRange = NSRange(location: lineRange.location + pos + 1,
-                                            length: close.upperBound - pos - 2)
-                    let closeRange = NSRange(location: lineRange.location + close.upperBound - 1, length: 1)
                     let codeFont = NSFont.monospacedSystemFont(ofSize: fontSize - 1, weight: .regular)
-                    if isCursorLine {
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: openRange)
-                        if innerRange.length > 0 {
-                            backing.addAttributes([
+                    applyWrap(lineRange: lineRange, pos: pos, close: close,
+                              markerLen: 1, isCursorLine: isCursorLine,
+                              innerAttrs: [
                                 .font: codeFont,
                                 .foregroundColor: NSColor.systemOrange,
                                 .backgroundColor: NSColor.textBackgroundColor.withAlphaComponent(0.3),
-                            ], range: innerRange)
-                        }
-                        backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: closeRange)
-                    } else {
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: openRange)
-                        if innerRange.length > 0 {
-                            backing.addAttributes([
-                                .font: codeFont,
-                                .foregroundColor: NSColor.systemOrange,
-                                .backgroundColor: NSColor.textBackgroundColor.withAlphaComponent(0.3),
-                            ], range: innerRange)
-                        }
-                        backing.addAttributes(hiddenAttrs(baseSize: fontSize), range: closeRange)
-                    }
-                    pos = close.upperBound
-                    continue
+                              ])
+                    pos = close.upperBound; continue
                 }
             }
 
@@ -351,10 +284,35 @@ final class MarkdownTextStorage: NSTextStorage {
         }
     }
 
+    /// 统一处理"标记包裹"的样式应用
+    private func applyWrap(
+        lineRange: NSRange,
+        pos: Int,
+        close: Range<Int>,
+        markerLen: Int,
+        isCursorLine: Bool,
+        innerAttrs: [NSAttributedString.Key: Any]
+    ) {
+        let absPos = lineRange.location + pos
+        let openRange  = NSRange(location: absPos, length: markerLen)
+        let innerLen   = close.upperBound - pos - markerLen * 2
+        let innerRange = NSRange(location: absPos + markerLen, length: max(0, innerLen))
+        let closeRange = NSRange(location: absPos + markerLen + max(0, innerLen), length: markerLen)
+
+        if isCursorLine {
+            backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: openRange)
+            if innerRange.length > 0 { backing.addAttributes(innerAttrs, range: innerRange) }
+            backing.addAttributes([.foregroundColor: NSColor.tertiaryLabelColor], range: closeRange)
+        } else {
+            backing.addAttributes(hidden(size: fontSize), range: openRange)
+            if innerRange.length > 0 { backing.addAttributes(innerAttrs, range: innerRange) }
+            backing.addAttributes(hidden(size: fontSize), range: closeRange)
+        }
+    }
+
     // MARK: - 工具方法
 
-    /// 将语法符号隐藏（字体极小 + 完全透明）
-    private func hiddenAttrs(baseSize: CGFloat) -> [NSAttributedString.Key: Any] {
+    private func hidden(size: CGFloat) -> [NSAttributedString.Key: Any] {
         [
             .font: NSFont.systemFont(ofSize: 0.01),
             .foregroundColor: NSColor.clear,

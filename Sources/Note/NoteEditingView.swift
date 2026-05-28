@@ -17,7 +17,8 @@ struct NoteEditingView: View {
                 nodeId: nodeId,
                 onChange: { newValue in
                     onSave(newValue)
-                }
+                },
+                onWindowAttached: { restoreFocusIfNeeded() }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -34,7 +35,8 @@ struct NoteEditingView: View {
                     },
                     onFocusChanged: { focused in
                         isFocused = focused
-                    }
+                    },
+                    onWindowAttached: { restoreFocusIfNeeded() }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -47,6 +49,14 @@ struct NoteEditingView: View {
                         .allowsHitTesting(false)
                 }
             }
+        }
+    }
+
+    private func restoreFocusIfNeeded() {
+        guard state.pendingFocusRestore, let id = nodeId else { return }
+        state.pendingFocusRestore = false
+        if let tv = NoteTextViewRegistry.shared.textView(for: id) {
+            tv.window?.makeFirstResponder(tv)
         }
     }
 }

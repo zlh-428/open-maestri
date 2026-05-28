@@ -8,12 +8,14 @@ struct MarkdownLiveEditor: NSViewRepresentable {
     var fontSize: CGFloat = NSFont.systemFontSize
     var nodeId: UUID? = nil
     var onChange: ((String) -> Void)? = nil
+    /// view 加入 window hierarchy（viewDidMoveToWindow）时调用，textView 已可接受焦点
+    var onWindowAttached: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    func makeNSView(context: Context) -> NoteAwareScrollView {
         let textStorage = MarkdownTextStorage()
         textStorage.fontSize = fontSize
 
@@ -41,13 +43,18 @@ struct MarkdownLiveEditor: NSViewRepresentable {
             textStorage.replaceCharacters(in: NSRange(location: 0, length: 0), with: text)
         }
 
-        let scrollView = NSScrollView()
-        scrollView.documentView = textView
+        let scrollView = NoteAwareScrollView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
         scrollView.backgroundColor = .clear
+
+        // textView 必须在 documentView 设置之前配置好 min/maxSize，
+        // 否则 NSScrollView 无法根据内容高度正确调整 documentView frame
+        textView.minSize = NSSize(width: 0, height: scrollView.contentSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        scrollView.documentView = textView
 
         context.coordinator.textView = textView
         context.coordinator.textStorage = textStorage
@@ -57,10 +64,11 @@ struct MarkdownLiveEditor: NSViewRepresentable {
             NoteTextViewRegistry.shared.register(nodeId: nodeId, textView: textView)
         }
 
+        scrollView.onWindowAttached = onWindowAttached
         return scrollView
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    func updateNSView(_ scrollView: NoteAwareScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView,
               let ts = textView.textStorage as? MarkdownTextStorage else { return }
         ts.fontSize = fontSize
@@ -72,11 +80,11 @@ struct MarkdownLiveEditor: NSViewRepresentable {
         textView.setSelectedRange(safeRange)
     }
 
-    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
-        if let nodeId = coordinator.parent.nodeId {
-            NoteScrollViewRegistry.shared.unregister(nodeId: nodeId)
-            NoteTextViewRegistry.shared.unregister(nodeId: nodeId)
-        }
+    static func dismantleNSView(_ nsView: NoteAwareScrollView, coordinator: Coordinator) {
+        guard let nodeId = coordinator.parent.nodeId,
+              let textView = coordinator.textView else { return }
+        NoteScrollViewRegistry.shared.unregister(nodeId: nodeId, ifMatching: nsView)
+        NoteTextViewRegistry.shared.unregister(nodeId: nodeId, ifMatching: textView)
     }
 
     // MARK: - Coordinator
@@ -98,7 +106,7 @@ struct MarkdownLiveEditor: NSViewRepresentable {
 
         func textDidEndEditing(_ notification: Notification) {
             isEditing = false
-            textStorage?.cursorLineIndex = -1
+            textStorage?.updateCursorLine(-1)
         }
 
         func textDidChange(_ notification: Notification) {
@@ -117,10 +125,15 @@ struct MarkdownLiveEditor: NSViewRepresentable {
         private func updateCursorLine(in tv: NSTextView) {
             let pos = tv.selectedRange().location
             let str = tv.string as NSString
-            let lineRange = str.lineRange(for: NSRange(location: min(pos, max(0, str.length - 1)), length: 0))
+            guard str.length > 0 else {
+                textStorage?.updateCursorLine(0)
+                return
+            }
+            let safePos = min(pos, str.length - 1)
+            let lineRange = str.lineRange(for: NSRange(location: safePos, length: 0))
             let prefix = str.substring(to: lineRange.location)
             let line = prefix.components(separatedBy: "\n").count - 1
-            textStorage?.cursorLineIndex = line
+            textStorage?.updateCursorLine(line)
         }
     }
 }

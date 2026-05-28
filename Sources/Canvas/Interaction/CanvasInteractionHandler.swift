@@ -193,8 +193,8 @@ extension CanvasViewportView {
             // 不使用 contentInteraction，让 AppKit 原生响应链处理后续 drag/up 事件，
             // 避免在 mouseDragged 中手动转发造成递归崩溃。
             if let node = currentNodes.first(where: { $0.id == id }),
-               case .stickyNote = node.content,
-               let tv = NoteTextViewRegistry.shared.textView(for: id) {
+               case .stickyNote = node.content {
+                guard let tv = NoteTextViewRegistry.shared.textView(for: id) else { return }
                 window?.makeFirstResponder(tv)
                 let correctedLocation = correctedWindowLocationForTextView(for: event, nodeId: id, textView: tv)
                 if let syntheticEvent = NSEvent.mouseEvent(
