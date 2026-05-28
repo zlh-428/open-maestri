@@ -92,7 +92,8 @@ final class MaestroHandlers {
             command: effectivePreset.command,
             workingDirectory: maestroSession.workingDirectory,
             workspaceId: activeWsId,
-            roleName: role?.name
+            roleName: role?.name,
+            agentType: effectivePreset.agentType
         )
         tm.writeLine(to: recruitId, text: "export OMAESTRI_AGENT_NAME=\"\(recruitName)\"")
         // 同步到 TerminalSession 供 ListHandler 使用

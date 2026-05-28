@@ -32,7 +32,8 @@ final class TerminalManager {
         workingDirectory: String,
         workspaceId: UUID? = nil,
         roleName: String? = nil,
-        displayName: String? = nil
+        displayName: String? = nil,
+        agentType: String = "generic_shell"
     ) -> TerminalSession {
         let session = TerminalSession(
             id: id,
@@ -40,6 +41,7 @@ final class TerminalManager {
             workingDirectory: workingDirectory,
             roleName: roleName
         )
+        session.agentType = agentType
         session.displayName = displayName
         terminals[id] = session
         if let wsId = workspaceId {
@@ -82,7 +84,8 @@ final class TerminalManager {
             command: preset.command,
             workingDirectory: workingDirectory,
             workspaceId: workspaceId,
-            roleName: roleName
+            roleName: roleName,
+            agentType: preset.agentType
         )
     }
 
@@ -188,6 +191,8 @@ final class TerminalSession {
     let command: String
     let workingDirectory: String
     let roleName: String?
+    /// 节点的 agent 类型（来自 TerminalContent.agentType），供 AskHandler 选择等待策略
+    var agentType: String = "generic_shell"
     /// 用户在 UI 中为此节点设置的显示名称（来自 TerminalContent.name）
     var displayName: String?
     /// Agent 实际分配的名称（来自 OMAESTRI_AGENT_NAME 环境变量，由 MaestroHandlers.recruit 注入）

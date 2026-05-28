@@ -27,7 +27,6 @@ final class AskHandler {
         let tm = TerminalManager.shared
         let cm = ConnectionManager.shared
         let connectedIds = cm.connectedNodeIds(for: callerTid)
-        // 匹配优先级：agentName（Maestro 招募设置）> displayName > command 名称 > UUID 前缀
         guard let targetSession = tm.terminals.values.first(where: { session in
             guard connectedIds.contains(session.id) else { return false }
             let lower = targetName.lowercased()
@@ -39,7 +38,6 @@ final class AskHandler {
             return "error: agent '\(targetName)' not found. Use 'omaestri list' to see connected agents."
         }
 
-        // 找到连接 ID，ask 全程保持 communicating 状态，收到回复后再恢复 idle
         let connectionId = cm.connections.values.first(where: {
             ($0.nodeIdA == callerTid && $0.nodeIdB == targetSession.id) ||
             ($0.nodeIdA == targetSession.id && $0.nodeIdB == callerTid)
@@ -49,21 +47,20 @@ final class AskHandler {
             NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)
         }
 
-        // 标记目标终端有活跃任务（使任务完成后能触发红点通知）
         targetSession.markActiveTask()
 
-        // 将 prompt 写入目标终端，用 \r 触发 readline 提交（\n 只输入不提交）
         let injectedPrompt = prompt.hasSuffix("\r") ? prompt : prompt.trimmingCharacters(in: .newlines) + "\r"
         tm.write(to: targetSession.id, text: injectedPrompt)
         logger.debug("Prompt injected to \(targetSession.id.uuidString.prefix(8)): \(prompt.prefix(50))")
 
-        // 记录注入前的 buffer 行数，用于过滤注入前的提示符（避免误判）
-        let baselineLineCount = bufferLineCount(session: targetSession, in: tm)
+        let result: String
+        if targetSession.agentType == "generic_shell" {
+            let baselineLineCount = bufferLineCount(session: targetSession, in: tm)
+            result = await waitForPromptEvent(session: targetSession, in: tm, baselineLineCount: baselineLineCount)
+        } else {
+            result = await waitForIdleNotification(session: targetSession, in: tm)
+        }
 
-        // 等待目标终端执行完成，然后返回其屏幕内容
-        let result = await waitForIdleThenSnapshot(session: targetSession, in: tm, baselineLineCount: baselineLineCount)
-
-        // 收到回复后恢复连接线为 idle
         if let cid = connectionId {
             cm.updateStatus(.idle, for: cid)
             NotificationCenter.default.post(name: .connectionStatusChanged, object: nil)
@@ -71,25 +68,102 @@ final class AskHandler {
         return result
     }
 
-    // MARK: - 等待回复完成后取屏幕快照
+    // MARK: - Shell 策略：事件驱动提示符检测
 
+    /// 订阅 PTY 输出回调，每次有新输出时检测提示符，匹配即立即返回
     @MainActor
-    private func waitForIdleThenSnapshot(session: TerminalSession, in tm: TerminalManager, baselineLineCount: Int) async -> String {
-        // 短暂延迟确保命令已开始执行
-        try? await Task.sleep(for: .milliseconds(300))
+    private func waitForPromptEvent(session: TerminalSession, in tm: TerminalManager, baselineLineCount: Int) async -> String {
+        try? await Task.sleep(for: .milliseconds(150))
 
-        let deadline = Date().addingTimeInterval(responseTimeout)
+        return await withCheckedContinuation { continuation in
+            let deadline = Date().addingTimeInterval(responseTimeout)
+            var resumed = false
 
-        while Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(300))
-            if hasPromptReturned(session: session, in: tm, baselineLineCount: baselineLineCount) { break }
+            guard let provider = tm.providers[session.id] else {
+                continuation.resume(returning: snapshot(session: session, in: tm))
+                return
+            }
+
+            let previousCallback = provider.onDataReceived
+
+            provider.onDataReceived = { [weak self] text in
+                previousCallback?(text)
+                guard let self, !resumed else { return }
+                Task { @MainActor in
+                    guard !resumed else { return }
+                    if self.hasPromptReturned(session: session, in: tm, baselineLineCount: baselineLineCount) {
+                        resumed = true
+                        provider.onDataReceived = previousCallback
+                        continuation.resume(returning: self.snapshot(session: session, in: tm))
+                    } else if Date() >= deadline {
+                        resumed = true
+                        provider.onDataReceived = previousCallback
+                        continuation.resume(returning: self.snapshot(session: session, in: tm))
+                    }
+                }
+            }
+
+            // 超时保底
+            Task { @MainActor in
+                let remaining = deadline.timeIntervalSinceNow
+                if remaining > 0 {
+                    try? await Task.sleep(for: .seconds(remaining))
+                }
+                guard !resumed else { return }
+                resumed = true
+                provider.onDataReceived = previousCallback
+                continuation.resume(returning: self.snapshot(session: session, in: tm))
+            }
         }
-
-        return snapshot(session: session, in: tm)
     }
 
+    // MARK: - Agent 策略：等待 terminalBecameIdle 通知
+
+    /// 监听 .terminalBecameIdle 通知，target 终端空闲后立即返回
+    @MainActor
+    private func waitForIdleNotification(session: TerminalSession, in tm: TerminalManager) async -> String {
+        // 短暂延迟等待 agent 开始处理（避免注入后 activityMonitor 尚未感知到新输出）
+        try? await Task.sleep(for: .milliseconds(500))
+
+        return await withCheckedContinuation { continuation in
+            var resumed = false
+            var observer: NSObjectProtocol?
+
+            let deadline = Date().addingTimeInterval(responseTimeout)
+
+            observer = NotificationCenter.default.addObserver(
+                forName: .terminalBecameIdle,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let self,
+                      !resumed,
+                      let tid = notification.userInfo?["terminalId"] as? UUID,
+                      tid == session.id else { return }
+                resumed = true
+                if let obs = observer { NotificationCenter.default.removeObserver(obs) }
+                Task { @MainActor in
+                    continuation.resume(returning: self.snapshot(session: session, in: tm))
+                }
+            }
+
+            // 超时保底
+            Task { @MainActor in
+                let remaining = deadline.timeIntervalSinceNow
+                if remaining > 0 {
+                    try? await Task.sleep(for: .seconds(remaining))
+                }
+                guard !resumed else { return }
+                resumed = true
+                if let obs = observer { NotificationCenter.default.removeObserver(obs) }
+                continuation.resume(returning: self.snapshot(session: session, in: tm))
+            }
+        }
+    }
+
+    // MARK: - 共用工具
+
     /// 判断目标终端是否已回到提示符（命令执行完毕）
-    /// baselineLineCount：注入前的 buffer 行数，必须有新增行才开始检测，避免误判输入回显中的 ❯
     @MainActor
     private func hasPromptReturned(session: TerminalSession, in tm: TerminalManager, baselineLineCount: Int) -> Bool {
         guard let provider = tm.providers[session.id],
@@ -103,18 +177,14 @@ final class AskHandler {
         let text = String(decoding: data, as: UTF8.self)
         var lines = text.components(separatedBy: "\n")
 
-        // 必须有新增行，才说明命令真正开始执行并产生了输出
-        // （避免误判：注入后 buffer 行数未增加时，末行的 ❯ 只是输入回显）
-        guard lines.count > baselineLineCount + 2 else { return false }
+        guard lines.count > baselineLineCount + 1 else { return false }
 
-        // 去掉尾部空行，找最后一个非空行
         while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
             lines.removeLast()
         }
         guard let lastLine = lines.last else { return false }
         let trimmed = lastLine.trimmingCharacters(in: .whitespaces)
 
-        // 匹配常见 shell 提示符尾部：% / $ / > / ❯（zsh/bash/fish/Claude Code）
         return trimmed.hasSuffix("%") || trimmed.hasSuffix("$") ||
                trimmed.hasSuffix(">") || trimmed.hasSuffix("❯") ||
                trimmed.hasSuffix("% ") || trimmed.hasSuffix("$ ")

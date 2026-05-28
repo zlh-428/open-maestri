@@ -193,7 +193,8 @@ struct CanvasToolbar: View {
                 workingDirectory: startDir,
                 workspaceId: wsId,
                 roleName: role?.name,
-                displayName: tc.name
+                displayName: tc.name,
+                agentType: preset.agentType
             )
         }
     }
