@@ -99,26 +99,23 @@ final class TerminalThemeRegistry {
 
     /// 根据偏好推断要使用的主题 ID
     /// "system" 模式会根据系统外观自动选择 dark/light
+    /// 自定义主题直接返回其 ID
     static func resolveThemeId(from preference: String) -> String {
         switch preference {
+        case "system":
+            // 根据系统外观决定
+            let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return isDark ? "maestri-dark" : "maestri-light"
         case "dark":
             return "maestri-dark"
         case "light":
             return "maestri-light"
-        case "dracula":
-            return "dracula"
-        case "solarized-dark":
-            return "solarized-dark"
-        case "solarized-light":
-            return "solarized-light"
-        case "nord":
-            return "nord"
-        case "one-dark":
-            return "one-dark"
-        case "tokyo-night":
-            return "tokyo-night"
         default:
-            // "system"：根据系统外观决定
+            // 自定义主题：直接使用 ID（如 dracula, nord, catppuccin-mocha 等）
+            // 验证主题是否存在，不存在则回退到系统
+            if TerminalThemeRegistry.shared.theme(for: preference) != nil {
+                return preference
+            }
             let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
             return isDark ? "maestri-dark" : "maestri-light"
         }
@@ -326,6 +323,181 @@ final class TerminalThemeRegistry {
             ansiBrightMagenta: "#BB9AF7",
             ansiBrightCyan: "#7DCFFF",
             ansiBrightWhite: "#C0CAF5"
+        ),
+        // Tokyo Night Day
+        TerminalTheme(
+            id: "tokyo-night-day",
+            name: "Tokyo Night Day",
+            foreground: "#3760BF",
+            background: "#E1E2E7",
+            cursor: "#3760BF",
+            selection: "#B6BFE2",
+            ansiBlack: "#E9E9ED",
+            ansiRed: "#F52A65",
+            ansiGreen: "#587539",
+            ansiYellow: "#8C6C3E",
+            ansiBlue: "#2E7DE9",
+            ansiMagenta: "#9854F1",
+            ansiCyan: "#007197",
+            ansiWhite: "#6172B0",
+            ansiBrightBlack: "#A1A6C5",
+            ansiBrightRed: "#F52A65",
+            ansiBrightGreen: "#587539",
+            ansiBrightYellow: "#8C6C3E",
+            ansiBrightBlue: "#2E7DE9",
+            ansiBrightMagenta: "#9854F1",
+            ansiBrightCyan: "#007197",
+            ansiBrightWhite: "#3760BF"
+        ),
+        // Catppuccin Mocha
+        TerminalTheme(
+            id: "catppuccin-mocha",
+            name: "Catppuccin Mocha",
+            foreground: "#CDD6F4",
+            background: "#1E1E2E",
+            cursor: "#F5E0DC",
+            selection: "#45475A",
+            ansiBlack: "#45475A",
+            ansiRed: "#F38BA8",
+            ansiGreen: "#A6E3A1",
+            ansiYellow: "#F9E2AF",
+            ansiBlue: "#89B4FA",
+            ansiMagenta: "#F5C2E7",
+            ansiCyan: "#94E2D5",
+            ansiWhite: "#BAC2DE",
+            ansiBrightBlack: "#585B70",
+            ansiBrightRed: "#F38BA8",
+            ansiBrightGreen: "#A6E3A1",
+            ansiBrightYellow: "#F9E2AF",
+            ansiBrightBlue: "#89B4FA",
+            ansiBrightMagenta: "#F5C2E7",
+            ansiBrightCyan: "#94E2D5",
+            ansiBrightWhite: "#A6ADC8"
+        ),
+        // Catppuccin Macchiato
+        TerminalTheme(
+            id: "catppuccin-macchiato",
+            name: "Catppuccin Macchiato",
+            foreground: "#CAD3F5",
+            background: "#24273A",
+            cursor: "#F4DBD6",
+            selection: "#494D64",
+            ansiBlack: "#494D64",
+            ansiRed: "#ED8796",
+            ansiGreen: "#A6DA95",
+            ansiYellow: "#EED49F",
+            ansiBlue: "#8AADF4",
+            ansiMagenta: "#F5BDE6",
+            ansiCyan: "#8BD5CA",
+            ansiWhite: "#B8C0E0",
+            ansiBrightBlack: "#5B6078",
+            ansiBrightRed: "#ED8796",
+            ansiBrightGreen: "#A6DA95",
+            ansiBrightYellow: "#EED49F",
+            ansiBrightBlue: "#8AADF4",
+            ansiBrightMagenta: "#F5BDE6",
+            ansiBrightCyan: "#8BD5CA",
+            ansiBrightWhite: "#A5ADCB"
+        ),
+        // Catppuccin Latte
+        TerminalTheme(
+            id: "catppuccin-latte",
+            name: "Catppuccin Latte",
+            foreground: "#4C4F69",
+            background: "#EFF1F5",
+            cursor: "#DC8A78",
+            selection: "#ACB0BE",
+            ansiBlack: "#5C5F77",
+            ansiRed: "#D20F39",
+            ansiGreen: "#40A02B",
+            ansiYellow: "#DF8E1D",
+            ansiBlue: "#1E66F5",
+            ansiMagenta: "#EA76CB",
+            ansiCyan: "#179299",
+            ansiWhite: "#ACB0BE",
+            ansiBrightBlack: "#6C6F85",
+            ansiBrightRed: "#D20F39",
+            ansiBrightGreen: "#40A02B",
+            ansiBrightYellow: "#DF8E1D",
+            ansiBrightBlue: "#1E66F5",
+            ansiBrightMagenta: "#EA76CB",
+            ansiBrightCyan: "#179299",
+            ansiBrightWhite: "#BCC0CC"
+        ),
+        // Gruvbox Dark
+        TerminalTheme(
+            id: "gruvbox-dark",
+            name: "Gruvbox Dark",
+            foreground: "#EBDBB2",
+            background: "#282828",
+            cursor: "#EBDBB2",
+            selection: "#504945",
+            ansiBlack: "#282828",
+            ansiRed: "#CC241D",
+            ansiGreen: "#98971A",
+            ansiYellow: "#D79921",
+            ansiBlue: "#458588",
+            ansiMagenta: "#B16286",
+            ansiCyan: "#689D6A",
+            ansiWhite: "#A89984",
+            ansiBrightBlack: "#928374",
+            ansiBrightRed: "#FB4934",
+            ansiBrightGreen: "#B8BB26",
+            ansiBrightYellow: "#FABD2F",
+            ansiBrightBlue: "#83A598",
+            ansiBrightMagenta: "#D3869B",
+            ansiBrightCyan: "#8EC07C",
+            ansiBrightWhite: "#EBDBB2"
+        ),
+        // Gruvbox Light
+        TerminalTheme(
+            id: "gruvbox-light",
+            name: "Gruvbox Light",
+            foreground: "#3C3836",
+            background: "#FBF1C7",
+            cursor: "#3C3836",
+            selection: "#D5C4A1",
+            ansiBlack: "#FBF1C7",
+            ansiRed: "#CC241D",
+            ansiGreen: "#98971A",
+            ansiYellow: "#D79921",
+            ansiBlue: "#458588",
+            ansiMagenta: "#B16286",
+            ansiCyan: "#689D6A",
+            ansiWhite: "#7C6F64",
+            ansiBrightBlack: "#928374",
+            ansiBrightRed: "#9D0006",
+            ansiBrightGreen: "#79740E",
+            ansiBrightYellow: "#B57614",
+            ansiBrightBlue: "#076678",
+            ansiBrightMagenta: "#8F3F71",
+            ansiBrightCyan: "#427B58",
+            ansiBrightWhite: "#3C3836"
+        ),
+        // Rosé Pine
+        TerminalTheme(
+            id: "rose-pine",
+            name: "Rosé Pine",
+            foreground: "#E0DEF4",
+            background: "#191724",
+            cursor: "#524F67",
+            selection: "#2A283E",
+            ansiBlack: "#26233A",
+            ansiRed: "#EB6F92",
+            ansiGreen: "#31748F",
+            ansiYellow: "#F6C177",
+            ansiBlue: "#9CCFD8",
+            ansiMagenta: "#C4A7E7",
+            ansiCyan: "#EBBCBA",
+            ansiWhite: "#E0DEF4",
+            ansiBrightBlack: "#6E6A86",
+            ansiBrightRed: "#EB6F92",
+            ansiBrightGreen: "#31748F",
+            ansiBrightYellow: "#F6C177",
+            ansiBrightBlue: "#9CCFD8",
+            ansiBrightMagenta: "#C4A7E7",
+            ansiBrightCyan: "#EBBCBA",
+            ansiBrightWhite: "#E0DEF4"
         ),
     ]
 }

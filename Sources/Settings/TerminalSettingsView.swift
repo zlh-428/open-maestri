@@ -41,21 +41,12 @@ struct TerminalSettingsView: View {
 
             // MARK: - 主题
             Section("settings.terminal.theme") {
-                Picker("settings.terminal.theme", selection: $state.preferences.terminalTheme) {
-                    Text("settings.terminal.theme.system").tag("system")
-                    Divider()
-                    Text("Maestri Dark").tag("dark")
-                    Text("Maestri Light").tag("light")
-                    Divider()
-                    Text("Dracula").tag("dracula")
-                    Text("Solarized Dark").tag("solarized-dark")
-                    Text("Solarized Light").tag("solarized-light")
-                    Text("Nord").tag("nord")
-                    Text("One Dark").tag("one-dark")
-                    Text("Tokyo Night").tag("tokyo-night")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("settings.terminal.theme")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    ThemePickerView(selectedThemeId: $state.preferences.terminalTheme)
                 }
-                Text("settings.terminal.theme.help")
-                    .font(.caption).foregroundStyle(.secondary)
             }
 
             // MARK: - 字体

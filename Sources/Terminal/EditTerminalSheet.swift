@@ -491,12 +491,30 @@ struct ColorPickerGridView: View {
 
 struct ThemePickerView: View {
     @Binding var selectedThemeId: String
+    @State private var showCustomThemePicker = false
 
     private let themes: [(id: String, name: String, bg: Color, fg: Color)] = [
         ("system", "terminal.theme.system".localized, Color(white: 0.97), .blue),
         ("maestri-dark", "terminal.theme.dark".localized, Color(white: 0.12), .green),
         ("maestri-light", "terminal.theme.light".localized, .white, .blue),
     ]
+
+    /// 判断当前选中的是否为自定义主题（非 system/maestri-dark/maestri-light）
+    private var isCustomThemeSelected: Bool {
+        !["system", "maestri-dark", "maestri-light"].contains(selectedThemeId)
+    }
+
+    /// 获取自定义主题的显示信息
+    private var customThemeDisplay: (bg: Color, fg: Color, name: String)? {
+        guard isCustomThemeSelected else { return nil }
+        let registry = TerminalThemeRegistry.shared
+        guard let theme = registry.theme(for: selectedThemeId) else { return nil }
+        return (
+            bg: Color(nsColor: NSColor(hex: theme.background) ?? .black),
+            fg: Color(nsColor: NSColor(hex: theme.cursor) ?? .white),
+            name: theme.name
+        )
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -536,20 +554,62 @@ struct ThemePickerView: View {
                 .buttonStyle(.plain)
             }
 
-            // 自定义占位
+            // 自定义主题按钮
             Button {
-                // TODO: 自定义主题
+                showCustomThemePicker = true
             } label: {
                 VStack(spacing: 4) {
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-                        .foregroundStyle(Color(white: 0.7))
-                        .frame(width: 86, height: 54)
-                        .overlay(
-                            Image(systemName: "plus")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.secondary)
-                        )
+                    if let display = customThemeDisplay {
+                        // 已选中自定义主题：显示该主题预览
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(display.bg)
+                            .frame(width: 86, height: 54)
+                            .overlay(
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("~/dev")
+                                        .font(.system(size: 9, design: .monospaced))
+                                    HStack(spacing: 2) {
+                                        Text("$")
+                                            .font(.system(size: 9, design: .monospaced))
+                                        Rectangle()
+                                            .fill(display.fg)
+                                            .frame(width: 5, height: 11)
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .padding(8)
+                                , alignment: .topLeading
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(isCustomThemeSelected ? Color.accentColor : Color(white: 0.8), lineWidth: isCustomThemeSelected ? 2 : 0.5)
+                            )
+                    } else {
+                        // 未选中自定义主题：显示虚线占位
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .frame(width: 86, height: 54)
+                            .overlay(
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("~/dev")
+                                        .font(.system(size: 9, design: .monospaced))
+                                    HStack(spacing: 2) {
+                                        Text("$")
+                                            .font(.system(size: 9, design: .monospaced))
+                                        Rectangle()
+                                            .fill(Color.blue)
+                                            .frame(width: 5, height: 11)
+                                    }
+                                }
+                                .foregroundStyle(.primary)
+                                .padding(8)
+                                , alignment: .topLeading
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(isCustomThemeSelected ? Color.accentColor : Color(white: 0.8), lineWidth: isCustomThemeSelected ? 2 : 0.5)
+                            )
+                    }
                     Text("terminal.theme.custom".localized)
                         .font(.system(size: 10))
                         .foregroundStyle(.secondary)
@@ -557,6 +617,256 @@ struct ThemePickerView: View {
             }
             .buttonStyle(.plain)
         }
+        .sheet(isPresented: $showCustomThemePicker) {
+            CustomThemePickerSheet(selectedThemeId: $selectedThemeId)
+        }
+    }
+}
+
+// MARK: - Custom Theme Picker Sheet
+
+struct CustomThemePickerSheet: View {
+    @Binding var selectedThemeId: String
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var previewThemeId: String = ""
+
+    private var allThemes: [TerminalTheme] {
+        TerminalThemeRegistry.shared.themes
+    }
+
+    private var previewTheme: TerminalTheme? {
+        TerminalThemeRegistry.shared.theme(for: previewThemeId)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 标题
+            Text("terminal.theme.custom_title")
+                .font(.system(size: 18, weight: .bold))
+                .padding(.top, 28)
+                .padding(.bottom, 24)
+
+            // 主题网格（可滚动）
+            ScrollView {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 16), count: 5), spacing: 20) {
+                    ForEach(allThemes) { theme in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                previewThemeId = theme.id
+                            }
+                        } label: {
+                            themeGridItem(theme: theme)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 32)
+            }
+            .frame(maxHeight: .infinity)
+
+            // 预览区域
+            previewSection
+                .padding(.horizontal, 32)
+                .padding(.top, 20)
+                .padding(.bottom, 16)
+
+            Divider()
+                .padding(.horizontal, 24)
+
+            // 底部按钮
+            HStack {
+                Button("button.cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+                .controlSize(.large)
+
+                Spacer()
+
+                Button("button.done") {
+                    selectedThemeId = previewThemeId
+                    dismiss()
+                }
+                .keyboardShortcut(.return)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(previewThemeId.isEmpty)
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 18)
+        }
+        .frame(width: 680, height: 680)
+        .onAppear {
+            // 如果当前已选中自定义主题，默认选中它
+            if allThemes.contains(where: { $0.id == selectedThemeId }) {
+                previewThemeId = selectedThemeId
+            } else {
+                previewThemeId = ""
+            }
+        }
+    }
+
+    // MARK: - 预览区域（含占位）
+
+    @ViewBuilder
+    private var previewSection: some View {
+        if let theme = previewTheme {
+            themePreviewView(theme: theme)
+        } else {
+            // 未选中时显示占位
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.15))
+                .frame(height: 150)
+                .overlay(
+                    Text("terminal.theme.preview_placeholder")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.tertiary)
+                )
+        }
+    }
+
+    // MARK: - 主题网格项
+
+    @ViewBuilder
+    private func themeGridItem(theme: TerminalTheme) -> some View {
+        let isSelected = previewThemeId == theme.id
+        let bgColor = Color(nsColor: NSColor(hex: theme.background) ?? .black)
+        let fgColor = Color(nsColor: NSColor(hex: theme.foreground) ?? .white)
+        let cursorColor = Color(nsColor: NSColor(hex: theme.cursor) ?? .green)
+
+        VStack(spacing: 6) {
+            RoundedRectangle(cornerRadius: 10)
+                .fill(bgColor)
+                .frame(height: 70)
+                .overlay(
+                    VStack(alignment: .leading, spacing: 3) {
+                        // ANSI 色条
+                        HStack(spacing: 2) {
+                            ForEach(ansiColors(for: theme), id: \.self) { color in
+                                Rectangle()
+                                    .fill(color)
+                                    .frame(width: 6, height: 4)
+                            }
+                        }
+                        Spacer()
+                        Text("~/dev")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundStyle(fgColor)
+                        HStack(spacing: 2) {
+                            Text("$")
+                                .font(.system(size: 9, design: .monospaced))
+                                .foregroundStyle(fgColor)
+                            Rectangle()
+                                .fill(cursorColor)
+                                .frame(width: 5, height: 11)
+                        }
+                    }
+                    .padding(8)
+                    , alignment: .topLeading
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isSelected ? Color.accentColor : Color(nsColor: .separatorColor).opacity(0.6),
+                                lineWidth: isSelected ? 2.5 : 0.5)
+                )
+
+            Text(theme.name)
+                .font(.system(size: 11))
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(height: 28)
+        }
+    }
+
+    // MARK: - 预览视图
+
+    @ViewBuilder
+    private func themePreviewView(theme: TerminalTheme) -> some View {
+        let bgColor = Color(nsColor: NSColor(hex: theme.background) ?? .black)
+        let fgColor = Color(nsColor: NSColor(hex: theme.foreground) ?? .white)
+        let greenColor = Color(nsColor: NSColor(hex: theme.ansiGreen) ?? .green)
+        let yellowColor = Color(nsColor: NSColor(hex: theme.ansiYellow) ?? .yellow)
+        let blueColor = Color(nsColor: NSColor(hex: theme.ansiBlue) ?? .blue)
+        let redColor = Color(nsColor: NSColor(hex: theme.ansiRed) ?? .red)
+        let cursorColor = Color(nsColor: NSColor(hex: theme.cursor) ?? .white)
+
+        RoundedRectangle(cornerRadius: 12)
+            .fill(bgColor)
+            .frame(height: 150)
+            .overlay(
+                VStack(alignment: .leading, spacing: 5) {
+                    // 模拟终端输出
+                    HStack(spacing: 0) {
+                        Text("ev@maestri")
+                            .foregroundStyle(greenColor)
+                        Text(":")
+                            .foregroundStyle(fgColor)
+                        Text("~/dev/maestro")
+                            .foregroundStyle(blueColor)
+                        Text("$ ")
+                            .foregroundStyle(fgColor)
+                        Text("git status")
+                            .foregroundStyle(fgColor)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+
+                    HStack(spacing: 0) {
+                        Text("On branch ")
+                            .foregroundStyle(fgColor)
+                        Text("dev")
+                            .foregroundStyle(yellowColor)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+
+                    HStack(spacing: 0) {
+                        Text("  modified:   ")
+                            .foregroundStyle(redColor)
+                        Text("Terminal/Theme/ThemePicker.swift")
+                            .foregroundStyle(fgColor)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+
+                    HStack(spacing: 0) {
+                        Text("  added:      ")
+                            .foregroundStyle(greenColor)
+                        Text("Terminal/Theme/TerminalThemeRegistry.swift")
+                            .foregroundStyle(fgColor)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+
+                    HStack(spacing: 0) {
+                        Text("$ ")
+                            .foregroundStyle(fgColor)
+                        Rectangle()
+                            .fill(cursorColor)
+                            .frame(width: 8, height: 15)
+                    }
+                    .font(.system(size: 12, design: .monospaced))
+                }
+                .padding(16)
+                , alignment: .topLeading
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.4), lineWidth: 0.5)
+            )
+    }
+
+    // MARK: - Helpers
+
+    private func ansiColors(for theme: TerminalTheme) -> [Color] {
+        [
+            Color(nsColor: NSColor(hex: theme.ansiRed) ?? .red),
+            Color(nsColor: NSColor(hex: theme.ansiGreen) ?? .green),
+            Color(nsColor: NSColor(hex: theme.ansiYellow) ?? .yellow),
+            Color(nsColor: NSColor(hex: theme.ansiBlue) ?? .blue),
+            Color(nsColor: NSColor(hex: theme.ansiMagenta) ?? .purple),
+            Color(nsColor: NSColor(hex: theme.ansiCyan) ?? .cyan),
+            Color(nsColor: NSColor(hex: theme.ansiBrightRed) ?? .red),
+            Color(nsColor: NSColor(hex: theme.ansiBrightGreen) ?? .green),
+        ]
     }
 }
 
