@@ -430,6 +430,16 @@ final class CanvasViewportView: NSView {
                 self.zoomCanvas(toAbsolute: target)
             }
         )
+        notificationObservers.append(
+            nc.addObserver(forName: .nextTerminal, object: nil, queue: .main) { [weak self] _ in
+                self?.cycleTerminalFocus(forward: true)
+            }
+        )
+        notificationObservers.append(
+            nc.addObserver(forName: .prevTerminal, object: nil, queue: .main) { [weak self] _ in
+                self?.cycleTerminalFocus(forward: false)
+            }
+        )
     }
 
     /// 平滑动画跳转到指定画布原点（供 Minimap 点击等外部调用）

@@ -203,7 +203,7 @@ extension CanvasViewportView {
     // MARK: - ⌃Tab 终端循环切换
 
     /// 按画布横坐标排序，循环切换到下一个/上一个终端节点
-    private func cycleTerminalFocus(forward: Bool) {
+    func cycleTerminalFocus(forward: Bool) {
         let sorted = sortedTerminalNodes()
         guard !sorted.isEmpty else { return }
 
