@@ -839,7 +839,7 @@ struct WorkspaceCanvasView: View {
             switch node.content {
             case .terminal(let tc): return tc.name
             case .stickyNote(let nc):
-                return nc.fileName.map { $0.hasSuffix(".md") ? String($0.dropLast(3)) : $0 } ?? "便签"
+                return nc.fileName.map { $0.hasSuffix(".md") ? String($0.dropLast(3)) : $0 } ?? "node.default_name.note".localized
             case .portal(let pc): return pc.name
             default: return "Node"
             }

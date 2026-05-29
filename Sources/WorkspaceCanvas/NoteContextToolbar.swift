@@ -61,7 +61,7 @@ struct NoteContextToolbar: View {
                 ConnectionBadgeButton(connections: connections, onDelete: onDeleteConnection)
             }
             noteButton("m.square",
-                       tooltip: isFormatted ? "纯文本" : "格式化",
+                       tooltip: isFormatted ? "note.toolbar.toggle_format.plain".localized : "note.toolbar.toggle_format.formatted".localized,
                        isActive: isFormatted)                           { onToggleFormatted() }
             noteButton("trash", tooltip: "Delete", isDestructive: true) { onDelete() }
         }

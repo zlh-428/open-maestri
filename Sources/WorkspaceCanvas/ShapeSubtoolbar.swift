@@ -24,20 +24,20 @@ struct ShapeSubtoolbar: View {
         ["rect", "ellipse", "diamond"].contains(selectedSubtool)
     }
 
-    private static let subtools: [(id: String, icon: String, help: String)] = [
-        ("freehand_pen",         "pencil",              "钢笔"),
-        ("stroke_arrow",         "arrow.up.right",      "箭头"),
-        ("freehand_highlighter", "highlighter",         "荧光笔"),
-        ("stroke_line",          "line.diagonal",       "线条"),
-        ("rect",                 "rectangle",           "矩形"),
-        ("ellipse",              "circle",              "圆形"),
-        ("diamond",              "diamond",             "菱形"),
+    private static let subtools: [(id: String, icon: String, helpKey: String)] = [
+        ("freehand_pen",         "pencil",              "draw.tool.pen"),
+        ("stroke_arrow",         "arrow.up.right",      "draw.tool.arrow"),
+        ("freehand_highlighter", "highlighter",         "draw.tool.highlighter"),
+        ("stroke_line",          "line.diagonal",       "draw.tool.line"),
+        ("rect",                 "rectangle",           "draw.tool.rect"),
+        ("ellipse",              "circle",              "draw.tool.ellipse"),
+        ("diamond",              "diamond",             "draw.tool.diamond"),
     ]
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(Self.subtools, id: \.id) { tool in
-                subtoolButton(id: tool.id, icon: tool.icon, help: tool.help)
+                subtoolButton(id: tool.id, icon: tool.icon, help: tool.helpKey.localized)
             }
             toolbarSeparator
             colorButton
@@ -88,7 +88,7 @@ struct ShapeSubtoolbar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("主题颜色")
+        .help("draw.help.theme_color".localized)
         .popover(isPresented: $showColorPicker, arrowEdge: .bottom) {
             NoteColorPickerPopover(selectedColor: defaultColor) { color in
                 defaultColor = color
@@ -134,7 +134,7 @@ struct ShapeSubtoolbar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("线条风格")
+        .help("draw.help.stroke_style".localized)
         .popover(isPresented: $showStrokeStylePicker, arrowEdge: .bottom) {
             ShapeStrokeStylePopover(selected: defaultStrokeStyle) { style in
                 defaultStrokeStyleRaw = style.rawValue
@@ -152,7 +152,7 @@ struct ShapeSubtoolbar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("填充风格")
+        .help("draw.help.fill_style".localized)
         .popover(isPresented: $showFillStylePicker, arrowEdge: .bottom) {
             ShapeFillStylePopover(selected: defaultFillStyle) { style in
                 defaultFillStyleRaw = style.rawValue

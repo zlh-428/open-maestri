@@ -164,7 +164,7 @@ struct ShapeContextToolbar: View {
 
     private var fontSizeStepper: some View {
         HStack(spacing: 2) {
-            Text("大小")
+            Text("shape.toolbar.font_size".localized)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
