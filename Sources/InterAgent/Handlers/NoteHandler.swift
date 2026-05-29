@@ -15,7 +15,19 @@ final class NoteHandler {
         case "read":   return handleRead(args: args, terminalId: terminalId)
         case "write":  return handleWrite(args: args, terminalId: terminalId)
         case "edit":   return handleEdit(args: args, terminalId: terminalId)
-        case "create": return handleCreate(args: args, terminalId: terminalId)
+        default: return "error: unknown note subcommand '\(args[1])'. Valid: read|write|edit|create"
+        }
+    }
+
+    func handleAsync(args: [String], terminalId: UUID?) async -> String {
+        guard args.count >= 2 else {
+            return "error: usage: omaestri note <read|write|edit|create> ..."
+        }
+        switch args[1] {
+        case "read":   return handleRead(args: args, terminalId: terminalId)
+        case "write":  return handleWrite(args: args, terminalId: terminalId)
+        case "edit":   return handleEdit(args: args, terminalId: terminalId)
+        case "create": return await handleCreate(args: args, terminalId: terminalId)
         default: return "error: unknown note subcommand '\(args[1])'. Valid: read|write|edit|create"
         }
     }
@@ -85,18 +97,30 @@ final class NoteHandler {
 
     // MARK: - create（FR35 AC：在画布创建新 Note 并连接当前终端）
 
-    private func handleCreate(args: [String], terminalId: UUID?) -> String {
+    private func handleCreate(args: [String], terminalId: UUID?) async -> String {
         let initialContent = args.count >= 3 ? args[2] : ""
         let noteName = "Note-\(UUID().uuidString.prefix(8))"
         let pm = PersistenceManager.shared
 
+        // 通过 terminalId 查找所属工作区，写入正确的 workspaces/{id}/notes/ 目录
+        let workspaceId: UUID?
+        if let tid = terminalId {
+            workspaceId = await MainActor.run { TerminalManager.shared.terminalWorkspaceMap[tid] }
+        } else {
+            workspaceId = nil
+        }
+
         do {
-            // 在全局 notes 目录创建（不依赖 @MainActor）
-            let notesDir = pm.appDataURL.appendingPathComponent("notes")
+            let notesDir: URL
+            if let wsId = workspaceId {
+                notesDir = pm.notesDirURL(workspaceId: wsId)
+            } else {
+                // 无法确定工作区时 fallback 到全局目录（不应发生）
+                notesDir = pm.appDataURL.appendingPathComponent("notes")
+            }
             try FileManager.default.createDirectory(at: notesDir, withIntermediateDirectories: true)
             let path = notesDir.appendingPathComponent("\(noteName).md").path
             try nm.write(filePath: path, content: initialContent)
-            // 注册到 NoteRegistry，使后续 read/write 可通过名称查找
             NoteRegistry.shared.register(name: noteName, filePath: path)
             logger.info("Note '\(noteName)' created at \(path)")
             return noteName

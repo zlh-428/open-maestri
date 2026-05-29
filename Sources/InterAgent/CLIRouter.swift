@@ -65,7 +65,7 @@ final class CLIRouter {
         case "check":
             return await CheckHandler.shared.handleAsync(args: args, terminalId: terminalId)
         case "note":
-            return NoteHandler.shared.handle(args: args, terminalId: terminalId)
+            return await NoteHandler.shared.handleAsync(args: args, terminalId: terminalId)
         case "portal":
             return await PortalHandler.shared.handleAsync(args: args, terminalId: terminalId)
         case "recruit", "dismiss", "connect", "role", "preset":
