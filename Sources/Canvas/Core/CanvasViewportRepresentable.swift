@@ -107,8 +107,9 @@ struct CanvasViewportRepresentable: NSViewRepresentable {
         // 同步角色预设到 renderer（供 TerminalNodeView 右键菜单使用）
         renderer.rolePresets = rolePresets
 
-        // 用节点 ID 集合构建 syncKey，避免"删一个再加一个"时数量不变导致漏同步
-        let nodeIds = ws.nodes.map { $0.id.uuidString }.sorted().joined(separator: ",")
+        // 用节点数量 + XOR 哈希构建 syncKey，O(n) 零字符串分配，避免"删一个再加一个"时数量不变导致漏同步
+        let nodeHash = ws.nodes.reduce(0) { $0 ^ $1.id.hashValue }
+        let nodeIds = "\(ws.nodes.count)-\(nodeHash)"
         let connCount = ws.connections.count + ws.noteConnections.count + ws.portalConnections.count
             + ws.portalToPortalConnections.count + ws.noteToNoteConnections.count
         let currentSyncKey = "\(nodeIds)|\(connCount)"

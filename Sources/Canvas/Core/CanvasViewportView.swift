@@ -13,7 +13,6 @@ final class CanvasViewportView: NSView {
     var canvasOrigin: CGPoint = Constants.canvasInitialOrigin {
         didSet {
             needsLayout = true
-            needsDisplay = true
             backgroundView?.canvasOrigin = canvasOrigin
             drawingLayerView?.canvasOrigin = canvasOrigin
             drawingOverlayView?.canvasOrigin = canvasOrigin
@@ -24,7 +23,6 @@ final class CanvasViewportView: NSView {
     var zoom: CGFloat = 1.0 {
         didSet {
             needsLayout = true
-            needsDisplay = true
             backgroundView?.zoom = zoom
             drawingLayerView?.zoom = zoom
             drawingOverlayView?.zoom = zoom
@@ -160,6 +158,9 @@ final class CanvasViewportView: NSView {
     private(set) var sortedNodesByZIndex: [CanvasNode] = []
     /// 按 zIndex 降序预排序的节点缓存（供 hitTest 从前到后命中检测使用）
     private(set) var sortedNodesByZIndexDesc: [CanvasNode] = []
+    /// 锁定节点 ID 集合（O(1) 查找缓存，由 invalidateSortedNodesCache + updateNodeLockedInPlace 同步）
+    /// 注意：CanvasHitTesting 扩展（独立文件）需要访问此属性，不能用 private
+    var lockedNodeIds: Set<UUID> = []
 
     /// 视口裁剪缓存：避免 layout() 每帧重新遍历所有节点
     private var _cachedViewportNodes: [CanvasNode] = []
@@ -177,6 +178,7 @@ final class CanvasViewportView: NSView {
     private func invalidateSortedNodesCache() {
         sortedNodesByZIndex = currentNodes.sorted { $0.zIndex < $1.zIndex }
         sortedNodesByZIndexDesc = sortedNodesByZIndex.reversed()
+        lockedNodeIds = Set(currentNodes.compactMap { $0.isLocked ? $0.id : nil })
     }
 
     /// 强制使视口裁剪缓存失效（供 CanvasNodeRenderer.sync() 在直接写 rootView 后调用，
@@ -206,7 +208,7 @@ final class CanvasViewportView: NSView {
         }
     }
 
-    /// 原地更新指定节点的 isLocked（不触发全量 sort，同步排序缓存 + 视口缓存）
+    /// 原地更新指定节点的 isLocked（不触发全量 sort，同步排序缓存 + O(1) 锁定集合 + 视口缓存）
     func updateNodeLockedInPlace(id: UUID, isLocked: Bool) {
         _skipSortOnDidSet = true
         for i in currentNodes.indices where currentNodes[i].id == id {
@@ -221,6 +223,12 @@ final class CanvasViewportView: NSView {
         for i in sortedNodesByZIndexDesc.indices where sortedNodesByZIndexDesc[i].id == id {
             sortedNodesByZIndexDesc[i].isLocked = isLocked
             break
+        }
+        // 增量同步 O(1) 查找缓存（避免全量重建）
+        if isLocked {
+            lockedNodeIds.insert(id)
+        } else {
+            lockedNodeIds.remove(id)
         }
         _viewportCacheDirty = true
     }
@@ -341,11 +349,11 @@ final class CanvasViewportView: NSView {
         if changed {
             invalidateSortedNodesCache()
             _viewportCacheDirty = true
-            NotificationCenter.default.post(
-                name: .canvasSelectionChanged,
-                object: nil,
-                userInfo: ["selectedIds": selectedNodeIds]
-            )
+            // 标记需要 layout，确保下一次 layout() 用新 zIndex 顺序重建 rootView
+            needsLayout = true
+            // 与 updateSelectionVisuals() 在同一 RunLoop Turn 触发时合并为单次投递，
+            // 避免双重 SwiftUI 树重建
+            scheduleSelectionChangedNotification()
         }
     }
 
@@ -774,14 +782,32 @@ final class CanvasViewportView: NSView {
     }
 
 
+    // MARK: - 选中通知合并投递
+
+    /// 防止同一运行循环内多次投递 .canvasSelectionChanged（合并为一次 SwiftUI 重建）
+    private var _pendingSelectionNotification = false
+
+    /// 将 .canvasSelectionChanged 通知延迟到当前运行循环末尾投递。
+    /// 同一 RunLoop Turn 内多次调用只产生一次通知，从而把
+    /// updateSelectionVisuals() 和 bringNodesToFront() 各自的投递合并为单次 SwiftUI 树重建。
+    private func scheduleSelectionChangedNotification() {
+        guard !_pendingSelectionNotification else { return }
+        _pendingSelectionNotification = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self._pendingSelectionNotification = false
+            NotificationCenter.default.post(
+                name: .canvasSelectionChanged,
+                object: nil,
+                userInfo: ["selectedIds": self.selectedNodeIds]
+            )
+        }
+    }
+
     // MARK: - 选中视觉更新
 
     private func updateSelectionVisuals() {
-        NotificationCenter.default.post(
-            name: .canvasSelectionChanged,
-            object: nil,
-            userInfo: ["selectedIds": selectedNodeIds]
-        )
+        scheduleSelectionChangedNotification()
     }
 
     private func reportSelectionChange() {

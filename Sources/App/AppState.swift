@@ -141,20 +141,28 @@ final class AppState {
 
     private func autosave() async {
         do {
-            try pm.saveManifest(manifest)
-            try pm.savePreferences(preferences)
-            // 仅保存有修改的工作区（dirty flag），避免每 30s 全量序列化所有工作区
-            let dirtyWorkspaces = await MainActor.run(body: {
-                workspaces.filter { $0.isDirty }
-            })
-            for ws in dirtyWorkspaces {
-                try await ws.save()
+            // 在 MainActor 上一次性快照所有主线程可变数据，消除与后台线程的竞态。
+            // 将 manifest、preferences 及各脏工作区的 payload 一并复制为值类型快照，
+            // 后续 I/O 全部操作快照副本，不再触碰任何 @Observable 属性。
+            let (manifestSnapshot, prefsSnapshot, dirtySnapshots):
+                (WorkspaceManifest, Preferences, [(WorkspaceManager, WorkspacePayload)]) =
+                    await MainActor.run {
+                        let dirty = workspaces.filter { $0.isDirty }
+                        return (manifest, preferences, dirty.map { ($0, $0.snapshotPayload()) })
+                    }
+
+            // 以下为纯序列化 I/O，不再读取任何主线程可变状态
+            try pm.saveManifest(manifestSnapshot)
+            try pm.savePreferences(prefsSnapshot)
+            for (ws, payload) in dirtySnapshots {
+                let doc = WorkspaceDocument(payload: payload)
+                try await pm.saveWorkspace(doc)
+                // isDirty 写回必须在 MainActor 上执行
+                await MainActor.run { ws.isDirty = false }
             }
-            await MainActor.run {
-                lastAutosaveTime = Date()
-            }
-            if !dirtyWorkspaces.isEmpty {
-                logger.debug("Autosave completed (\(dirtyWorkspaces.count) dirty workspaces saved)")
+            await MainActor.run { lastAutosaveTime = Date() }
+            if !dirtySnapshots.isEmpty {
+                logger.debug("Autosave completed (\(dirtySnapshots.count) dirty workspaces saved)")
             }
         } catch {
             logger.error("Autosave failed: \(error)")

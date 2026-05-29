@@ -28,6 +28,13 @@ final class NoteNodeViewController: NSViewController {
     private var notificationObserver: NSObjectProtocol?
     private var fileChangeObserver: NSObjectProtocol?
 
+    // MARK: - 防抖写入状态
+
+    /// 当前待写入的内容（nil 表示无待刷新内容）
+    private var pendingSaveContent: String?
+    /// 防抖任务句柄，取消后重建以重置 300ms 计时
+    private var debounceTask: Task<Void, Never>?
+
     init(noteId: UUID, filePath: String) {
         self.noteId = noteId
         self.filePath = filePath
@@ -43,12 +50,7 @@ final class NoteNodeViewController: NSViewController {
             filePath: filePath,
             nodeId: noteId
         ) { [weak self] newContent in
-            guard let self else { return }
-            do {
-                try NoteFileManager.shared.write(filePath: filePath, content: newContent)
-            } catch {
-                noteLogger.error("Failed to save note: \(error.localizedDescription)")
-            }
+            self?.scheduleSave(content: newContent)
         } onFirstLineChanged: { [weak self] title in
             self?.onTitleChanged?(title)
         }
@@ -67,6 +69,14 @@ final class NoteNodeViewController: NSViewController {
         }
         if let obs = fileChangeObserver {
             NotificationCenter.default.removeObserver(obs)
+        }
+        // 视图销毁时将内存缓存立即写入磁盘（后台执行，不阻塞主线程）
+        debounceTask?.cancel()
+        if let content = pendingSaveContent {
+            let fp = filePath
+            DispatchQueue.global(qos: .utility).async {
+                try? NoteFileManager.shared.write(filePath: fp, content: content)
+            }
         }
     }
 
@@ -115,6 +125,45 @@ final class NoteNodeViewController: NSViewController {
             .trimmingCharacters(in: .whitespaces)
         if !title.isEmpty {
             onTitleChanged?(title)
+        }
+    }
+
+    // MARK: - 防抖磁盘写入
+
+    /// 防抖保存：缓存最新内容，300ms 无新输入后在后台线程写盘。
+    /// 主线程调用（NSTextViewDelegate 回调保证在主线程）。
+    private func scheduleSave(content: String) {
+        pendingSaveContent = content
+        // 重置计时器
+        debounceTask?.cancel()
+        let fp = filePath
+        debounceTask = Task.detached { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+            } catch {
+                // 被取消：等待下次 scheduleSave 或 flushPendingSave
+                return
+            }
+            // ── 此处已脱离主线程，在协作线程池上执行同步 I/O ──
+            try? NoteFileManager.shared.write(filePath: fp, content: content)
+            // 清理状态（回主线程）
+            await MainActor.run { [weak self] in
+                self?.pendingSaveContent = nil
+                self?.debounceTask = nil
+            }
+        }
+    }
+
+    /// 立即将待写内容刷新到磁盘（视图隐藏时调用）。
+    /// 取消防抖任务，后台异步写入，不阻塞调用线程。
+    func flushPendingSave() {
+        debounceTask?.cancel()
+        debounceTask = nil
+        guard let content = pendingSaveContent else { return }
+        pendingSaveContent = nil
+        let fp = filePath
+        Task.detached {
+            try? NoteFileManager.shared.write(filePath: fp, content: content)
         }
     }
 }

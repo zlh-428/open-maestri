@@ -7,14 +7,6 @@ final class AskHandler {
     private let responseTimeout: TimeInterval = 30
     private init() {}
 
-    func handle(args: [String], terminalId: UUID?) -> String {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result = ""
-        Task.detached { result = await self.handleAsync(args: args, terminalId: terminalId); semaphore.signal() }
-        semaphore.wait()
-        return result
-    }
-
     @MainActor
     func handleAsync(args: [String], terminalId: UUID?) async -> String {
         guard args.count >= 3 else {

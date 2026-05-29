@@ -382,34 +382,31 @@ struct CanvasNodesSwiftUIView: View {
     var onLockToggle: ((UUID, Bool) -> Void)?
 
     var body: some View {
-        GeometryReader { _ in
-            ZStack {
-                ForEach(nodes, id: \.id) { node in
-                    let posX = (node.frame.midX - canvasOrigin.x) * zoom
-                    let posY = (node.frame.midY - canvasOrigin.y) * zoom
-                    nodeView(for: node)
-                        // 以原始画布尺寸渲染，内容不感知 zoom
-                        .frame(width: node.frame.width, height: node.frame.height)
-                        // scaleEffect 从中心缩放到屏幕尺寸，与 position center 语义匹配
-                        .scaleEffect(zoom)
-                        // position 与 hitTestCanvas/canvasRectToScreen 坐标系完全一致
-                        .position(x: posX, y: posY)
-                        // 所有几何变换（frame/scaleEffect/position）由 AppKit 层逐帧驱动，
-                        // 必须切断所有动画传播路径（包括 zoom 变化触发的 scaleEffect 动画），
-                        // 否则 SwiftUI 隐式动画会在拖拽/缩放时将节点插值到错误坐标导致消失。
-                        // .animation(.none, value:) 只覆盖特定值的通道，
-                        // .transaction 全量切断，是唯一可靠方案。
-                        .transaction { $0.animation = nil }
-                        // fileTree 节点的 hitTesting 由 CanvasNodesView.mouseDown 手动转发事件：
-                        // 若设为 true，NSHostingView.hitTest 会穿透到内部 NSOutlineView，
-                        // 导致 CanvasNodesView.mouseDown 不被调用，所有路由逻辑失效。
-                        .allowsHitTesting(false)
-                }
+        ZStack {
+            ForEach(nodes, id: \.id) { node in
+                let posX = (node.frame.midX - canvasOrigin.x) * zoom
+                let posY = (node.frame.midY - canvasOrigin.y) * zoom
+                nodeView(for: node)
+                    // 以原始画布尺寸渲染，内容不感知 zoom
+                    .frame(width: node.frame.width, height: node.frame.height)
+                    // scaleEffect 从中心缩放到屏幕尺寸，与 position center 语义匹配
+                    .scaleEffect(zoom)
+                    // position 与 hitTestCanvas/canvasRectToScreen 坐标系完全一致
+                    .position(x: posX, y: posY)
+                    // 所有几何变换（frame/scaleEffect/position）由 AppKit 层逐帧驱动，
+                    // 必须切断所有动画传播路径（包括 zoom 变化触发的 scaleEffect 动画），
+                    // 否则 SwiftUI 隐式动画会在拖拽/缩放时将节点插值到错误坐标导致消失。
+                    // .animation(.none, value:) 只覆盖特定值的通道，
+                    // .transaction 全量切断，是唯一可靠方案。
+                    .transaction { $0.animation = nil }
+                    // fileTree 节点的 hitTesting 由 CanvasNodesView.mouseDown 手动转发事件：
+                    // 若设为 true，NSHostingView.hitTest 会穿透到内部 NSOutlineView，
+                    // 导致 CanvasNodesView.mouseDown 不被调用，所有路由逻辑失效。
+                    .allowsHitTesting(false)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        // 忽略 safe area，使 GeometryReader 尺寸与 NSHostingView frame 完全一致
-        // 否则 safe area insets 导致 SwiftUI .position() 坐标与 AppKit hitTest 坐标系不对齐
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // 忽略 safe area，确保 SwiftUI .position() 坐标与 AppKit hitTest 坐标系完全对齐
         .ignoresSafeArea()
         .environment(\.dropTargetNodeId, dropTargetNodeId)
     }

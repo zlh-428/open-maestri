@@ -6,11 +6,6 @@ final class ListHandler {
     private let logger = Logger.make(category: "ListHandler")
     private init() {}
 
-    func handle(args: [String], terminalId: UUID?) -> String {
-        guard let tid = terminalId else { return "error: missing terminal ID" }
-        return runOnMain { await self.handleAsync(args: args, terminalId: tid) }
-    }
-
     @MainActor
     func handleAsync(args: [String], terminalId: UUID?) async -> String {
         guard let tid = terminalId else { return "error: missing terminal ID" }
@@ -89,11 +84,4 @@ final class ListHandler {
         return ("Portal", nil)
     }
 
-    private func runOnMain(_ block: @escaping () async -> String) -> String {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result = ""
-        Task.detached { result = await block(); semaphore.signal() }
-        semaphore.wait()
-        return result
-    }
 }

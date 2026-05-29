@@ -162,10 +162,9 @@ final class InterAgentServer {
     }
 
     private func handleUnixClient(fd: Int32) {
-        defer { close(fd) }
         var accumulated = Data()
         var buffer = [UInt8](repeating: 0, count: 65536)
-        // 接收完整 HTTP 请求
+        // 接收完整 HTTP 请求（阻塞 recv 保留在 DispatchQueue 线程上）
         while true {
             let n = recv(fd, &buffer, buffer.count, 0)
             guard n > 0 else { break }
@@ -179,9 +178,15 @@ final class InterAgentServer {
             }
         }
         guard !accumulated.isEmpty else { return }
-        let parsed = parseHTTPRequest(accumulated)
-        let responseData = buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion)
-        responseData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
+        // 读取完成后进入 async 上下文路由命令，不再阻塞 GCD 线程
+        Task { [weak self, fd] in
+            if let self {
+                let parsed = await self.parseHTTPRequest(accumulated)
+                let responseData = self.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion)
+                responseData.withUnsafeBytes { Darwin.send(fd, $0.baseAddress, $0.count, 0) }
+            }
+            close(fd)
+        }
     }
 
     /// Gracefully shuts down the TCP listener and cancels all in-flight connections.
@@ -252,12 +257,14 @@ final class InterAgentServer {
                 let contentLength = Self.parseContentLength(from: headerStr)
                 let bodyReceived = total.count - bodyStart
                 if contentLength <= 0 || bodyReceived >= contentLength {
-                    // 请求完整
-                    if let parsed = self?.parseHTTPRequest(total) {
-                        let responseData = self?.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion) ?? Data()
+                    // 请求完整 — 进入 async 上下文路由命令
+                    Task { [weak self] in
+                        guard let self else { connection.cancel(); return }
+                        let parsed = await self.parseHTTPRequest(total)
+                        let responseData = self.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion)
                         connection.send(content: responseData, completion: .idempotent)
+                        connection.cancel()
                     }
-                    connection.cancel()
                     return
                 }
             }
@@ -266,11 +273,13 @@ final class InterAgentServer {
                 self?.receiveData(on: connection, accumulated: total)
             } else {
                 // 连接提前关闭
-                if let parsed = self?.parseHTTPRequest(total) {
-                    let responseData = self?.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion) ?? Data()
+                Task { [weak self] in
+                    guard let self else { connection.cancel(); return }
+                    let parsed = await self.parseHTTPRequest(total)
+                    let responseData = self.buildHTTPResponse(body: parsed.responseBody, httpVersion: parsed.httpVersion)
                     connection.send(content: responseData, completion: .idempotent)
+                    connection.cancel()
                 }
-                connection.cancel()
             }
         }
     }
@@ -292,7 +301,7 @@ final class InterAgentServer {
         let httpVersion: String  // "1.0" 或 "1.1"
     }
 
-    private func parseHTTPRequest(_ data: Data) -> ParsedRequest {
+    private func parseHTTPRequest(_ data: Data) async -> ParsedRequest {
         // 解析 HTTP 请求，提取 JSON body、X-Terminal-ID header 和 HTTP 版本
         let raw = String(decoding: data, as: UTF8.self)
         var terminalId: UUID?
@@ -333,7 +342,7 @@ final class InterAgentServer {
         guard !args.isEmpty else {
             return ParsedRequest(responseBody: "error: missing args", httpVersion: httpVersion)
         }
-        let responseBody = CLIRouter.shared.route(args: args, terminalId: terminalId)
+        let responseBody = await CLIRouter.shared.routeAsync(args: args, terminalId: terminalId)
         return ParsedRequest(responseBody: responseBody, httpVersion: httpVersion)
     }
 

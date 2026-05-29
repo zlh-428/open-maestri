@@ -295,8 +295,7 @@ struct ShapeFillStylePopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Self.styles.indices, id: \.self) { idx in
-                let option = Self.styles[idx]
+            ForEach(Self.styles, id: \.style) { option in
                 Button {
                     onSelect(option.style)
                 } label: {

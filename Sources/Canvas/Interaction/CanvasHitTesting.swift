@@ -178,8 +178,9 @@ extension CanvasViewportView {
 
     // MARK: - 节点锁定查询
 
+    /// O(1) Set 查找，由 lockedNodeIds 缓存维护（替代原 O(n) 线性扫描）
     func isNodeLocked(_ id: UUID) -> Bool {
-        currentNodes.first(where: { $0.id == id })?.isLocked ?? false
+        lockedNodeIds.contains(id)
     }
 
     // MARK: - 选中逻辑

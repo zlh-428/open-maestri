@@ -5,8 +5,8 @@ import AppKit
 final class DrawingLayerView: NSView {
     override var isFlipped: Bool { true }
 
-    var canvasOrigin: CGPoint = .zero { didSet { needsDisplay = true } }
-    var zoom: CGFloat = 1.0 { didSet { needsDisplay = true } }
+    var canvasOrigin: CGPoint = .zero
+    var zoom: CGFloat = 1.0
 
     /// (节点画布 frame, 内容) 对，由外部在 sync 时更新
     var drawingNodes: [(frame: CGRect, content: ShapeContent)] = [] {

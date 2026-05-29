@@ -6,14 +6,6 @@ final class MaestroHandlers {
     private let logger = Logger.make(category: "MaestroHandlers")
     private init() {}
 
-    func handle(args: [String], terminalId: UUID?) -> String {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result = ""
-        Task.detached { result = await self.handleAsync(args: args, terminalId: terminalId); semaphore.signal() }
-        semaphore.wait()
-        return result
-    }
-
     func handleAsync(args: [String], terminalId: UUID?) async -> String {
         guard let command = args.first else { return "error: empty command" }
         switch command {

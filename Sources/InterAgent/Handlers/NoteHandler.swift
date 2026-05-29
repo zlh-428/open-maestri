@@ -7,18 +7,6 @@ final class NoteHandler {
     private let nm = NoteFileManager.shared
     private init() {}
 
-    func handle(args: [String], terminalId: UUID?) -> String {
-        guard args.count >= 2 else {
-            return "error: usage: omaestri note <read|write|edit|create> ..."
-        }
-        switch args[1] {
-        case "read":   return handleRead(args: args, terminalId: terminalId)
-        case "write":  return handleWrite(args: args, terminalId: terminalId)
-        case "edit":   return handleEdit(args: args, terminalId: terminalId)
-        default: return "error: unknown note subcommand '\(args[1])'. Valid: read|write|edit|create"
-        }
-    }
-
     func handleAsync(args: [String], terminalId: UUID?) async -> String {
         guard args.count >= 2 else {
             return "error: usage: omaestri note <read|write|edit|create> ..."

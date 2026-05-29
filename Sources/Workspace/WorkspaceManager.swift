@@ -76,10 +76,13 @@ final class WorkspaceManager: Identifiable {
     // MARK: - 保存（Story 1.5 AC：autosave 后台执行）
 
     func save() async throws {
-        let payload = buildPayload()
+        // buildPayload() 读取所有 @Observable 属性，必须在 MainActor 上调用，
+        // 否则在后台线程调用会与主线程写入产生数据竞态。
+        let payload = await MainActor.run { buildPayload() }
         let doc = WorkspaceDocument(payload: payload)
         try await pm.saveWorkspace(doc)
-        isDirty = false
+        // isDirty 是 @Observable 属性，写回同样需要回到 MainActor
+        await MainActor.run { isDirty = false }
         logger.debug("Workspace \(self.id) saved")
     }
 
@@ -98,13 +101,23 @@ final class WorkspaceManager: Identifiable {
     }
 
     func removeNode(id nodeId: UUID) {
+        guard let node = nodes.first(where: { $0.id == nodeId }) else { return }
+
         // 停止 Terminal PTY 进程（避免内存泄漏）
-        if let node = nodes.first(where: { $0.id == nodeId }),
-           case .terminal = node.content {
+        if case .terminal = node.content {
             Task { @MainActor in
                 TerminalManager.shared.removeTerminal(id: nodeId)
             }
         }
+
+        // 释放 Portal WKWebView 实例及其所有代理对象（避免内存泄漏）
+        if case .portal = node.content {
+            Task { @MainActor in
+                PortalWebViewStore.shared.removeWebView(for: nodeId)
+            }
+            portalToPortalConnections.removeAll { $0.portalIdA == nodeId || $0.portalIdB == nodeId }
+        }
+
         nodes.removeAll { $0.id == nodeId }
         isDirty = true
         connections.removeAll { $0.terminalIdA == nodeId || $0.terminalIdB == nodeId }

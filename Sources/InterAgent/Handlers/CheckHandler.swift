@@ -6,10 +6,6 @@ final class CheckHandler {
     private let logger = Logger.make(category: "CheckHandler")
     private init() {}
 
-    func handle(args: [String], terminalId: UUID?) -> String {
-        runOnDetached { await self.handleAsync(args: args, terminalId: terminalId) }
-    }
-
     @MainActor
     func handleAsync(args: [String], terminalId: UUID?) async -> String {
         guard args.count >= 2 else {
@@ -84,11 +80,4 @@ final class CheckHandler {
         return result
     }
 
-    private func runOnDetached(_ block: @escaping () async -> String) -> String {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result = ""
-        Task.detached { result = await block(); semaphore.signal() }
-        semaphore.wait()
-        return result
-    }
 }

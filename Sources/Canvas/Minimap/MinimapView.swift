@@ -120,13 +120,17 @@ final class MinimapView: NSView {
         if nodes.isEmpty {
             canvasBounds = CGRect(x: 9600, y: 8300, width: 800, height: 600)
         } else {
-            let allX = nodes.flatMap { [$0.minX, $0.maxX] }
-            let allY = nodes.flatMap { [$0.minY, $0.maxY] }
+            var minX = CGFloat.infinity, maxX = -CGFloat.infinity
+            var minY = CGFloat.infinity, maxY = -CGFloat.infinity
+            for r in nodes {
+                minX = min(minX, r.minX); maxX = max(maxX, r.maxX)
+                minY = min(minY, r.minY); maxY = max(maxY, r.maxY)
+            }
             canvasBounds = CGRect(
-                x: (allX.min() ?? 9600) - 100,
-                y: (allY.min() ?? 8300) - 100,
-                width: (allX.max() ?? 10400) - (allX.min() ?? 9600) + 200,
-                height: (allY.max() ?? 8900) - (allY.min() ?? 8300) + 200
+                x: minX - 100,
+                y: minY - 100,
+                width: maxX - minX + 200,
+                height: maxY - minY + 200
             )
         }
         nodeFrames = nodes
