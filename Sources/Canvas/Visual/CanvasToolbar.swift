@@ -163,7 +163,7 @@ struct CanvasToolbar: View {
     private func createTerminal(preset: AgentPreset, role: RolePreset?, isManager: Bool = false, workingDirectory: String? = nil) {
         let dir = workingDirectory ?? workspace.workingDirectory
         var tc = TerminalContent(
-            name: preset.name,
+            name: nextTerminalName(baseName: preset.name),
             agentType: preset.agentType,
             command: preset.command,
             workingDirectory: dir
@@ -268,7 +268,21 @@ struct CanvasToolbar: View {
         return CGPoint(x: baseX + CGFloat(col) * stepX, y: baseY + CGFloat(row) * stepY)
     }
 
-    /// 根据现有同类型节点数量生成递增编号名称（如 "Portal #1", "Note #2"）
+    /// 根据 baseName 生成唯一终端名称，始终带序号，如 "Claude Code #1"
+    private func nextTerminalName(baseName: String) -> String {
+        let existingNames = Set(workspace.nodes.compactMap { node -> String? in
+            guard case .terminal(let tc) = node.content else { return nil }
+            return tc.name
+        })
+        var index = 1
+        while true {
+            let candidate = "\(baseName) #\(index)"
+            if !existingNames.contains(candidate) { return candidate }
+            index += 1
+        }
+    }
+
+    /// 根据现有节点名称查重，生成不冲突的递增编号名称（删除节点后不会产生重复）
     private func nextNodeName(for nodeType: String) -> String {
         let prefix: String
         switch nodeType {
@@ -280,18 +294,22 @@ struct CanvasToolbar: View {
         default: prefix = "Node"
         }
 
-        let existingCount = workspace.nodes.count { node in
+        let existingNames: Set<String> = Set(workspace.nodes.compactMap { node in
             switch (nodeType, node.content) {
-            case ("portal", .portal): return true
-            case ("stickyNote", .stickyNote): return true
-            case ("fileTree", .fileTree): return true
-            case ("text", .text): return true
-            case ("shape", .shape): return true
-            default: return false
+            case ("portal", .portal(let pc)): return pc.name
+            case ("stickyNote", .stickyNote(let nc)):
+                return nc.fileName.map { URL(fileURLWithPath: $0).deletingPathExtension().lastPathComponent }
+            case ("fileTree", .fileTree(let fc)): return fc.name
+            default: return nil
             }
-        }
+        })
 
-        return "\(prefix) #\(existingCount + 1)"
+        var index = 1
+        while true {
+            let candidate = "\(prefix) #\(index)"
+            if !existingNames.contains(candidate) { return candidate }
+            index += 1
+        }
     }
 }
 
