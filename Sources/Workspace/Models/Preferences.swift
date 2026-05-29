@@ -157,7 +157,7 @@ struct ShortcutConfig: Codable, Equatable {
         prevWorkspaceShortcut  = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "arrowup")
         workspaceJumpModifier  = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "command")
         zoomToggleShortcut     = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "backslash")
-        zoomScrollModifier     = KeyBinding(command: false, control: false, option: true,  shift: false, keyCode: "option")
+        zoomScrollModifier     = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "command")
         scrollSwitchModifier   = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "command")
         tileModifier           = KeyBinding(command: true,  control: false, option: false, shift: false, keyCode: "command")
         panToggleShortcut      = KeyBinding(command: false, control: false, option: false, shift: false, keyCode: "h")

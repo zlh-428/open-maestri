@@ -44,13 +44,13 @@ struct ShortcutsSettingsView: View {
         ShortcutGroup(id: "element_nav", titleKey: "shortcut.group.element_nav", actions: [
             ShortcutAction(id: "cycleTerminalNext",  nameKey: "shortcut.cycle_terminal_next",  defaultKey: "⌃Tab", keyCaps: ["⌃", "Tab"]),
             ShortcutAction(id: "cycleTerminalPrev",  nameKey: "shortcut.cycle_terminal_prev",  defaultKey: "⌃⇧Tab", keyCaps: ["⌃", "⇧", "Tab"]),
-            ShortcutAction(id: "centerNode",         nameKey: "shortcut.center_node",           defaultKey: "⌘\\", keyCaps: ["⌘", "\\"]),
+            ShortcutAction(id: "centerNode",         nameKey: "shortcut.center_node",           defaultKey: "\\", keyCaps: ["\\"]),
             ShortcutAction(
                 id: "connectNodes",
                 nameKey: "shortcut.connect_nodes",
                 descriptionKey: "shortcut.connect_nodes.desc",
-                defaultKey: "⌘L",
-                keyCaps: ["⌘", "L"]
+                defaultKey: "L",
+                keyCaps: ["L"]
             ),
             ShortcutAction(id: "deleteNode",         nameKey: "shortcut.delete_node",           defaultKey: "⌘W", keyCaps: ["⌘", "W"]),
             ShortcutAction(
@@ -66,8 +66,8 @@ struct ShortcutsSettingsView: View {
                 id: "zoomScrollModifier",
                 nameKey: "shortcut.zoom_scroll_modifier",
                 descriptionKey: "shortcut.zoom_scroll_modifier.desc",
-                defaultKey: "⌥",
-                keyCaps: ["⌥"]
+                defaultKey: "⌘",
+                keyCaps: ["⌘"]
             ),
             ShortcutAction(id: "toggleScrollLock",   nameKey: "shortcut.toggle_scroll_lock",    defaultKey: "⌘⇧B", keyCaps: ["⌘", "⇧", "B"]),
             ShortcutAction(id: "filterSearch",       nameKey: "shortcut.filter_search",         defaultKey: "⌘P", keyCaps: ["⌘", "P"]),
