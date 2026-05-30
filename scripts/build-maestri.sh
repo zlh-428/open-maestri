@@ -60,16 +60,18 @@ APP_RESOURCES="$APP_BUNDLE/Contents/Resources"
 cp "$CLI_SRC" "$APP_RESOURCES/omaestri"
 echo "✅ omaestri copied to $APP_RESOURCES"
 
-# Assets（图标）
+# Assets（图标）—— 用 iconutil 直接转换，确保生成包含所有尺寸的完整 ICNS
+# actool 在此场景下 output-files 为空，导致生成的 ICNS 缺少 ic08/ic09/ic10 等关键尺寸
 ASSETS_SRC="$PROJECT_DIR/Sources/Assets.xcassets"
-if [ -d "$ASSETS_SRC" ]; then
-  xcrun actool \
-    --compile "$APP_BUNDLE/Contents/Resources" \
-    --platform macosx \
-    --minimum-deployment-target 14.0 \
-    --app-icon AppIcon \
-    --output-partial-info-plist /dev/null \
-    "$ASSETS_SRC" 2>/dev/null || true
+ICONSET_DIR="$PROJECT_DIR/AppIcon.iconset"
+if [ -d "$ASSETS_SRC/AppIcon.appiconset" ]; then
+  rm -rf "$ICONSET_DIR"
+  mkdir -p "$ICONSET_DIR"
+  cp "$ASSETS_SRC/AppIcon.appiconset/"*.png "$ICONSET_DIR/"
+  iconutil -c icns "$ICONSET_DIR" -o "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
+  rm -rf "$ICONSET_DIR"
+  ICNS_SIZE=$(wc -c < "$APP_BUNDLE/Contents/Resources/AppIcon.icns")
+  echo "✅ AppIcon.icns compiled (${ICNS_SIZE} bytes)"
 fi
 
 # 本地化字符串：将 .xcstrings 编译为各语言 .lproj/Localizable.strings
