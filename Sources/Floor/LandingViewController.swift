@@ -68,9 +68,12 @@ struct LandingView: View {
     }
 
     private func loadDiff() {
+        // 提前在 @MainActor 上捕获值，避免在 Task.detached 内跨 actor 访问
+        let branchName = floor.branchName
+        let dir = workingDirectory
         Task.detached(priority: .userInitiated) {
-            let result = (try? runGit(["diff", "--stat", floor.branchName], in: workingDirectory)) ?? ""
-            let noDiff = "git.no_diff".localized
+            let result = (try? runGit(["diff", "--stat", branchName], in: dir)) ?? ""
+            let noDiff = await "git.no_diff".localized  // @MainActor 属性需要 await
             await MainActor.run { diffText = result.isEmpty ? noDiff : result }
         }
     }
@@ -78,9 +81,13 @@ struct LandingView: View {
     private func performLand() {
         isLanding = true
         landError = nil
+        // 提前在 @MainActor 上捕获值，避免在 Task.detached 内跨 actor 访问
+        let capturedFloor = floor
+        let branch = targetBranch
+        let dir = workingDirectory
         Task.detached(priority: .userInitiated) {
             do {
-                try FloorManager.shared.land(floor: floor, targetBranch: targetBranch, workingDirectory: workingDirectory)
+                try FloorManager.shared.land(floor: capturedFloor, targetBranch: branch, workingDirectory: dir)
                 await MainActor.run {
                     isLanding = false
                     landSuccess = true
@@ -97,8 +104,10 @@ struct LandingView: View {
         }
     }
 
+    // nonisolated：此方法不访问任何 self 属性，无需在 @MainActor 上运行
+    // 允许从 Task.detached 直接调用而不阻塞主线程
     @discardableResult
-    private func runGit(_ args: [String], in directory: String) throws -> String {
+    nonisolated private func runGit(_ args: [String], in directory: String) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
         process.arguments = args
