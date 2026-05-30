@@ -52,31 +52,31 @@ final class CLIRouterTests: XCTestCase {
         XCTAssertTrue(result.hasPrefix("error:"))
     }
 
-    // MARK: - Note（同步路由，无 @MainActor 依赖）
+    // MARK: - Note
 
-    func testNoteCommandRequiresSubcommand() {
-        let result = router.route(args: ["note"], terminalId: testTerminalId)
+    func testNoteCommandRequiresSubcommand() async {
+        let result = await router.routeAsync(args: ["note"], terminalId: testTerminalId)
         XCTAssertTrue(result.hasPrefix("error:"))
     }
 
-    func testNoteReadRequiresName() {
-        let result = router.route(args: ["note", "read"], terminalId: testTerminalId)
+    func testNoteReadRequiresName() async {
+        let result = await router.routeAsync(args: ["note", "read"], terminalId: testTerminalId)
         XCTAssertTrue(result.hasPrefix("error:"))
     }
 
-    func testNoteWriteReturnsError_NoteNotFound() {
+    func testNoteWriteReturnsError_NoteNotFound() async {
         // 不存在的 Note 应返回 error（路径不存在）
-        let result = router.route(args: ["note", "write", "NonExistentNote", "content"], terminalId: testTerminalId)
+        let result = await router.routeAsync(args: ["note", "write", "NonExistentNote", "content"], terminalId: testTerminalId)
         XCTAssertTrue(result.hasPrefix("error:"), "Write to non-existent note should error: \(result)")
     }
 
-    func testNoteEditReturnsError_NoteNotFound() {
-        let result = router.route(args: ["note", "edit", "NonExistentNote", "old", "new"], terminalId: testTerminalId)
+    func testNoteEditReturnsError_NoteNotFound() async {
+        let result = await router.routeAsync(args: ["note", "edit", "NonExistentNote", "old", "new"], terminalId: testTerminalId)
         XCTAssertTrue(result.hasPrefix("error:"), "Edit on non-existent note should error: \(result)")
     }
 
-    func testNoteUnknownSubcommand() {
-        let result = router.route(args: ["note", "foobar"], terminalId: testTerminalId)
+    func testNoteUnknownSubcommand() async {
+        let result = await router.routeAsync(args: ["note", "foobar"], terminalId: testTerminalId)
         XCTAssertTrue(result.hasPrefix("error:"))
     }
 
