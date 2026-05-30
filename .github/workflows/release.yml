@@ -33,17 +33,16 @@ jobs:
 
       - name: Create DMG
         run: |
-          VERSION="${{ github.ref_name }}"
           STAGING="build/dmg-staging"
           mkdir -p "$STAGING"
           cp -R build/open-maestri.app "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
           hdiutil create \
-            -volname "open-maestri $VERSION" \
+            -volname "Open Maestri" \
             -srcfolder "$STAGING" \
             -ov \
             -format UDZO \
-            "build/open-maestri-$VERSION.dmg"
+            "build/Open.Maestri.dmg"
           rm -rf "$STAGING"
 
       - name: Zip App Bundle
@@ -53,11 +52,51 @@ jobs:
             open-maestri.app \
             "open-maestri-${{ github.ref_name }}.zip"
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log "$PREV_TAG"..HEAD --pretty=format:"- %s" --no-merges)
+          else
+            CHANGES=$(git log --pretty=format:"- %s" --no-merges)
+          fi
+
+          BODY=$(cat <<'RELEASE_BODY'
+          ## What's Changed
+
+          $CHANGES_PLACEHOLDER
+
+          ## Installation
+
+          Download **Open.Maestri.dmg**, open it, and drag **Open Maestri** to Applications.
+
+          **First launch:** right-click the app → Open (macOS Gatekeeper will warn about unsigned apps).
+
+          Alternatively, run in Terminal:
+          ```
+          xattr -cr /Applications/open-maestri.app
+          ```
+
+          Requires macOS 14+ and Apple Silicon (M1/M2/M3/M4).
+
+          > This is an unsigned early-access build. Code signing and notarization will be added once our Apple Developer account is approved.
+          RELEASE_BODY
+          )
+
+          BODY="${BODY/\$CHANGES_PLACEHOLDER/$CHANGES}"
+
+          {
+            echo 'body<<GITHUB_RELEASE_EOF'
+            echo "$BODY"
+            echo 'GITHUB_RELEASE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: open-maestri ${{ github.ref_name }}
+          body: ${{ steps.release_notes.outputs.body }}
           files: |
-            build/open-maestri-${{ github.ref_name }}.dmg
+            build/Open.Maestri.dmg
             build/open-maestri-${{ github.ref_name }}.zip
-          generate_release_notes: true
