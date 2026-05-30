@@ -16,7 +16,7 @@
   <a href="https://github.com/zlh-428/open-maestri/releases/latest"><img src="https://img.shields.io/github/v/release/zlh-428/open-maestri?style=flat-square&label=release&color=blue" alt="Latest Release"></a>
   <a href="https://github.com/zlh-428/open-maestri/stargazers"><img src="https://img.shields.io/github/stars/zlh-428/open-maestri?style=flat-square&color=yellow" alt="Stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL%20v3-green?style=flat-square" alt="License: GPL v3"></a>
-  <a href="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?style=flat-square" alt="Platform: macOS 14+"><img src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?style=flat-square" alt="Platform"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey?style=flat-square" alt="Platform: macOS 14+">
   <a href="https://img.shields.io/badge/swift-5.9-orange?style=flat-square" alt="Swift 5.9"><img src="https://img.shields.io/badge/swift-5.9-orange?style=flat-square" alt="Swift"></a>
   <a href="https://github.com/zlh-428/open-maestri/actions"><img src="https://img.shields.io/github/actions/workflow/status/zlh-428/open-maestri/ci.yml?style=flat-square&label=CI" alt="CI"></a>
 </p>
@@ -27,6 +27,10 @@
   <a href="#omaestri-cli">CLI Reference</a> ·
   <a href="docs/roadmap.md">Roadmap</a> ·
   <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+<p align="center">
+  <img src="docs/images/demo.gif" alt="Open-Mastrti in action" width="720">
 </p>
 
 ---
