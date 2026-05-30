@@ -57,7 +57,16 @@ Place terminals, AI agents, Markdown notes, file browsers, and embedded browsers
 
 ### Option 1: Download
 
-Grab the latest signed `.dmg` from [GitHub Releases](https://github.com/zlh-428/open-maestri/releases) — ready to run.
+Grab the latest `.dmg` from [GitHub Releases](https://github.com/zlh-428/open-maestri/releases).
+
+> **macOS Gatekeeper notice** — Because this build is not notarized by Apple, macOS may show a security warning on first launch. To bypass it, use either method:
+>
+> **Method A** — Right-click the app → **Open** → **Open** (one-time only)
+>
+> **Method B** — Run in Terminal after installation:
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/open-maestri.app
+> ```
 
 ### Option 2: Build from Source
 

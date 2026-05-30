@@ -57,7 +57,16 @@ open-maestri 是专为 Agentic AI 时代打造的**画布式编排层**。它不
 
 ### 方式一：下载安装包
 
-从 [GitHub Releases](https://github.com/zlh-428/open-maestri/releases) 下载最新签名 `.dmg`，直接安装运行。
+从 [GitHub Releases](https://github.com/zlh-428/open-maestri/releases) 下载最新 `.dmg`。
+
+> **macOS Gatekeeper 提示** — 由于构建未经 Apple 公证，首次启动时 macOS 可能弹出安全警告。可通过以下任一方式绕过：
+>
+> **方法 A** — 右键点击应用 → **打开** → **打开**（仅首次需要）
+>
+> **方法 B** — 安装后在终端执行：
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/open-maestri.app
+> ```
 
 ### 方式二：从源码构建
 
