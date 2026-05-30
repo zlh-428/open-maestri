@@ -314,6 +314,13 @@ final class SwiftTermProvider: NSObject {
 
     private func enableMetalIfNeeded(view: LocalProcessTerminalView, metalEnabled: Bool) {
         guard metalEnabled else { return }
+        // SwiftTerm 的 Metal 渲染器依赖 Bundle.module（SwiftTerm_SwiftTerm.bundle）加载编译好的
+        // metallib。当 bundle 不存在时，Bundle.module 的 one-time init 会触发 assertionFailure 崩溃。
+        // 因此在启用 Metal 前先验证 bundle 是否可用，缺失时安全降级到 CPU 渲染。
+        guard SwiftTermProvider.isMetalBundleAvailable() else {
+            logger.warning("SwiftTerm Metal bundle not found — Metal renderer disabled for terminal \(self.terminalId.uuidString.prefix(8))")
+            return
+        }
         Task { @MainActor in
             do {
                 try view.setUseMetal(true)
@@ -322,6 +329,26 @@ final class SwiftTermProvider: NSObject {
                 self.logger.warning("Failed to enable Metal renderer: \(error.localizedDescription)")
             }
         }
+    }
+
+    /// 检查 SwiftTerm 的 Metal shader bundle 是否存在。
+    /// swift build 将 SwiftTerm_SwiftTerm.bundle 放在可执行文件同目录；
+    /// 打包为 .app 时需要将该 bundle 复制到 Contents/Resources/ 内，
+    /// 否则 Bundle.module（由 swift build 自动生成）找不到 bundle 会触发 fatalError 崩溃。
+    private static func isMetalBundleAvailable() -> Bool {
+        let bundleName = "SwiftTerm_SwiftTerm.bundle"
+        // 1. app bundle 的 Resources 目录（正常打包路径）
+        if let resourceURL = Bundle.main.resourceURL,
+           FileManager.default.fileExists(atPath: resourceURL.appendingPathComponent(bundleName).path) {
+            return true
+        }
+        // 2. 可执行文件同目录（swift build 直接运行时）
+        let execDir = Bundle.main.executableURL?.deletingLastPathComponent()
+        if let execDir,
+           FileManager.default.fileExists(atPath: execDir.appendingPathComponent(bundleName).path) {
+            return true
+        }
+        return false
     }
 
     func applyMetalRenderer(enabled: Bool) {

@@ -126,6 +126,18 @@ for dylib in "$BUILD_DIR"/*.dylib; do
   [ -f "$dylib" ] && cp "$dylib" "$APP_BUNDLE/Contents/Frameworks/" || true
 done
 
+# SwiftTerm Metal shader bundle（NSBundle.module 所需）
+# swift build -c release 将 SwiftTerm 的 Metal 资源编译到 SwiftTerm_SwiftTerm.bundle
+# 该 bundle 与可执行文件同目录，需复制到 app bundle Resources 中，
+# 否则 MetalTerminalRenderer.candidateBundles() 中 Bundle.module 找不到 bundle 而触发 assertionFailure 崩溃
+SWIFTTERM_BUNDLE="$HOST_BUILD_DIR/SwiftTerm_SwiftTerm.bundle"
+if [ -d "$SWIFTTERM_BUNDLE" ]; then
+  cp -R "$SWIFTTERM_BUNDLE" "$APP_BUNDLE/Contents/Resources/"
+  echo "✅ SwiftTerm Metal bundle copied to Resources"
+else
+  echo "⚠️  SwiftTerm_SwiftTerm.bundle not found at $SWIFTTERM_BUNDLE — Metal renderer will be unavailable"
+fi
+
 echo "▶ Code signing (ad-hoc)..."
 ENTITLEMENTS="$PROJECT_DIR/Sources/open-maestri.entitlements"
 if [ -f "$ENTITLEMENTS" ]; then
