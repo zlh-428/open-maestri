@@ -30,20 +30,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             WindowStateObserver.shared.configureMainWindow()
         }
 
-        // 4. Sparkle 自动更新（Debug 构建跳过自动检查，避免签名/appcast 缺失报错）
-        #if DEBUG
+        // 4. Sparkle 自动更新
+        // startingUpdater: false — 禁止启动时自动检查，避免 appcast/签名未就绪时弹出错误弹窗。
+        // 用户可在 Settings → General 手动触发 checkForUpdates()。
         updaterController = SPUStandardUpdaterController(
             startingUpdater: false,
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
-        #else
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
-        #endif
         logger.debug("Application did finish launching")
     }
 
