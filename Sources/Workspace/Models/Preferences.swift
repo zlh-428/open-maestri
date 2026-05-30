@@ -47,7 +47,7 @@ struct Preferences: Codable, Equatable {
         self.sshPort = 22
         self.sshScriptPath = "~/.local/bin/omaestri"
         self.sshAddToPath = true
-        self.metalRendererEnabled = true
+        self.metalRendererEnabled = false
         self.scrollbackMemoryLimit = false
         self.optionAsMeta = false
         self.autosaveIntervalSeconds = 30
@@ -75,7 +75,7 @@ struct Preferences: Codable, Equatable {
         sshPort = try container.decodeIfPresent(Int.self, forKey: .sshPort) ?? 22
         sshScriptPath = try container.decodeIfPresent(String.self, forKey: .sshScriptPath) ?? "~/.local/bin/omaestri"
         sshAddToPath = try container.decodeIfPresent(Bool.self, forKey: .sshAddToPath) ?? true
-        metalRendererEnabled = try container.decodeIfPresent(Bool.self, forKey: .metalRendererEnabled) ?? true
+        metalRendererEnabled = try container.decodeIfPresent(Bool.self, forKey: .metalRendererEnabled) ?? false
         scrollbackMemoryLimit = try container.decodeIfPresent(Bool.self, forKey: .scrollbackMemoryLimit) ?? false
         optionAsMeta = try container.decodeIfPresent(Bool.self, forKey: .optionAsMeta) ?? false
         autosaveIntervalSeconds = try container.decodeIfPresent(Int.self, forKey: .autosaveIntervalSeconds) ?? 30

@@ -353,6 +353,11 @@ final class SwiftTermProvider: NSObject {
 
     func applyMetalRenderer(enabled: Bool) {
         guard let view = terminalView else { return }
+        // 启用时同样做 bundle 检查，避免通过设置 UI 触发崩溃
+        if enabled, !SwiftTermProvider.isMetalBundleAvailable() {
+            logger.warning("SwiftTerm Metal bundle not found — ignoring Metal enable request for terminal \(self.terminalId.uuidString.prefix(8))")
+            return
+        }
         do {
             try view.setUseMetal(enabled)
             logger.debug("Metal renderer \(enabled ? "enabled" : "disabled") for terminal \(self.terminalId.uuidString.prefix(8))")
