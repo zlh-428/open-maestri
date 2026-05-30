@@ -34,10 +34,22 @@ hdiutil create \
 rm -rf "$STAGING"
 
 echo "▶ Setting volume icon..."
-MOUNT_DIR=$(hdiutil attach "$TMP_DMG" -readwrite -noverify -noautoopen | tail -1 | awk '{print $NF}')
-cp "$APP_BUNDLE/Contents/Resources/AppIcon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
-SetFile -a C "$MOUNT_DIR"
+# 使用 /tmp 下的临时挂载点，彻底规避 /Volumes/ 含空格路径在 CI 环境挂载失败的问题
+MOUNT_DIR="/tmp/dmg-mount-$$"
+mkdir -p "$MOUNT_DIR"
+hdiutil attach "$TMP_DMG" -readwrite -noverify -noautoopen -mountpoint "$MOUNT_DIR"
+
+# 复制卷图标（若 AppIcon.icns 存在）
+if [ -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns" ]; then
+  cp "$APP_BUNDLE/Contents/Resources/AppIcon.icns" "$MOUNT_DIR/.VolumeIcon.icns"
+  # SetFile 在新版 Xcode CLI 中已废弃，若可用则设置自定义图标标志，否则跳过
+  if command -v SetFile &>/dev/null; then
+    SetFile -a C "$MOUNT_DIR"
+  fi
+fi
+
 hdiutil detach "$MOUNT_DIR" -quiet
+rmdir "$MOUNT_DIR" 2>/dev/null || true
 
 echo "▶ Compressing to final DMG..."
 hdiutil convert "$TMP_DMG" \
