@@ -2,7 +2,11 @@ name: Release Build
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
 
 jobs:
   release:
@@ -15,13 +19,37 @@ jobs:
         with:
           xcode-version: 'latest-stable'
 
+      - name: Test
+        run: swift test
+
       - name: Build Release App
         run: bash build-maestri.sh
 
-      - name: Upload App Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create DMG
+        run: |
+          VERSION="${{ github.ref_name }}"
+          STAGING="build/dmg-staging"
+          mkdir -p "$STAGING"
+          cp -R build/open-maestri.app "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create \
+            -volname "open-maestri $VERSION" \
+            -srcfolder "$STAGING" \
+            -ov \
+            -format UDZO \
+            "build/open-maestri-$VERSION.dmg"
+          rm -rf "$STAGING"
+
+      - name: Zip App Bundle
+        run: |
+          cd build
+          zip -r open-maestri-${{ github.ref_name }}.zip open-maestri.app
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: open-maestri-${{ github.sha }}
-          path: build/open-maestri.app
-          if-no-files-found: error
-          retention-days: 30
+          name: open-maestri ${{ github.ref_name }}
+          files: |
+            build/open-maestri-${{ github.ref_name }}.dmg
+            build/open-maestri-${{ github.ref_name }}.zip
+          generate_release_notes: true
