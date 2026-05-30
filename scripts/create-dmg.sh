@@ -34,10 +34,23 @@ hdiutil create \
 rm -rf "$STAGING"
 
 echo "▶ Setting volume icon..."
-# 使用 /tmp 下的临时挂载点，彻底规避 /Volumes/ 含空格路径在 CI 环境挂载失败的问题
-MOUNT_DIR="/tmp/dmg-mount-$$"
-mkdir -p "$MOUNT_DIR"
-hdiutil attach "$TMP_DMG" -readwrite -noverify -noautoopen -mountpoint "$MOUNT_DIR"
+# 用 -plist 解析 hdiutil 输出，读取真实挂载点，不依赖 -mountpoint 猜测路径
+MOUNT_DIR=$(hdiutil attach "$TMP_DMG" -readwrite -noverify -noautoopen -plist | \
+  python3 -c "
+import sys, plistlib
+data = plistlib.loads(sys.stdin.buffer.read())
+for entity in data.get('system-entities', []):
+    mp = entity.get('mount-point', '')
+    if mp:
+        print(mp)
+        break
+")
+
+if [ -z "$MOUNT_DIR" ]; then
+  echo "✗ hdiutil attach 未能获取挂载点"
+  exit 1
+fi
+echo "  → 挂载于: ${MOUNT_DIR}"
 
 # 复制卷图标（若 AppIcon.icns 存在）
 if [ -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns" ]; then
@@ -49,7 +62,6 @@ if [ -f "$APP_BUNDLE/Contents/Resources/AppIcon.icns" ]; then
 fi
 
 hdiutil detach "$MOUNT_DIR" -quiet
-rmdir "$MOUNT_DIR" 2>/dev/null || true
 
 echo "▶ Compressing to final DMG..."
 hdiutil convert "$TMP_DMG" \
