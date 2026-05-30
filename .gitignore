@@ -40,7 +40,6 @@ app-builds/
 memory/
 
 # Local-only docs and AI tooling artifacts
-docs/
 _bmad/
 _bmad-output/
 design-artifacts/
