@@ -7,7 +7,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
   release:
@@ -26,77 +25,15 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Install dependencies
-        run: brew install create-dmg
-
-      # ── 证书导入 + 公证凭证存储 ───────────────────────────────────────────
-      - name: Import signing certificate
-        env:
-          CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-        run: |
-          # 解码 p12 证书到临时文件
-          CERT_FILE="$(mktemp).p12"
-          echo "$CERTIFICATE_P12" | base64 --decode > "$CERT_FILE"
-
-          # 创建临时 keychain（用随机密码，避免硬编码）
-          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
-          KEYCHAIN_PASSWORD="$(uuidgen)"
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
-
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          # 导入证书（-A 允许所有应用访问）
-          security import "$CERT_FILE" \
-            -P "$CERTIFICATE_PASSWORD" \
-            -A \
-            -f pkcs12 \
-            -k "$KEYCHAIN_PATH"
-          security set-key-partition-list \
-            -S apple-tool:,apple: \
-            -k "$KEYCHAIN_PASSWORD" \
-            "$KEYCHAIN_PATH"
-
-          # 将临时 keychain 加入搜索列表
-          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
-
-          # 将公证凭证存入 keychain（后续步骤直接用 --keychain-profile）
-          xcrun notarytool store-credentials "open-maestri-notary" \
-            --apple-id "${{ secrets.APPLE_ID }}" \
-            --team-id "${{ secrets.APPLE_TEAM_ID }}" \
-            --password "${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}" \
-            --keychain "$KEYCHAIN_PATH"
-
-          rm -f "$CERT_FILE"
-
-          # 验证证书已正确导入
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
-
-      # ── 测试 ─────────────────────────────────────────────────────────────
       - name: Test
         run: swift test
 
-      # ── 构建（带 Developer ID 签名）────────────────────────────────────────
       - name: Build Release App
-        env:
-          CODESIGN_IDENTITY: ${{ secrets.APPLE_CODESIGN_IDENTITY }}
         run: bash build-maestri.sh
 
-      # ── 打包 ZIP（先于 DMG，用于公证）─────────────────────────────────────
-      - name: Package ZIP
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          ditto -c -k --keepParent \
-            "build/open-maestri.app" \
-            "build/open-maestri-${VERSION}.zip"
-
-      # ── 打包 DMG ─────────────────────────────────────────────────────────
       - name: Create DMG
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          VERSION="${{ github.ref_name }}"
           STAGING="build/dmg-staging"
           mkdir -p "$STAGING"
           cp -R build/open-maestri.app "$STAGING/"
@@ -106,158 +43,21 @@ jobs:
             -srcfolder "$STAGING" \
             -ov \
             -format UDZO \
-            "build/open-maestri-${VERSION}.dmg"
+            "build/open-maestri-$VERSION.dmg"
           rm -rf "$STAGING"
 
-      # ── 验证签名 ─────────────────────────────────────────────────────────
-      - name: Verify code signature
+      - name: Zip App Bundle
         run: |
-          bundle="build/open-maestri.app"
-          echo "--- Signature info ---"
-          codesign -dvv "$bundle"
-          echo ""
-          echo "--- Signature verification ---"
-          codesign --verify --deep --strict --verbose=2 "$bundle"
+          cd build
+          ditto -c -k --keepParent \
+            open-maestri.app \
+            "open-maestri-${{ github.ref_name }}.zip"
 
-      # ── 公证（best-effort，不阻断发布）────────────────────────────────────
-      - name: Notarize (best-effort)
-        if: vars.SKIP_NOTARIZE != 'true'
-        id: notarize
-        continue-on-error: true
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          zip_path="build/open-maestri-${VERSION}.zip"
-          dmg_path="build/open-maestri-${VERSION}.dmg"
-
-          echo "Submitting ZIP for notarization..."
-          xcrun notarytool submit "$zip_path" \
-            --keychain-profile "open-maestri-notary" \
-            --wait --timeout 15m || { echo "::warning::ZIP notarization failed or timed out"; exit 1; }
-
-          echo "Stapling app bundle..."
-          xcrun stapler staple -v "build/open-maestri.app"
-
-          # 重新打包 ZIP（含 staple ticket）
-          rm -f "$zip_path"
-          ditto -c -k --keepParent "build/open-maestri.app" "$zip_path"
-
-          # DMG 单独签名 + 公证 + staple
-          codesign --force \
-            --sign "${{ secrets.APPLE_CODESIGN_IDENTITY }}" \
-            --timestamp \
-            "$dmg_path"
-          xcrun notarytool submit "$dmg_path" \
-            --keychain-profile "open-maestri-notary" \
-            --wait --timeout 15m || { echo "::warning::DMG notarization failed or timed out"; exit 1; }
-          xcrun stapler staple -v "$dmg_path"
-
-          echo "notarized=true" >> "$GITHUB_OUTPUT"
-
-      # ── Sparkle EdDSA 签名 ───────────────────────────────────────────────
-      - name: Sign update with EdDSA (Sparkle)
-        id: sparkle_sign
-        env:
-          SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
-        run: |
-          sign_tool=".build/artifacts/sparkle/Sparkle/bin/sign_update"
-          VERSION="${{ steps.version.outputs.version }}"
-          zip_path="build/open-maestri-${VERSION}.zip"
-
-          if [[ -z "$SPARKLE_EDDSA_KEY" ]]; then
-            echo "::warning::SPARKLE_EDDSA_KEY not set — skipping appcast update"
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          if [[ ! -f "$sign_tool" ]]; then
-            echo "::warning::sign_update tool not found at $sign_tool — skipping"
-            echo "signed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          sign_output="$(echo "$SPARKLE_EDDSA_KEY" | "$sign_tool" "$zip_path" --ed-key-file -)"
-          ed_signature="$(echo "$sign_output" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')"
-          length="$(echo "$sign_output" | sed -n 's/.*length="\([^"]*\)".*/\1/p')"
-
-          echo "ed_signature=$ed_signature" >> "$GITHUB_OUTPUT"
-          echo "length=$length" >> "$GITHUB_OUTPUT"
-          echo "signed=true" >> "$GITHUB_OUTPUT"
-          echo "EdDSA signature: $ed_signature (length: $length)"
-
-      # ── 更新 appcast.xml ─────────────────────────────────────────────────
-      - name: Update appcast.xml
-        if: steps.sparkle_sign.outputs.signed == 'true'
-        run: |
-          bash scripts/update-appcast.sh \
-            "${{ steps.version.outputs.version }}" \
-            "${{ github.run_number }}" \
-            "${{ steps.sparkle_sign.outputs.ed_signature }}" \
-            "${{ steps.sparkle_sign.outputs.length }}"
-          cat appcast.xml
-
-      - name: Update appcast.xml via PR
-        if: steps.sparkle_sign.outputs.signed == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          branch="chore/appcast-v${{ steps.version.outputs.version }}"
-          cp appcast.xml /tmp/appcast.xml
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git checkout -f -b "$branch" origin/main
-          cp /tmp/appcast.xml appcast.xml
-          git add appcast.xml
-          git commit -m "chore: update appcast.xml for v${{ steps.version.outputs.version }}"
-          git push --force origin "$branch"
-          gh pr create \
-            --base main \
-            --head "$branch" \
-            --title "chore: update appcast.xml for v${{ steps.version.outputs.version }}" \
-            --body "Automated appcast.xml update from release workflow."
-          gh pr merge "$branch" --merge --admin --delete-branch
-
-      # ── 发布到 GitHub Releases ─────────────────────────────────────────────
       - name: Create GitHub Release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          gh release create "$GITHUB_REF_NAME" \
-            --title "open-maestri $GITHUB_REF_NAME" \
-            --generate-notes \
-            --notes-start-tag "$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo '')" \
-            --draft \
-            "build/open-maestri-${VERSION}.dmg#open-maestri.dmg (macOS)" \
-            "build/open-maestri-${VERSION}.zip#open-maestri.zip (macOS)"
-
-      - name: Append install instructions to release notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NOTARIZED: ${{ steps.notarize.outputs.notarized }}
-        run: |
-          existing="$(gh release view "$GITHUB_REF_NAME" --json body -q .body)"
-          if [[ "$NOTARIZED" == "true" ]]; then
-            install_note="> ✅ 本构建已通过 Apple 签名与公证，安装后可直接启动，不会触发 Gatekeeper 警告。"
-          else
-            install_note="> ⚠️ 本构建已签名但未完成公证。首次启动请右键点击应用 → **打开**，或在终端执行：\`xattr -dr com.apple.quarantine /Applications/open-maestri.app\`"
-          fi
-          gh release edit "$GITHUB_REF_NAME" --notes "$(cat <<EOF
-${existing}
-
----
-
-## 安装说明
-
-1. 下载 **open-maestri.dmg**，打开后将 **open-maestri** 拖入 **Applications**。
-2. 需要 **macOS 14.0+**。
-
-${install_note}
-EOF
-          )"
-
-      # ── 清理 Keychain ─────────────────────────────────────────────────────
-      - name: Cleanup keychain
-        if: always()
-        run: |
-          security delete-keychain "$RUNNER_TEMP/build.keychain-db" 2>/dev/null || true
+        uses: softprops/action-gh-release@v2
+        with:
+          name: open-maestri ${{ github.ref_name }}
+          files: |
+            build/open-maestri-${{ github.ref_name }}.dmg
+            build/open-maestri-${{ github.ref_name }}.zip
+          generate_release_notes: true
