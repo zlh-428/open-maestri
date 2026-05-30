@@ -2,10 +2,10 @@
 
 > 面向 macOS 的开源多智能体编排画布 —— 像管理团队一样管理 AI Agent，而不是一堆终端窗口。
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL%20v3-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey.svg)](https://developer.apple.com/macos/)
 [![Swift](https://img.shields.io/badge/swift-5.9-orange.svg)](https://swift.org)
-[![CI](https://github.com/your-org/open-maestri/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/open-maestri/actions)
+[![CI](https://github.com/zlh-428/open-maestri/actions/workflows/ci.yml/badge.svg)](https://github.com/zlh-428/open-maestri/actions)
 
 [English](README.md)
 
@@ -83,7 +83,7 @@ omaestri dismiss "Builder"
 
 | | open-maestri | Maestri |
 |---|---|---|
-| 许可证 | Apache 2.0（永久免费） | 专有软件（SetApp 订阅） |
+| 许可证 | GPL v3（永久免费） | 专有软件（SetApp 订阅） |
 | macOS 要求 | **14.0+（Sonoma）** | macOS 26.2+ |
 | 源码开放 | 是 | 否 |
 | 数据格式 | 完全兼容 | Maestri 私有格式 |
@@ -104,12 +104,12 @@ omaestri dismiss "Builder"
 
 ### 下载安装包（推荐）
 
-从 [GitHub Releases](https://github.com/your-org/open-maestri/releases) 下载最新签名 `.dmg`。
+从 [GitHub Releases](https://github.com/zlh-428/open-maestri/releases) 下载最新签名 `.dmg`。
 
 ### 从源码构建
 
 ```bash
-git clone https://github.com/your-org/open-maestri.git
+git clone https://github.com/zlh-428/open-maestri.git
 cd open-maestri
 
 # 使用 Swift Package Manager 构建
@@ -159,7 +159,7 @@ open-maestri/
 │   └── OpenMaestriTests/       # 单元测试与集成测试
 ├── Package.swift               # Swift Package Manager 配置
 ├── .github/workflows/ci.yml    # GitHub Actions CI
-└── LICENSE                     # Apache 2.0
+└── LICENSE                     # GPL v3.0
 ```
 
 ---
@@ -226,7 +226,7 @@ xcodebuild \
 
 ## 许可证
 
-Apache License 2.0 — 详见 [LICENSE](LICENSE) 文件。
+GNU General Public License v3.0 — 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
