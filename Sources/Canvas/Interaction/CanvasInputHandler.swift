@@ -377,6 +377,12 @@ extension CanvasViewportView {
     }
 
     override func magnify(with event: NSEvent) {
+        // 捏合开始：冻结所有终端 layout，防止 scaleEffect 的 CALayer transform 变化
+        // 触发 Metal drawable 重建导致闪烁（frozen 期间 terminalView.frame 保持旧尺寸）
+        if event.phase == .began {
+            setTerminalZoomFreeze(true)
+        }
+
         let newZoom = (zoom * (1 + event.magnification))
             .clamped(to: Constants.canvasMinZoom...Constants.canvasMaxZoom)
         let mouseScreen = convert(event.locationInWindow, from: nil)
@@ -394,5 +400,25 @@ extension CanvasViewportView {
         notifyViewportChanged()
         // 立即重渲染连线（不等 SwiftUI updateNSView 回路）
         onViewportPanned?()
+
+        // 捏合结束：解冻终端，触发一次防抖 resize 落地最终尺寸
+        if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+            setTerminalZoomFreeze(false)
+        }
+    }
+
+    /// 遍历当前所有终端节点，冻结或解冻其 MaestroTerminalView 的 layout。
+    private func setTerminalZoomFreeze(_ freeze: Bool) {
+        for node in currentNodes {
+            guard case .terminal = node.content,
+                  let provider = TerminalManager.shared.providers[node.id],
+                  let maestroView = provider.terminalView?.superview as? MaestroTerminalView
+            else { continue }
+            if freeze {
+                maestroView.freezeForZoom()
+            } else {
+                maestroView.unfreezeAfterZoom()
+            }
+        }
     }
 }

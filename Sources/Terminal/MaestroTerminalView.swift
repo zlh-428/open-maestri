@@ -22,6 +22,12 @@ final class MaestroTerminalView: NSView {
     /// true = terminalView 首次出现在 layout 中，跳过防抖直接同步
     private var isInitialLayout: Bool = true
 
+    /// 画布缩放期间冻结 layout，防止 scaleEffect 的 CALayer transform 变化
+    /// 触发 Metal drawable 重建导致终端内容闪烁。
+    /// 冻结期间 layout() 跳过所有 terminalView.frame 修改；
+    /// unfreezeAfterZoom() 解冻后立即同步一次 frame。
+    private(set) var isFrozenForZoom: Bool = false
+
     init(terminalId: UUID, frame: NSRect = .zero) {
         self.terminalId = terminalId
         super.init(frame: frame)
@@ -136,6 +142,14 @@ extension MaestroTerminalView {
             return
         }
 
+        // 画布缩放期间：冻结 terminalView.frame，让 scaleEffect 做纯视觉拉伸。
+        // Metal layer 不感知 bounds 变化，不触发 drawable 重建，消除闪烁。
+        // unfreezeAfterZoom() 会在缩放结束后同步一次正确 frame。
+        if isFrozenForZoom {
+            pendingBounds = newBounds
+            return
+        }
+
         // bounds 正在变化（resize 拖拽中）：使用防抖，避免每帧触发 SwiftTerm reflow。
         // 先把终端子视图锁定在旧尺寸（内容稳定不闪烁），200ms 静默后才真正 resize。
         pendingBounds = newBounds
@@ -155,6 +169,31 @@ extension MaestroTerminalView {
         // resize 真正落地前先快照 scrollback，防止 reflow 破坏 buffer
         TerminalManager.shared.providers[terminalId]?.snapshotScrollbackBeforeResize()
         tv.frame = pendingBounds
+    }
+
+    // MARK: - 缩放冻结 / 解冻
+
+    /// 画布捏合缩放开始时调用：冻结 terminalView frame，阻止 Metal drawable 重建。
+    func freezeForZoom() {
+        guard !isFrozenForZoom else { return }
+        isFrozenForZoom = true
+        // 取消 resize 防抖任务，缩放结束后由 unfreezeAfterZoom 统一处理
+        resizeDebounceTask?.cancel()
+        resizeDebounceTask = nil
+    }
+
+    /// 画布捏合缩放结束时调用：解冻并立即同步一次正确 frame（带防抖，避免 reflow）。
+    func unfreezeAfterZoom() {
+        guard isFrozenForZoom else { return }
+        isFrozenForZoom = false
+        guard pendingBounds.size != .zero else { return }
+        // 用 200ms 防抖落地最终 frame（与 resize 拖拽结束行为一致）
+        resizeDebounceTask?.cancel()
+        resizeDebounceTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(200))
+            guard !Task.isCancelled, let self else { return }
+            self.commitResize()
+        }
     }
 }
 
