@@ -79,14 +79,14 @@ struct CanvasToolbar: View {
                         toggleDrawingTool("portal")
                     }
 
-                    // 7. 格式（文本标签）
-                    FloatingToolButton(
-                        icon: "textformat",
-                        tooltip: "canvas.toolbar.format".localized,
-                        isActive: activeDrawingTool == "text"
-                    ) {
-                        toggleDrawingTool("text")
-                    }
+                    // TODO: Text Label 工具 — 暂时隐藏，待后续迭代实现文本标签节点的完整交互和样式
+                    // FloatingToolButton(
+                    //     icon: "textformat",
+                    //     tooltip: "canvas.toolbar.format".localized,
+                    //     isActive: activeDrawingTool == "text"
+                    // ) {
+                    //     toggleDrawingTool("text")
+                    // }
 
                     // 8. 图形工具（矩形）
                     FloatingToolButton(
