@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussion / Question
+    url: https://github.com/zlh-428/open-maestri/discussions
+    about: For general questions, ideas, or show-and-tell — use Discussions instead of Issues.
