@@ -69,7 +69,7 @@ git push origin main --tags
 
 ```bash
 # Produces build/open-maestri.app (ad-hoc signed, Sparkle bundled)
-bash build-maestri.sh
+bash scripts/build-maestri.sh
 
 # Package as DMG (requires create-dmg or hdiutil)
 # Option A — hdiutil (built-in, no extras needed)
@@ -252,7 +252,7 @@ Both assets contain the same `.app` bundle.
 
 ## Code Signing Notes
 
-The `build-maestri.sh` script signs the app **ad-hoc** (`--sign -`). This means:
+The `scripts/build-maestri.sh` script signs the app **ad-hoc** (`--sign -`). This means:
 
 - The app runs on any Mac without requiring an Apple Developer account.
 - macOS Gatekeeper will show a warning on first launch on other machines — users must right-click → Open to bypass it.
@@ -261,7 +261,7 @@ The `build-maestri.sh` script signs the app **ad-hoc** (`--sign -`). This means:
 To distribute notarized builds in the future:
 
 1. Obtain an Apple Developer account and a Developer ID Application certificate.
-2. Replace `--sign -` with `--sign "Developer ID Application: Your Name (TEAMID)"` in `build-maestri.sh`.
+2. Replace `--sign -` with `--sign "Developer ID Application: Your Name (TEAMID)"` in `scripts/build-maestri.sh`.
 3. Submit the `.dmg` to Apple notarization: `xcrun notarytool submit ...`
 4. Staple the ticket: `xcrun stapler staple build/open-maestri-1.2.0.dmg`
 
@@ -269,7 +269,7 @@ To distribute notarized builds in the future:
 
 ## Build Script Reference
 
-`build-maestri.sh` performs the following steps automatically:
+`scripts/build-maestri.sh` performs the following steps automatically:
 
 1. `swift build -c release` — main app (host architecture)
 2. Builds `omaestri` CLI as a Universal Binary (arm64 + x86_64 via `lipo`)
@@ -280,8 +280,8 @@ To distribute notarized builds in the future:
 **Options:**
 
 ```bash
-bash build-maestri.sh           # build only
-bash build-maestri.sh --launch  # build then open the app
+bash scripts/build-maestri.sh           # build only
+bash scripts/build-maestri.sh --launch  # build then open the app
 ```
 
 Output: `build/open-maestri.app`

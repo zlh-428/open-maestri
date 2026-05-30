@@ -53,13 +53,13 @@ The dev script assembles a temporary `.app` bundle at `/tmp/maestri-app-build/op
 ### Release Build (Packaged .app)
 
 ```bash
-bash build-maestri.sh
+bash scripts/build-maestri.sh
 ```
 
 Produces `build/open-maestri.app`. To launch immediately after packaging:
 
 ```bash
-bash build-maestri.sh --launch
+bash scripts/build-maestri.sh --launch
 ```
 
 ---

@@ -29,21 +29,10 @@ jobs:
         run: swift test
 
       - name: Build Release App
-        run: bash build-maestri.sh
+        run: bash scripts/build-maestri.sh
 
       - name: Create DMG
-        run: |
-          STAGING="build/dmg-staging"
-          mkdir -p "$STAGING"
-          cp -R build/open-maestri.app "$STAGING/"
-          ln -s /Applications "$STAGING/Applications"
-          hdiutil create \
-            -volname "Open Maestri" \
-            -srcfolder "$STAGING" \
-            -ov \
-            -format UDZO \
-            "build/Open.Maestri.dmg"
-          rm -rf "$STAGING"
+        run: bash scripts/create-dmg.sh
 
       - name: Zip App Bundle
         run: |

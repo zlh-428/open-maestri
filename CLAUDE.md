@@ -32,7 +32,7 @@ swift test
 swift test --filter OpenMaestriTests.WorkspaceManagerTests/testCreateWorkspace
 
 # 打包 .app（ad-hoc 签名）
-bash build-maestri.sh
+bash scripts/build-maestri.sh
 ```
 
 Package.swift 包含 3 个 target：`open-maestri`（主应用）、`omaestri`（CLI 工具）、`OpenMaestriTests`（测试）。

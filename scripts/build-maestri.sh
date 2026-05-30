@@ -1,11 +1,11 @@
 #!/bin/bash
 # build-maestri.sh — 本地 Release 打包脚本
-# 用法：bash build-maestri.sh [--launch]
+# 用法：bash scripts/build-maestri.sh [--launch]
 #   --launch   打包完成后自动启动 App
 
 set -euo pipefail
 
-PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 HOST_BUILD_DIR="$(cd "$PROJECT_DIR" && swift build --show-bin-path -c release 2>/dev/null)"
 BUILD_DIR="$PROJECT_DIR/.build/release"
 EXEC="$HOST_BUILD_DIR/open-maestri"
