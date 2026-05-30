@@ -141,7 +141,7 @@ xcodebuild -version
 克隆后 SPM 会自动解析依赖（SwiftTerm、Sparkle）：
 
 ```bash
-git clone https://github.com/your-org/open-maestri.git
+git clone https://github.com/zlh-428/open-maestri.git
 cd open-maestri
 ```
 

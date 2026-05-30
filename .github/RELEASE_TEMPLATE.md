@@ -60,5 +60,5 @@ Replace the existing app in **Applications** with the new version. Workspaces an
 
 ---
 
-*For issues or feedback, please open a GitHub issue at [your-org/open-maestri](https://github.com/your-org/open-maestri/issues).*
-*如有问题或反馈，请在 [your-org/open-maestri](https://github.com/your-org/open-maestri/issues) 提交 GitHub Issue。*
+*For issues or feedback, please open a GitHub issue at [zlh-428/open-maestri](https://github.com/zlh-428/open-maestri/issues).*
+*如有问题或反馈，请在 [zlh-428/open-maestri](https://github.com/zlh-428/open-maestri/issues) 提交 GitHub Issue。*

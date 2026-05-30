@@ -144,7 +144,7 @@ xcodebuild -version
 Clone and let SPM resolve dependencies automatically (SwiftTerm, Sparkle):
 
 ```bash
-git clone https://github.com/your-org/open-maestri.git
+git clone https://github.com/zlh-428/open-maestri.git
 cd open-maestri
 ```
 
