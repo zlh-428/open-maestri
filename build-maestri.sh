@@ -126,14 +126,27 @@ for dylib in "$BUILD_DIR"/*.dylib; do
   [ -f "$dylib" ] && cp "$dylib" "$APP_BUNDLE/Contents/Frameworks/" || true
 done
 
-echo "▶ Code signing (ad-hoc)..."
+echo "▶ Code signing..."
 ENTITLEMENTS="$PROJECT_DIR/Sources/open-maestri.entitlements"
+
+# 优先使用环境变量传入的 Developer ID（CI 公证签名）
+# 本地开发未设置时，回退到 ad-hoc 签名
+CODESIGN_IDENTITY="${CODESIGN_IDENTITY:-}"
+
+if [ -n "$CODESIGN_IDENTITY" ]; then
+  echo "  Using Developer ID: $CODESIGN_IDENTITY"
+  SIGN_FLAGS=(--force --deep --sign "$CODESIGN_IDENTITY" --options runtime --timestamp)
+else
+  echo "  No CODESIGN_IDENTITY set — using ad-hoc signing (local dev only)"
+  SIGN_FLAGS=(--force --deep --sign -)
+fi
+
 if [ -f "$ENTITLEMENTS" ]; then
-  codesign --force --deep --sign - \
+  codesign "${SIGN_FLAGS[@]}" \
     --entitlements "$ENTITLEMENTS" \
     "$APP_BUNDLE"
 else
-  codesign --force --deep --sign - "$APP_BUNDLE"
+  codesign "${SIGN_FLAGS[@]}" "$APP_BUNDLE"
 fi
 
 SIZE=$(du -sh "$APP_BUNDLE" | cut -f1)
