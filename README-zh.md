@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/home.png" alt="open-maestri canvas" width="760">
+  <img src="Sources/Assets.xcassets/AppIcon.appiconset/icon_512x512@2x.png" alt="open-maestri canvas" width="50">
 </p>
 
 <h1 align="center">open-maestri</h1>
